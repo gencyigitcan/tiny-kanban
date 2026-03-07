@@ -192,6 +192,10 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
+                            <label class="form-label">Başlangıç Tarihi</label>
+                            <input class="form-input" type="date" id="cardStart">
+                        </div>
+                        <div class="form-group">
                             <label class="form-label">Bitiş Tarihi</label>
                             <input class="form-input" type="date" id="cardDue">
                         </div>
@@ -382,6 +386,7 @@
             document.getElementById('cardPriority').value = card?.priority || 'medium';
             document.getElementById('cardColumn').value = card?.col || 'todo';
             document.getElementById('cardSP').value = card?.storyPoints ?? '';
+            document.getElementById('cardStart').value = card?.startDate || '';
             document.getElementById('cardDue').value = card?.dueDate || '';
 
             // Epics dropdown
@@ -467,6 +472,7 @@
                 priority: document.getElementById('cardPriority').value,
                 col: document.getElementById('cardColumn').value,
                 storyPoints: document.getElementById('cardSP').value ? Number(document.getElementById('cardSP').value) : null,
+                startDate: document.getElementById('cardStart').value || null,
                 dueDate: document.getElementById('cardDue').value || null,
                 epicId: document.getElementById('cardEpic').value || null,
                 sprintId: document.getElementById('cardSprint').value || null,

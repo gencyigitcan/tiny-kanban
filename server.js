@@ -42,7 +42,7 @@ app.get('/api/cards', (req, res) => res.json(readData().cards));
 
 app.post('/api/cards', (req, res) => {
   const { title, desc, assignee, priority, col,
-    dueDate, labels, storyPoints, subtasks, epicId, sprintId } = req.body;
+    startDate, dueDate, labels, storyPoints, subtasks, epicId, sprintId } = req.body;
   if (!title?.trim()) return res.status(400).json({ error: 'Title required' });
   const data = readData();
   const card = {
@@ -52,6 +52,7 @@ app.post('/api/cards', (req, res) => {
     assignee: (assignee || '').trim(),
     priority: priority || 'medium',
     col: col || 'todo',
+    startDate: startDate || null,
     dueDate: dueDate || null,
     labels: Array.isArray(labels) ? labels : [],
     storyPoints: storyPoints ? Number(storyPoints) : null,
@@ -71,7 +72,7 @@ app.put('/api/cards/:id', (req, res) => {
   const idx = data.cards.findIndex(c => c.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Card not found' });
   const allowed = ['title', 'desc', 'assignee', 'priority', 'col',
-    'dueDate', 'labels', 'storyPoints', 'subtasks', 'comments', 'epicId', 'sprintId'];
+    'startDate', 'dueDate', 'labels', 'storyPoints', 'subtasks', 'comments', 'epicId', 'sprintId'];
   allowed.forEach(k => { if (req.body[k] !== undefined) data.cards[idx][k] = req.body[k]; });
   writeData(data);
   res.json(data.cards[idx]);
