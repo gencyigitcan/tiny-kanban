@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tiny Kanban – My Board</title>
-    <meta name="description" content="Kişisel proje takip panom">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
@@ -13,7 +12,7 @@
 
 <body>
 
-    <!-- NAV -->
+    <!-- TOP NAV -->
     <nav class="topnav">
         <a class="topnav-link active" href="/board.html">📋 My Board</a>
         <div class="topnav-sep"></div>
@@ -25,14 +24,12 @@
         <div class="header-brand">
             <div class="header-logo">K</div>
             <span class="header-title">My Board</span>
-            <span class="header-subtitle">Kişisel</span>
+            <span class="header-subtitle" id="sprintBadge">—</span>
         </div>
-
         <div class="header-search">
             <span class="search-icon">🔍</span>
-            <input type="text" id="searchInput" placeholder="Kart ara… (başlık, açıklama, kişi)" autocomplete="off">
+            <input type="text" id="searchInput" placeholder="Kart ara…" autocomplete="off">
         </div>
-
         <div class="header-filters">
             <select class="filter-select" id="filterAssignee">
                 <option value="">Tüm kişiler</option>
@@ -44,139 +41,261 @@
                 <option value="low">🟢 Düşük</option>
             </select>
         </div>
-
         <div class="header-actions">
-            <button class="btn btn-primary" id="addTaskBtn">
-                <span>✚</span><span class="label">Yeni Görev</span>
-            </button>
-            <button class="btn btn-danger" id="clearBtn">
-                <span>🗑</span><span class="label">Temizle</span>
-            </button>
+            <button class="btn btn-primary" id="addTaskBtn">✚ <span class="label">Yeni Görev</span></button>
+            <button class="btn btn-secondary" id="manageEpicsBtn">🏷 <span class="label">Epics</span></button>
+            <button class="btn btn-secondary" id="manageSprintsBtn">⚡ <span class="label">Sprints</span></button>
+            <button class="btn btn-danger" id="clearBtn">🗑 <span class="label">Temizle</span></button>
         </div>
     </header>
 
-    <!-- BOARD -->
-    <main class="board-wrap" id="board">
+    <!-- VIEW TABS -->
+    <div class="view-tabs">
+        <button class="view-tab active" data-view="board">📋 Board</button>
+        <button class="view-tab" data-view="list">☰ Liste</button>
+        <button class="view-tab" data-view="backlog">📦 Backlog</button>
+        <button class="view-tab" data-view="dashboard">📊 Dashboard</button>
+        <button class="view-tab" data-view="gantt">📅 Gantt</button>
+    </div>
 
-        <!-- TODO -->
-        <section class="column" data-col="todo">
-            <div class="col-header">
-                <div class="col-header-top">
-                    <div class="col-title-wrap">
-                        <span class="col-dot"></span>
-                        <span class="col-title">Yapılacak</span>
+    <!-- BOARD VIEW -->
+    <div class="view-container active" id="view-board">
+        <main class="board-wrap">
+            <section class="column" data-col="todo">
+                <div class="col-header">
+                    <div class="col-header-top">
+                        <div class="col-title-wrap"><span class="col-dot"></span><span
+                                class="col-title">Yapılacak</span></div>
+                        <span class="col-count" data-count="todo">0</span>
                     </div>
-                    <span class="col-count" data-count="todo">0</span>
+                    <div class="wip-badge">Limit yok</div>
                 </div>
-                <div class="wip-badge">Limit yok</div>
-            </div>
-            <div class="col-body" id="col-todo" data-col="todo" ondragover="onDragOver(event)" ondrop="onDrop(event)"
-                ondragleave="onDragLeave(event)">
-                <div class="empty-state">
-                    <div class="empty-icon">📋</div>
-                    <div>Görev yok</div>
-                    <div>Eklemek için <kbd>N</kbd> bas</div>
-                </div>
-            </div>
-            <div class="quick-add">
-                <input class="quick-add-input" type="text" placeholder="+ Hızlı ekle (Enter ile onayla)"
-                    data-col="todo">
-            </div>
-        </section>
-
-        <!-- DOING -->
-        <section class="column" data-col="doing">
-            <div class="col-header">
-                <div class="col-header-top">
-                    <div class="col-title-wrap">
-                        <span class="col-dot"></span>
-                        <span class="col-title">Yapılıyor</span>
+                <div class="col-body" id="col-todo" data-col="todo" ondragover="onDragOver(event)"
+                    ondrop="onDrop(event)" ondragleave="onDragLeave(event)">
+                    <div class="empty-state">
+                        <div class="empty-icon">📋</div>
+                        <div>Görev yok — <kbd>N</kbd> ile ekle</div>
                     </div>
-                    <span class="col-count" data-count="doing">0</span>
                 </div>
-                <div class="wip-badge">Limit yok</div>
-            </div>
-            <div class="col-body" id="col-doing" data-col="doing" ondragover="onDragOver(event)" ondrop="onDrop(event)"
-                ondragleave="onDragLeave(event)">
-                <div class="empty-state">
-                    <div class="empty-icon">⚡</div>
-                    <div>Devam eden görev yok</div>
-                </div>
-            </div>
-            <div class="quick-add">
-                <input class="quick-add-input" type="text" placeholder="+ Hızlı ekle (Enter ile onayla)"
-                    data-col="doing">
-            </div>
-        </section>
-
-        <!-- DONE -->
-        <section class="column" data-col="done">
-            <div class="col-header">
-                <div class="col-header-top">
-                    <div class="col-title-wrap">
-                        <span class="col-dot"></span>
-                        <span class="col-title">Tamamlandı</span>
+                <div class="quick-add"><input class="quick-add-input" type="text" placeholder="+ Hızlı ekle (Enter)"
+                        data-col="todo"></div>
+            </section>
+            <section class="column" data-col="doing">
+                <div class="col-header">
+                    <div class="col-header-top">
+                        <div class="col-title-wrap"><span class="col-dot"></span><span
+                                class="col-title">Yapılıyor</span></div>
+                        <span class="col-count" data-count="doing">0</span>
                     </div>
-                    <span class="col-count" data-count="done">0</span>
+                    <div class="wip-badge">Limit yok</div>
                 </div>
-                <div class="wip-badge">Limit yok</div>
-            </div>
-            <div class="col-body" id="col-done" data-col="done" ondragover="onDragOver(event)" ondrop="onDrop(event)"
-                ondragleave="onDragLeave(event)">
-                <div class="empty-state">
-                    <div class="empty-icon">✅</div>
-                    <div>Tamamlanan görevler burada görünür</div>
+                <div class="col-body" id="col-doing" data-col="doing" ondragover="onDragOver(event)"
+                    ondrop="onDrop(event)" ondragleave="onDragLeave(event)">
+                    <div class="empty-state">
+                        <div class="empty-icon">⚡</div>
+                        <div>Devam eden yok</div>
+                    </div>
                 </div>
-            </div>
-            <div class="quick-add">
-                <input class="quick-add-input" type="text" placeholder="+ Hızlı ekle (Enter ile onayla)"
-                    data-col="done">
-            </div>
-        </section>
+                <div class="quick-add"><input class="quick-add-input" type="text" placeholder="+ Hızlı ekle (Enter)"
+                        data-col="doing"></div>
+            </section>
+            <section class="column" data-col="done">
+                <div class="col-header">
+                    <div class="col-header-top">
+                        <div class="col-title-wrap"><span class="col-dot"></span><span
+                                class="col-title">Tamamlandı</span></div>
+                        <span class="col-count" data-count="done">0</span>
+                    </div>
+                    <div class="wip-badge">Limit yok</div>
+                </div>
+                <div class="col-body" id="col-done" data-col="done" ondragover="onDragOver(event)"
+                    ondrop="onDrop(event)" ondragleave="onDragLeave(event)">
+                    <div class="empty-state">
+                        <div class="empty-icon">✅</div>
+                        <div>Tamamlanan görevler burada</div>
+                    </div>
+                </div>
+                <div class="quick-add"><input class="quick-add-input" type="text" placeholder="+ Hızlı ekle (Enter)"
+                        data-col="done"></div>
+            </section>
+        </main>
+    </div>
 
-    </main>
+    <!-- LIST VIEW -->
+    <div class="view-container" id="view-list">
+        <div id="listView"></div>
+    </div>
 
-    <!-- ADD / EDIT MODAL -->
-    <div class="modal-overlay" id="modalOverlay">
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-            <h2 class="modal-title" id="modalTitle">Yeni Görev</h2>
-            <form id="cardForm" autocomplete="off">
-                <input type="hidden" id="editCardId">
-                <div class="form-group">
-                    <label class="form-label" for="cardTitle">Başlık <span style="color:var(--danger)">*</span></label>
-                    <input class="form-input" type="text" id="cardTitle" placeholder="ör. Login bug düzelt" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="cardDesc">Açıklama</label>
-                    <textarea class="form-textarea" id="cardDesc" placeholder="İsteğe bağlı detaylar…"></textarea>
-                </div>
-                <div class="form-row">
+    <!-- BACKLOG VIEW -->
+    <div class="view-container" id="view-backlog">
+        <div id="backlogView"></div>
+    </div>
+
+    <!-- DASHBOARD VIEW -->
+    <div class="view-container" id="view-dashboard">
+        <div id="dashboardView"></div>
+    </div>
+
+    <!-- GANTT VIEW -->
+    <div class="view-container" id="view-gantt">
+        <div id="ganttView"></div>
+    </div>
+
+    <!-- ============================================================
+     CARD DETAIL MODAL
+     ============================================================ -->
+    <div class="modal-overlay" id="cardModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title" id="cardModalTitle">Görev Detayı</h2>
+                <button class="modal-close" id="cardModalClose">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="cardForm" autocomplete="off">
+                    <input type="hidden" id="editCardId">
                     <div class="form-group">
-                        <label class="form-label" for="cardAssignee">Kişi</label>
-                        <input class="form-input" type="text" id="cardAssignee" placeholder="ör. Ali">
+                        <label class="form-label">Başlık <span style="color:var(--danger)">*</span></label>
+                        <input class="form-input" type="text" id="cardTitle" placeholder="ör. Login bug düzelt"
+                            required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="cardPriority">Öncelik</label>
-                        <select class="form-select" id="cardPriority">
-                            <option value="medium">🟠 Orta</option>
-                            <option value="high">🔴 Yüksek</option>
-                            <option value="low">🟢 Düşük</option>
+                        <label class="form-label">Açıklama</label>
+                        <textarea class="form-textarea" id="cardDesc" placeholder="Detaylar…"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Kişi</label>
+                            <input class="form-input" type="text" id="cardAssignee" placeholder="ör. Ali">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Öncelik</label>
+                            <select class="form-select" id="cardPriority">
+                                <option value="medium">🟠 Orta</option>
+                                <option value="high">🔴 Yüksek</option>
+                                <option value="low">🟢 Düşük</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Kolon</label>
+                            <select class="form-select" id="cardColumn">
+                                <option value="todo">Yapılacak</option>
+                                <option value="doing">Yapılıyor</option>
+                                <option value="done">Tamamlandı</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Story Points</label>
+                            <input class="form-input" type="number" id="cardSP" min="0" max="100" placeholder="ör. 5">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Bitiş Tarihi</label>
+                            <input class="form-input" type="date" id="cardDue">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Epic</label>
+                            <select class="form-select" id="cardEpic">
+                                <option value="">— Epic seç —</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Sprint</label>
+                        <select class="form-select" id="cardSprint">
+                            <option value="">— Sprint seç —</option>
                         </select>
                     </div>
+
+                    <!-- Labels -->
+                    <div class="form-group">
+                        <label class="form-label">Etiketler</label>
+                        <div class="labels-grid" id="labelsGrid"></div>
+                    </div>
+
+                    <!-- Subtasks -->
+                    <div class="form-group">
+                        <label class="form-label">Alt Görevler</label>
+                        <div class="subtasks-list" id="subtasksList"></div>
+                        <div class="add-subtask-row">
+                            <input class="add-subtask-input" type="text" id="newSubtask" placeholder="Alt görev ekle…">
+                            <button type="button" class="btn btn-secondary btn-sm" id="addSubtaskBtn">Ekle</button>
+                        </div>
+                    </div>
+
+                    <!-- Comments -->
+                    <div class="form-group" id="commentsSection" style="display:none">
+                        <label class="form-label">Yorumlar</label>
+                        <div class="comments-list" id="commentsList"></div>
+                        <div class="add-comment-row">
+                            <textarea class="add-comment-input" id="newComment" rows="2"
+                                placeholder="Yorum ekle…"></textarea>
+                            <button type="button" class="btn btn-secondary btn-sm" id="addCommentBtn"
+                                style="align-self:flex-end">Gönder</button>
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger btn-sm" id="deleteCardBtn" style="margin-right:auto">🗑
+                    Sil</button>
+                <button type="button" class="btn btn-secondary" id="cardCancelBtn">İptal</button>
+                <button type="button" class="btn btn-primary" id="cardSaveBtn">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+     EPIC MANAGER MODAL
+     ============================================================ -->
+    <div class="modal-overlay" id="epicModal">
+        <div class="modal" style="max-width:460px">
+            <div class="modal-header">
+                <h2 class="modal-title">🏷 Epic Yönetimi</h2>
+                <button class="modal-close" onclick="closeModal('epicModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="manager-list" id="epicList"></div>
+                <div class="form-row" style="margin-top:16px">
+                    <input class="form-input" type="text" id="newEpicName" placeholder="Epic adı…">
+                    <input class="form-input" type="color" id="newEpicColor" value="#6366f1"
+                        style="width:48px;padding:4px 6px;cursor:pointer">
+                    <button class="btn btn-primary btn-sm" id="addEpicBtn">Ekle</button>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="cardColumn">Kolon</label>
-                    <select class="form-select" id="cardColumn">
-                        <option value="todo">Yapılacak</option>
-                        <option value="doing">Yapılıyor</option>
-                        <option value="done">Tamamlandı</option>
-                    </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+     SPRINT MANAGER MODAL
+     ============================================================ -->
+    <div class="modal-overlay" id="sprintModal">
+        <div class="modal" style="max-width:460px">
+            <div class="modal-header">
+                <h2 class="modal-title">⚡ Sprint Yönetimi</h2>
+                <button class="modal-close" onclick="closeModal('sprintModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="manager-list" id="sprintList"></div>
+                <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+                    <input class="form-input" type="text" id="newSprintName" placeholder="Sprint adı… (ör. Sprint 1)">
+                    <div class="form-row">
+                        <div class="form-group" style="margin:0">
+                            <label class="form-label" style="font-size:11px">Başlangıç</label>
+                            <input class="form-input" type="date" id="newSprintStart">
+                        </div>
+                        <div class="form-group" style="margin:0">
+                            <label class="form-label" style="font-size:11px">Bitiş</label>
+                            <input class="form-input" type="date" id="newSprintEnd">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="addSprintBtn" style="align-self:flex-start">Sprint
+                        Ekle</button>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="cancelBtn">İptal</button>
-                    <button type="submit" class="btn btn-primary" id="saveBtn">Kaydet</button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 
@@ -186,17 +305,49 @@
     <script src="/js/board.js"></script>
     <script src="/js/api.js"></script>
     <script>
-        // ── State ─────────────────────────────────────────────────
+        // ── App state ──────────────────────────────────────────────
         let cards = [];
+        let epics = [];
+        let sprints = [];
+        let currentView = 'board';
 
-        async function loadCards() {
+        // ── Boot ──────────────────────────────────────────────────
+        async function boot() {
             try {
-                cards = await API.getCards();
-                renderBoard(cards);
-            } catch (e) {
-                showToast('Sunucuya bağlanılamadı', 'error');
-            }
+                [cards, epics, sprints] = await Promise.all([API.getCards(), API.getEpics(), API.getSprints()]);
+                renderAll();
+            } catch { showToast('Sunucuya bağlanılamadı', 'error'); }
         }
+
+        function renderAll() {
+            renderBoard(cards, epics);
+            if (currentView === 'list') renderListView(cards, epics);
+            if (currentView === 'backlog') renderBacklogView(cards, sprints, epics);
+            if (currentView === 'dashboard') renderDashboard(cards, epics, sprints);
+            if (currentView === 'gantt') renderGantt(cards);
+            updateSprintBadge();
+        }
+
+        function updateSprintBadge() {
+            const active = sprints.find(s => s.active);
+            const el = document.getElementById('sprintBadge');
+            if (el) el.textContent = active ? `🟢 ${active.name}` : 'Sprint yok';
+        }
+
+        // ── View switcher ─────────────────────────────────────────
+        document.querySelectorAll('.view-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentView = btn.dataset.view;
+                document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.view-container').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('view-' + currentView).classList.add('active');
+                if (currentView === 'list') renderListView(cards, epics);
+                if (currentView === 'backlog') renderBacklogView(cards, sprints, epics);
+                if (currentView === 'dashboard') renderDashboard(cards, epics, sprints);
+                if (currentView === 'gantt') renderGantt(cards);
+            });
+        });
 
         // ── Drag & Drop (server mode) ─────────────────────────────
         async function onDrop(e) {
@@ -209,79 +360,152 @@
             const card = cards.find(c => c.id === dragId);
             if (!card || card.col === toCol) { dragId = null; return; }
             try {
-                const updated = await API.updateCard(dragId, { col: toCol });
-                const idx = cards.findIndex(c => c.id === dragId);
-                if (idx !== -1) cards[idx] = updated;
-                renderBoard(cards);
+                const upd = await API.updateCard(dragId, { col: toCol });
+                Object.assign(card, upd);
+                renderAll();
             } catch { showToast('Taşıma başarısız', 'error'); }
             dragId = null;
         }
 
-        // ── Modal ─────────────────────────────────────────────────
-        const overlay = document.getElementById('modalOverlay');
-        const form = document.getElementById('cardForm');
+        // ── Card Detail Modal ─────────────────────────────────────
+        let _editSubtasks = [];
+        let _editComments = [];
 
-        function openModal(opts = {}) {
-            document.getElementById('modalTitle').textContent = opts.title || 'Yeni Görev';
-            document.getElementById('editCardId').value = opts.id || '';
-            document.getElementById('cardTitle').value = opts.cardTitle || '';
-            document.getElementById('cardDesc').value = opts.cardDesc || '';
-            document.getElementById('cardAssignee').value = opts.cardAssignee || '';
-            document.getElementById('cardPriority').value = opts.cardPriority || 'medium';
-            document.getElementById('cardColumn').value = opts.cardColumn || 'todo';
-            overlay.classList.add('open');
+        function openCardDetail(id) {
+            const isNew = !id;
+            const card = isNew ? null : cards.find(c => c.id === id);
+            document.getElementById('cardModalTitle').textContent = isNew ? 'Yeni Görev' : 'Görevi Düzenle';
+            document.getElementById('editCardId').value = id || '';
+            document.getElementById('cardTitle').value = card?.title || '';
+            document.getElementById('cardDesc').value = card?.desc || '';
+            document.getElementById('cardAssignee').value = card?.assignee || '';
+            document.getElementById('cardPriority').value = card?.priority || 'medium';
+            document.getElementById('cardColumn').value = card?.col || 'todo';
+            document.getElementById('cardSP').value = card?.storyPoints ?? '';
+            document.getElementById('cardDue').value = card?.dueDate || '';
+
+            // Epics dropdown
+            const epicSel = document.getElementById('cardEpic');
+            epicSel.innerHTML = '<option value="">— Epic seç —</option>' +
+                epics.map(e => `<option value="${e.id}" ${card?.epicId === e.id ? 'selected' : ''}>${escHtml(e.name)}</option>`).join('');
+
+            // Sprints dropdown
+            const sprintSel = document.getElementById('cardSprint');
+            sprintSel.innerHTML = '<option value="">— Sprint seç —</option>' +
+                sprints.map(s => `<option value="${s.id}" ${card?.sprintId === s.id ? 'selected' : ''}>${escHtml(s.name)}</option>`).join('');
+
+            // Labels
+            const selectedLabels = new Set(card?.labels || []);
+            document.getElementById('labelsGrid').innerHTML = LABELS.map(l =>
+                `<div class="label-chip${selectedLabels.has(l.id) ? ' selected' : ''}" style="background:${l.bg};color:${l.color}" data-lid="${l.id}" onclick="toggleLabel(this)">${escHtml(l.name)}</div>`
+            ).join('');
+
+            // Subtasks
+            _editSubtasks = JSON.parse(JSON.stringify(card?.subtasks || []));
+            _editComments = JSON.parse(JSON.stringify(card?.comments || []));
+            renderSubtasksList();
+            renderCommentsList();
+            document.getElementById('commentsSection').style.display = id ? 'block' : 'none';
+            document.getElementById('deleteCardBtn').style.display = id ? 'inline-flex' : 'none';
+            document.getElementById('newSubtask').value = '';
+            document.getElementById('newComment').value = '';
+            openModal('cardModal');
             document.getElementById('cardTitle').focus();
         }
-        function closeModal() { overlay.classList.remove('open'); form.reset(); }
 
-        function openEdit(id) {
-            const card = cards.find(c => c.id === id);
-            if (!card) return;
-            openModal({
-                title: 'Görevi Düzenle', id: card.id, cardTitle: card.title,
-                cardDesc: card.desc, cardAssignee: card.assignee, cardPriority: card.priority, cardColumn: card.col
-            });
+        function toggleLabel(el) {
+            el.classList.toggle('selected');
         }
 
-        async function doDelete(id) {
-            const card = cards.find(c => c.id === id);
-            if (!card || !confirm(`"${card.title}" silinsin mi?`)) return;
-            try {
-                await API.deleteCard(id);
-                cards = cards.filter(c => c.id !== id);
-                renderBoard(cards);
-                showToast('Görev silindi');
-            } catch { showToast('Silme başarısız', 'error'); }
+        function renderSubtasksList() {
+            document.getElementById('subtasksList').innerHTML = _editSubtasks.map((st, i) => `
+    <div class="subtask-row">
+      <input class="subtask-check" type="checkbox" ${st.done ? 'checked' : ''} onchange="_editSubtasks[${i}].done=this.checked;renderSubtasksList()">
+      <span class="subtask-text${st.done ? ' done-text' : ''}">${escHtml(st.text)}</span>
+      <button type="button" class="subtask-del" onclick="_editSubtasks.splice(${i},1);renderSubtasksList()">✕</button>
+    </div>`).join('');
         }
 
-        form.addEventListener('submit', async e => {
-            e.preventDefault();
+        function renderCommentsList() {
+            document.getElementById('commentsList').innerHTML = _editComments.map(c => `
+    <div class="comment-row">
+      <div class="comment-meta">${new Date(c.createdAt).toLocaleString('tr-TR')}</div>
+      <div class="comment-body">${escHtml(c.text)}</div>
+    </div>`).join('');
+        }
+
+        document.getElementById('addSubtaskBtn').addEventListener('click', () => {
+            const inp = document.getElementById('newSubtask');
+            const text = inp.value.trim();
+            if (!text) return;
+            _editSubtasks.push({ id: Date.now().toString(36), text, done: false });
+            renderSubtasksList();
+            inp.value = '';
+        });
+        document.getElementById('newSubtask').addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addSubtaskBtn').click(); }
+        });
+
+        document.getElementById('addCommentBtn').addEventListener('click', () => {
+            const inp = document.getElementById('newComment');
+            const text = inp.value.trim();
+            if (!text) return;
+            _editComments.push({ id: Date.now().toString(36), text, createdAt: Date.now() });
+            renderCommentsList();
+            inp.value = '';
+        });
+
+        document.getElementById('cardSaveBtn').addEventListener('click', async () => {
             const id = document.getElementById('editCardId').value;
+            const title = document.getElementById('cardTitle').value.trim();
+            if (!title) { showToast('Başlık boş olamaz', 'warn'); return; }
+            const selectedLabels = [...document.querySelectorAll('#labelsGrid .label-chip.selected')].map(el => el.dataset.lid);
             const payload = {
-                title: document.getElementById('cardTitle').value,
+                title,
                 desc: document.getElementById('cardDesc').value,
                 assignee: document.getElementById('cardAssignee').value,
                 priority: document.getElementById('cardPriority').value,
-                col: document.getElementById('cardColumn').value
+                col: document.getElementById('cardColumn').value,
+                storyPoints: document.getElementById('cardSP').value ? Number(document.getElementById('cardSP').value) : null,
+                dueDate: document.getElementById('cardDue').value || null,
+                epicId: document.getElementById('cardEpic').value || null,
+                sprintId: document.getElementById('cardSprint').value || null,
+                labels: selectedLabels,
+                subtasks: _editSubtasks,
+                comments: _editComments,
             };
             try {
                 if (id) {
-                    const updated = await API.updateCard(id, payload);
+                    const upd = await API.updateCard(id, payload);
                     const idx = cards.findIndex(c => c.id === id);
-                    if (idx !== -1) cards[idx] = updated;
-                    showToast('Görev güncellendi ✓');
+                    if (idx !== -1) cards[idx] = upd;
+                    showToast('Güncellendi ✓');
                 } else {
                     const card = await API.addCard(payload);
                     cards.push(card);
-                    showToast('Görev eklendi ✓');
+                    showToast('Eklendi ✓');
                 }
-                closeModal();
-                renderBoard(cards);
-            } catch { showToast('Kaydetme başarısız', 'error'); }
+                closeModal('cardModal');
+                renderAll();
+            } catch { showToast('Kaydetilemedi', 'error'); }
         });
 
-        document.getElementById('cancelBtn').addEventListener('click', closeModal);
-        overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+        document.getElementById('deleteCardBtn').addEventListener('click', async () => {
+            const id = document.getElementById('editCardId').value;
+            if (!id) return;
+            const card = cards.find(c => c.id === id);
+            if (!confirm(`"${card?.title}" silinsin mi?`)) return;
+            try {
+                await API.deleteCard(id);
+                cards = cards.filter(c => c.id !== id);
+                closeModal('cardModal');
+                renderAll();
+                showToast('Silindi');
+            } catch { showToast('Silinemedi', 'error'); }
+        });
+
+        document.getElementById('cardCancelBtn').addEventListener('click', () => closeModal('cardModal'));
+        document.getElementById('cardModalClose').addEventListener('click', () => closeModal('cardModal'));
 
         // ── Quick-add ─────────────────────────────────────────────
         document.querySelectorAll('.quick-add-input').forEach(input => {
@@ -294,41 +518,137 @@
                     const card = await API.addCard({ title, col });
                     cards.push(card);
                     input.value = '';
-                    renderBoard(cards);
-                    showToast('Görev eklendi ✓');
+                    renderAll();
+                    showToast('Eklendi ✓');
                 } catch { showToast('Eklenemedi', 'error'); }
             });
         });
 
+        // ── Search & Filter ───────────────────────────────────────
+        document.getElementById('searchInput').addEventListener('input', () => renderAll());
+        document.getElementById('filterAssignee').addEventListener('change', () => renderAll());
+        document.getElementById('filterPriority').addEventListener('change', () => renderAll());
+
         // ── Header buttons ────────────────────────────────────────
-        document.getElementById('addTaskBtn').addEventListener('click', () => openModal());
+        document.getElementById('addTaskBtn').addEventListener('click', () => openCardDetail(null));
         document.getElementById('clearBtn').addEventListener('click', async () => {
             if (!cards.length) { showToast('Pano zaten boş'); return; }
-            if (!confirm('Tüm görevler silinsin mi? Bu işlem geri alınamaz.')) return;
+            if (!confirm('Tüm görevler silinsin mi?')) return;
             try {
                 await Promise.all(cards.map(c => API.deleteCard(c.id)));
                 cards = [];
-                renderBoard(cards);
-                showToast('Pano temizlendi');
-            } catch { showToast('Temizleme başarısız', 'error'); }
+                renderAll();
+                showToast('Temizlendi');
+            } catch { showToast('Hata', 'error'); }
         });
 
-        // ── Search & filter ───────────────────────────────────────
-        document.getElementById('searchInput').addEventListener('input', () => renderBoard(cards));
-        document.getElementById('filterAssignee').addEventListener('change', () => renderBoard(cards));
-        document.getElementById('filterPriority').addEventListener('change', () => renderBoard(cards));
+        // ── Epic Manager ──────────────────────────────────────────
+        function renderEpicList() {
+            document.getElementById('epicList').innerHTML = epics.map(e => `
+    <div class="manager-item">
+      <span style="width:14px;height:14px;border-radius:50%;background:${e.color};display:inline-block;flex-shrink:0"></span>
+      <div class="manager-item-info">
+        <div class="manager-item-name">${escHtml(e.name)}</div>
+        <div class="manager-item-sub">${cards.filter(c => c.epicId === e.id).length} görev</div>
+      </div>
+      <div class="manager-item-actions">
+        <button class="btn btn-sm btn-danger" onclick="deleteEpic('${e.id}')">Sil</button>
+      </div>
+    </div>`).join('') || '<p style="color:var(--text-muted);font-size:13px">Henüz epic yok</p>';
+        }
+
+        document.getElementById('manageEpicsBtn').addEventListener('click', () => {
+            renderEpicList(); openModal('epicModal');
+        });
+        document.getElementById('addEpicBtn').addEventListener('click', async () => {
+            const name = document.getElementById('newEpicName').value.trim();
+            const color = document.getElementById('newEpicColor').value;
+            if (!name) return;
+            try {
+                const epic = await API.addEpic({ name, color });
+                epics.push(epic);
+                document.getElementById('newEpicName').value = '';
+                renderEpicList();
+                renderAll();
+            } catch { showToast('Epic eklenemedi', 'error'); }
+        });
+
+        async function deleteEpic(id) {
+            if (!confirm('Epic silinsn mi?')) return;
+            await API.deleteEpic(id);
+            epics = epics.filter(e => e.id !== id);
+            renderEpicList();
+            renderAll();
+        }
+
+        // ── Sprint Manager ────────────────────────────────────────
+        function renderSprintList() {
+            document.getElementById('sprintList').innerHTML = sprints.map(s => `
+    <div class="manager-item">
+      <div class="manager-item-info">
+        <div class="manager-item-name">${escHtml(s.name)} ${s.active ? '<span class="sprint-active-badge">Aktif</span>' : ''}</div>
+        <div class="manager-item-sub">${s.startDate || '?'} → ${s.endDate || '?'} &nbsp;·&nbsp; ${cards.filter(c => c.sprintId === s.id).length} görev</div>
+      </div>
+      <div class="manager-item-actions">
+        ${!s.active ? `<button class="btn btn-sm btn-secondary" onclick="activateSprint('${s.id}')">Aktif Yap</button>` : ''}
+        <button class="btn btn-sm btn-danger" onclick="deleteSprint('${s.id}')">Sil</button>
+      </div>
+    </div>`).join('') || '<p style="color:var(--text-muted);font-size:13px">Henüz sprint yok</p>';
+        }
+
+        document.getElementById('manageSprintsBtn').addEventListener('click', () => {
+            renderSprintList(); openModal('sprintModal');
+        });
+        document.getElementById('addSprintBtn').addEventListener('click', async () => {
+            const name = document.getElementById('newSprintName').value.trim();
+            const start = document.getElementById('newSprintStart').value;
+            const end = document.getElementById('newSprintEnd').value;
+            if (!name) return;
+            try {
+                const sprint = await API.addSprint({ name, startDate: start, endDate: end });
+                sprints.push(sprint);
+                document.getElementById('newSprintName').value = '';
+                document.getElementById('newSprintStart').value = '';
+                document.getElementById('newSprintEnd').value = '';
+                renderSprintList();
+                renderAll();
+            } catch { showToast('Sprint eklenemedi', 'error'); }
+        });
+        async function activateSprint(id) {
+            await API.updateSprint(id, { active: true });
+            sprints.forEach(s => { s.active = s.id === id; });
+            renderSprintList();
+            renderAll();
+        }
+        async function deleteSprint(id) {
+            if (!confirm('Sprint silinsin mi?')) return;
+            await API.deleteSprint(id);
+            sprints = sprints.filter(s => s.id !== id);
+            renderSprintList();
+            renderAll();
+        }
+
+        // ── Modal helpers ─────────────────────────────────────────
+        function openModal(id) {
+            document.getElementById(id).classList.add('open');
+        }
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('open');
+        }
+        document.querySelectorAll('.modal-overlay').forEach(ov => {
+            ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open'); });
+        });
 
         // ── Keyboard shortcuts ────────────────────────────────────
         document.addEventListener('keydown', e => {
             const tag = document.activeElement.tagName.toLowerCase();
             if (['input', 'textarea', 'select'].includes(tag)) return;
-            if (e.key === 'n' || e.key === 'N') openModal();
-            if (e.key === 'Escape') closeModal();
+            if (e.key === 'n' || e.key === 'N') openCardDetail(null);
+            if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
         });
-        overlay.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
         // ── Boot ──────────────────────────────────────────────────
-        loadCards();
+        boot();
     </script>
 </body>
 
