@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tiny Kanban – Demo Panosu</title>
-    <meta name="description" content="Tiny Kanban uygulamasının herkese açık Türkçe demo sayfası">
+    <meta name="description"
+        content="Tiny Kanban uygulamasının herkese açık Türkçe demo sayfası — 6 sprint, gerçekçi proje verisi">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
@@ -31,14 +32,12 @@
         <div class="header-brand">
             <div class="header-logo">D</div>
             <span class="header-title">Demo Panosu</span>
-            <span class="header-subtitle">Örnek Proje</span>
+            <span class="header-subtitle" id="sprintBadge">🟢 Sprint 6</span>
         </div>
-
         <div class="header-search">
             <span class="search-icon">🔍</span>
             <input type="text" id="searchInput" placeholder="Kart ara…" autocomplete="off">
         </div>
-
         <div class="header-filters">
             <select class="filter-select" id="filterAssignee">
                 <option value="">Tüm kişiler</option>
@@ -50,149 +49,197 @@
                 <option value="low">🟢 Düşük</option>
             </select>
         </div>
-
         <div class="header-actions">
-            <a class="btn btn-primary" href="/board.html">
-                <span>📋</span><span class="label">Kendi Panomu Aç</span>
-            </a>
+            <a class="btn btn-primary" href="/board.html">📋 <span class="label">Kendi Panomu Aç</span></a>
         </div>
     </header>
 
-    <!-- BOARD -->
-    <main class="board-wrap" id="board">
+    <!-- VIEW TABS -->
+    <div class="view-tabs">
+        <button class="view-tab active" data-view="board">📋 Board</button>
+        <button class="view-tab" data-view="list">☰ Liste</button>
+        <button class="view-tab" data-view="backlog">📦 Backlog</button>
+        <button class="view-tab" data-view="dashboard">📊 Dashboard</button>
+        <button class="view-tab" data-view="gantt">📅 Gantt</button>
+    </div>
 
-        <!-- TODO -->
-        <section class="column" data-col="todo">
-            <div class="col-header">
-                <div class="col-header-top">
-                    <div class="col-title-wrap">
-                        <span class="col-dot"></span>
-                        <span class="col-title">Yapılacak</span>
+    <!-- BOARD VIEW -->
+    <div class="view-container active" id="view-board">
+        <main class="board-wrap">
+            <section class="column" data-col="todo">
+                <div class="col-header">
+                    <div class="col-header-top">
+                        <div class="col-title-wrap"><span class="col-dot"></span><span
+                                class="col-title">Yapılacak</span></div>
+                        <span class="col-count" data-count="todo">0</span>
                     </div>
-                    <span class="col-count" data-count="todo">0</span>
+                    <div class="wip-badge">Demo verisi</div>
                 </div>
-                <div class="wip-badge">Demo verisi</div>
-            </div>
-            <div class="col-body" id="col-todo" data-col="todo">
-                <div class="empty-state">
-                    <div class="empty-icon">📋</div>
-                    <div>Görev yok</div>
-                </div>
-            </div>
-        </section>
-
-        <!-- DOING -->
-        <section class="column" data-col="doing">
-            <div class="col-header">
-                <div class="col-header-top">
-                    <div class="col-title-wrap">
-                        <span class="col-dot"></span>
-                        <span class="col-title">Yapılıyor</span>
+                <div class="col-body" id="col-todo" data-col="todo">
+                    <div class="empty-state">
+                        <div class="empty-icon">📋</div>
+                        <div>Görev yok</div>
                     </div>
-                    <span class="col-count" data-count="doing">0</span>
                 </div>
-                <div class="wip-badge">Demo verisi</div>
-            </div>
-            <div class="col-body" id="col-doing" data-col="doing">
-                <div class="empty-state">
-                    <div class="empty-icon">⚡</div>
-                    <div>Devam eden yok</div>
-                </div>
-            </div>
-        </section>
-
-        <!-- DONE -->
-        <section class="column" data-col="done">
-            <div class="col-header">
-                <div class="col-header-top">
-                    <div class="col-title-wrap">
-                        <span class="col-dot"></span>
-                        <span class="col-title">Tamamlandı</span>
+            </section>
+            <section class="column" data-col="doing">
+                <div class="col-header">
+                    <div class="col-header-top">
+                        <div class="col-title-wrap"><span class="col-dot"></span><span
+                                class="col-title">Yapılıyor</span></div>
+                        <span class="col-count" data-count="doing">0</span>
                     </div>
-                    <span class="col-count" data-count="done">0</span>
+                    <div class="wip-badge">Demo verisi</div>
                 </div>
-                <div class="wip-badge">Demo verisi</div>
-            </div>
-            <div class="col-body" id="col-done" data-col="done">
-                <div class="empty-state">
-                    <div class="empty-icon">✅</div>
-                    <div>Tamamlanan yok</div>
+                <div class="col-body" id="col-doing" data-col="doing">
+                    <div class="empty-state">
+                        <div class="empty-icon">⚡</div>
+                        <div>Devam eden yok</div>
+                    </div>
                 </div>
-            </div>
-        </section>
+            </section>
+            <section class="column" data-col="done">
+                <div class="col-header">
+                    <div class="col-header-top">
+                        <div class="col-title-wrap"><span class="col-dot"></span><span
+                                class="col-title">Tamamlandı</span></div>
+                        <span class="col-count" data-count="done">0</span>
+                    </div>
+                    <div class="wip-badge">Demo verisi</div>
+                </div>
+                <div class="col-body" id="col-done" data-col="done">
+                    <div class="empty-state">
+                        <div class="empty-icon">✅</div>
+                        <div>Tamamlanan yok</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
 
-    </main>
+    <!-- LIST VIEW -->
+    <div class="view-container" id="view-list">
+        <div id="listView"></div>
+    </div>
+    <!-- BACKLOG VIEW -->
+    <div class="view-container" id="view-backlog">
+        <div id="backlogView"></div>
+    </div>
+    <!-- DASHBOARD VIEW -->
+    <div class="view-container" id="view-dashboard">
+        <div id="dashboardView"></div>
+    </div>
+    <!-- GANTT VIEW -->
+    <div class="view-container" id="view-gantt">
+        <div id="ganttView"></div>
+    </div>
 
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="/js/board.js"></script>
     <script>
-        // ── Türkçe demo kartları (readonly, sunucuya yazılmaz) ─────
-        const DEMO_CARDS = [
-            // YAPILACAK
-            {
-                id: 'd1', title: 'API servisini yeniden düzenle',
-                desc: 'Ortak HTTP istemcisini ayrı bir modüle çıkar.',
-                assignee: 'Mert', priority: 'medium', col: 'todo'
-            },
-            {
-                id: 'd2', title: 'Staging sunucusunu yayına al',
-                desc: 'Yeni EC2 instance ve nginx konfigürasyonu oluştur.',
-                assignee: 'Deniz', priority: 'high', col: 'todo'
-            },
-            {
-                id: 'd3', title: 'Birim testleri yaz',
-                desc: 'Auth modülü için %80 test coverage hedefi.',
-                assignee: 'Selin', priority: 'medium', col: 'todo'
-            },
-            {
-                id: 'd4', title: 'Mobil tasarımı güncelle',
-                desc: 'Küçük ekranlar için kart düzenini iyileştir.',
-                assignee: 'Ali', priority: 'low', col: 'todo'
-            },
+        // ── Demo sayfasında kart detayı açılmasın ─────────────────
+        window.openCardDetail = () => { };
+        window.doDelete = () => { };
+        window.activateSprint = () => { };
 
-            // YAPILIYOR
-            {
-                id: 'd5', title: 'Giriş hatasını düzelt',
-                desc: 'SSO sağlayıcılarıyla giriş yapılamıyor.',
-                assignee: 'Mert', priority: 'high', col: 'doing'
-            },
-            {
-                id: 'd6', title: 'Ana sayfa hero tasarla',
-                desc: 'Gradyan yazı efektli yeni hero bölümü oluştur.',
-                assignee: 'Selin', priority: 'medium', col: 'doing'
-            },
-            {
-                id: 'd7', title: 'Standup raporunu hazırla',
-                desc: 'Sprint ilerleme özetini PM toplantısı için hazırla.',
-                assignee: 'Deniz', priority: 'low', col: 'doing'
-            },
-
-            // TAMAMLANDI
-            {
-                id: 'd8', title: 'README güncellendi',
-                desc: 'Yeni API endpoint\'leri dokümante edildi.',
-                assignee: 'Ali', priority: 'low', col: 'done'
-            },
-            {
-                id: 'd9', title: 'TypeScript\'e geçiş',
-                desc: 'Eski JS dosyaları .ts formatına dönüştürüldü.',
-                assignee: 'Mert', priority: 'medium', col: 'done'
-            },
-            {
-                id: 'd10', title: 'CI/CD pipeline kuruldu',
-                desc: 'GitHub Actions ile otomatik deploy süreci oluşturuldu.',
-                assignee: 'Selin', priority: 'high', col: 'done'
-            }
+        // ── Epics ─────────────────────────────────────────────────
+        const DEMO_EPICS = [
+            { id: 'e1', name: 'Kullanıcı Yönetimi', color: '#6366f1' },
+            { id: 'e2', name: 'Ödeme Sistemi', color: '#f59e0b' },
+            { id: 'e3', name: 'Mobil Uygulama', color: '#22c55e' },
+            { id: 'e4', name: 'Raporlama', color: '#ef4444' },
+            { id: 'e5', name: 'Altyapı & DevOps', color: '#0891b2' },
+            { id: 'e6', name: 'Tasarım Sistemi', color: '#8b5cf6' },
         ];
 
-        // Readonly modda render — düzenleme/silme butonları gösterilmez
-        renderBoard(DEMO_CARDS, true);
+        // ── Sprints ───────────────────────────────────────────────
+        const DEMO_SPRINTS = [
+            { id: 's1', name: 'Sprint 1', startDate: '2025-10-01', endDate: '2025-10-14', active: false },
+            { id: 's2', name: 'Sprint 2', startDate: '2025-10-15', endDate: '2025-10-28', active: false },
+            { id: 's3', name: 'Sprint 3', startDate: '2025-10-29', endDate: '2025-11-11', active: false },
+            { id: 's4', name: 'Sprint 4', startDate: '2025-11-12', endDate: '2025-11-25', active: false },
+            { id: 's5', name: 'Sprint 5', startDate: '2025-11-26', endDate: '2025-12-09', active: false },
+            { id: 's6', name: 'Sprint 6', startDate: '2026-02-23', endDate: '2026-03-21', active: true },
+        ];
 
-        // Search & filter (sadece görsel, sunucu çağrısı yok)
-        document.getElementById('searchInput').addEventListener('input', () => renderBoard(DEMO_CARDS, true));
-        document.getElementById('filterAssignee').addEventListener('change', () => renderBoard(DEMO_CARDS, true));
-        document.getElementById('filterPriority').addEventListener('change', () => renderBoard(DEMO_CARDS, true));
+        // ── Cards (6 sprintlik gerçekçi Türkçe demo verisi) ───────
+        const DEMO_CARDS = [
+
+            // ══════════════ SPRINT 1 ══════════════
+            { id: 'd101', title: 'Proje iskeleti oluşturuldu', desc: 'Next.js + TypeScript + Tailwind kurulumu yapıldı.', assignee: 'Mert', priority: 'high', col: 'done', sprintId: 's1', epicId: 'e5', labels: ['devops'], storyPoints: 5, startDate: '2025-10-01', dueDate: '2025-10-04', subtasks: [{ id: 'st1', text: 'Repo oluştur', done: true }, { id: 'st2', text: 'tsconfig ayarla', done: true }], comments: [], createdAt: 1727737200000 },
+            { id: 'd102', title: 'Veritabanı şeması tasarlandı', desc: 'PostgreSQL tablo yapıları ve ilişkiler belirlendi.', assignee: 'Ayşe', priority: 'high', col: 'done', sprintId: 's1', epicId: 'e1', labels: ['task'], storyPoints: 8, startDate: '2025-10-01', dueDate: '2025-10-07', subtasks: [{ id: 'st3', text: 'ER diyagramı çiz', done: true }, { id: 'st4', text: 'Migration dosyaları', done: true }], comments: [], createdAt: 1727737200000 },
+            { id: 'd103', title: 'CI/CD pipeline kuruldu', desc: 'GitHub Actions ile otomatik test ve deploy süreci.', assignee: 'Kerem', priority: 'high', col: 'done', sprintId: 's1', epicId: 'e5', labels: ['devops'], storyPoints: 13, startDate: '2025-10-06', dueDate: '2025-10-14', subtasks: [{ id: 'st5', text: 'Test pipeline', done: true }, { id: 'st6', text: 'Staging deploy', done: true }, { id: 'st7', text: 'Prod deploy', done: true }], comments: [], createdAt: 1727737200000 },
+            { id: 'd104', title: 'Tasarım token\'ları oluşturuldu', desc: 'Renk, tipografi ve boşluk sistemi tanımlandı.', assignee: 'Selin', priority: 'medium', col: 'done', sprintId: 's1', epicId: 'e6', labels: ['design'], storyPoints: 5, startDate: '2025-10-01', dueDate: '2025-10-10', subtasks: [], comments: [], createdAt: 1727737200000 },
+
+            // ══════════════ SPRINT 2 ══════════════
+            { id: 'd201', title: 'Kullanıcı kayıt & giriş', desc: 'JWT tabanlı authentication sistemi kuruldu.', assignee: 'Mert', priority: 'high', col: 'done', sprintId: 's2', epicId: 'e1', labels: ['feature'], storyPoints: 13, startDate: '2025-10-15', dueDate: '2025-10-22', subtasks: [{ id: 'st8', text: 'Kayıt formu', done: true }, { id: 'st9', text: 'JWT middleware', done: true }, { id: 'st10', text: 'Refresh token', done: true }], comments: [], createdAt: 1729033200000 },
+            { id: 'd202', title: 'Şifre sıfırlama akışı', desc: 'E-posta ile şifre sıfırlama linki gönderimi.', assignee: 'Ayşe', priority: 'high', col: 'done', sprintId: 's2', epicId: 'e1', labels: ['feature'], storyPoints: 8, startDate: '2025-10-15', dueDate: '2025-10-20', subtasks: [{ id: 'st11', text: 'Mail şablonu', done: true }, { id: 'st12', text: 'Token doğrulama', done: true }], comments: [], createdAt: 1729033200000 },
+            { id: 'd203', title: 'Ana sayfa hero bölümü', desc: 'Animasyonlu gradient efektli landing page tasarımı.', assignee: 'Selin', priority: 'medium', col: 'done', sprintId: 's2', epicId: 'e6', labels: ['design', 'feature'], storyPoints: 5, startDate: '2025-10-20', dueDate: '2025-10-28', subtasks: [], comments: [], createdAt: 1729033200000 },
+            { id: 'd204', title: 'Rate limiting eklendi', desc: 'API endpoint\'leri için 100 req/min sınırı.', assignee: 'Kerem', priority: 'medium', col: 'done', sprintId: 's2', epicId: 'e5', labels: ['devops'], storyPoints: 3, startDate: '2025-10-15', dueDate: '2025-10-18', subtasks: [], comments: [], createdAt: 1729033200000 },
+            { id: 'd205', title: 'SSO entegrasyonu (Google)', desc: 'Google OAuth2 ile tek tıkla giriş.', assignee: 'Mert', priority: 'high', col: 'done', sprintId: 's2', epicId: 'e1', labels: ['feature'], storyPoints: 13, startDate: '2025-10-22', dueDate: '2025-10-28', subtasks: [{ id: 'st13', text: 'OAuth flow', done: true }, { id: 'st14', text: 'Profil senkronizasyonu', done: true }], comments: [], createdAt: 1729033200000 },
+
+            // ══════════════ SPRINT 3 ══════════════
+            { id: 'd301', title: 'Ödeme altyapısı entegrasyonu', desc: 'Stripe API ile ödeme sayfası ve webhook\'lar.', assignee: 'Ayşe', priority: 'high', col: 'done', sprintId: 's3', epicId: 'e2', labels: ['feature'], storyPoints: 21, startDate: '2025-10-29', dueDate: '2025-11-08', subtasks: [{ id: 'st15', text: 'Stripe checkout', done: true }, { id: 'st16', text: 'Webhook handler', done: true }, { id: 'st17', text: 'Refund akışı', done: true }], comments: [], createdAt: 1730329200000 },
+            { id: 'd302', title: 'Fatura oluşturma sistemi', desc: 'PDF fatura üretimi ve e-posta gönderimi.', assignee: 'Kerem', priority: 'high', col: 'done', sprintId: 's3', epicId: 'e2', labels: ['feature', 'docs'], storyPoints: 8, startDate: '2025-10-29', dueDate: '2025-11-05', subtasks: [{ id: 'st18', text: 'PDF şablonu', done: true }, { id: 'st19', text: 'Mail gönderimi', done: true }], comments: [], createdAt: 1730329200000 },
+            { id: 'd303', title: 'Mobil uygulama wireframe', desc: 'React Native için akış şemaları ve ekran tasarımları.', assignee: 'Selin', priority: 'medium', col: 'done', sprintId: 's3', epicId: 'e3', labels: ['design'], storyPoints: 8, startDate: '2025-10-29', dueDate: '2025-11-11', subtasks: [{ id: 'st20', text: 'Ana akışlar', done: true }, { id: 'st21', text: 'Figma bileşenleri', done: true }], comments: [], createdAt: 1730329200000 },
+            { id: 'd304', title: 'Kupon & indirim sistemi', desc: 'Promosyon kodu validasyonu ve ödeme entegrasyonu.', assignee: 'Mert', priority: 'medium', col: 'done', sprintId: 's3', epicId: 'e2', labels: ['feature'], storyPoints: 5, startDate: '2025-11-04', dueDate: '2025-11-11', subtasks: [], comments: [], createdAt: 1730329200000 },
+
+            // ══════════════ SPRINT 4 ══════════════
+            { id: 'd401', title: 'React Native temel yapısı', desc: 'Navigation stack, state management, HTTP client.', assignee: 'Mert', priority: 'high', col: 'done', sprintId: 's4', epicId: 'e3', labels: ['feature'], storyPoints: 13, startDate: '2025-11-12', dueDate: '2025-11-20', subtasks: [{ id: 'st22', text: 'Expo setup', done: true }, { id: 'st23', text: 'Navigation', done: true }, { id: 'st24', text: 'Zustand store', done: true }], comments: [], createdAt: 1731624000000 },
+            { id: 'd402', title: 'Push bildirim sistemi', desc: 'Firebase Cloud Messaging ile anlık bildirimler.', assignee: 'Kerem', priority: 'high', col: 'done', sprintId: 's4', epicId: 'e3', labels: ['feature', 'devops'], storyPoints: 8, startDate: '2025-11-12', dueDate: '2025-11-19', subtasks: [{ id: 'st25', text: 'FCM entegrasyonu', done: true }, { id: 'st26', text: 'Token yönetimi', done: true }], comments: [], createdAt: 1731624000000 },
+            { id: 'd403', title: 'Analitik dashboard v1', desc: 'Günlük aktif kullanıcı ve gelir grafikleri.', assignee: 'Ayşe', priority: 'high', col: 'done', sprintId: 's4', epicId: 'e4', labels: ['feature'], storyPoints: 13, startDate: '2025-11-18', dueDate: '2025-11-25', subtasks: [{ id: 'st27', text: 'Chart.js entegrasyonu', done: true }, { id: 'st28', text: 'Veri API\'leri', done: true }], comments: [], createdAt: 1731624000000 },
+            { id: 'd404', title: 'Birim test coverage %70', desc: 'Jest ile kritik bileşenler test edildi.', assignee: 'Kerem', priority: 'medium', col: 'done', sprintId: 's4', epicId: 'e5', labels: ['test'], storyPoints: 8, startDate: '2025-11-12', dueDate: '2025-11-25', subtasks: [], comments: [], createdAt: 1731624000000 },
+
+            // ══════════════ SPRINT 5 ══════════════
+            { id: 'd501', title: 'Performans optimizasyonu', desc: 'Lighthouse skoru 65\'ten 95\'e çıkarıldı.', assignee: 'Mert', priority: 'high', col: 'done', sprintId: 's5', epicId: 'e5', labels: ['devops'], storyPoints: 13, startDate: '2025-11-26', dueDate: '2025-12-05', subtasks: [{ id: 'st29', text: 'Image lazy loading', done: true }, { id: 'st30', text: 'Code splitting', done: true }, { id: 'st31', text: 'CDN entegrasyonu', done: true }], comments: [], createdAt: 1732921200000 },
+            { id: 'd502', title: 'Çoklu dil desteği (i18n)', desc: 'TR/EN/DE dil desteği, otomatik tarayıcı dili tespiti.', assignee: 'Selin', priority: 'medium', col: 'done', sprintId: 's5', epicId: 'e1', labels: ['feature'], storyPoints: 8, startDate: '2025-11-26', dueDate: '2025-12-03', subtasks: [{ id: 'st32', text: 'next-intl kurulumu', done: true }, { id: 'st33', text: 'TR çeviriler', done: true }, { id: 'st34', text: 'EN çeviriler', done: true }], comments: [], createdAt: 1732921200000 },
+            { id: 'd503', title: 'E2E test suite kurulumu', desc: 'Playwright ile kritik kullanıcı akışları test edildi.', assignee: 'Kerem', priority: 'medium', col: 'done', sprintId: 's5', epicId: 'e5', labels: ['test'], storyPoints: 8, startDate: '2025-11-26', dueDate: '2025-12-09', subtasks: [{ id: 'st35', text: 'Giriş akışı', done: true }, { id: 'st36', text: 'Ödeme akışı', done: true }], comments: [], createdAt: 1732921200000 },
+            { id: 'd504', title: 'Karanlık mod desteği', desc: 'CSS custom properties ile sistem temasına uyumlu.', assignee: 'Selin', priority: 'low', col: 'done', sprintId: 's5', epicId: 'e6', labels: ['design', 'feature'], storyPoints: 5, startDate: '2025-12-01', dueDate: '2025-12-09', subtasks: [], comments: [], createdAt: 1732921200000 },
+            { id: 'd505', title: 'GDPR uyumluluk kontrol', desc: 'Çerez politikası, veri silme talebi akışı.', assignee: 'Ayşe', priority: 'high', col: 'done', sprintId: 's5', epicId: 'e1', labels: ['task', 'docs'], storyPoints: 5, startDate: '2025-11-26', dueDate: '2025-12-04', subtasks: [], comments: [], createdAt: 1732921200000 },
+
+            // ══════════════ SPRINT 6 (Aktif) ══════════════
+            { id: 'd601', title: 'Gelişmiş raporlama modülü', desc: 'Özelleştirilebilir tarih aralıklı rapor dışa aktarma (CSV/PDF).', assignee: 'Ayşe', priority: 'high', col: 'doing', sprintId: 's6', epicId: 'e4', labels: ['feature'], storyPoints: 13, startDate: '2026-02-23', dueDate: '2026-03-10', subtasks: [{ id: 'st37', text: 'Filtre bileşeni', done: true }, { id: 'st38', text: 'CSV export', done: true }, { id: 'st39', text: 'PDF export', done: false }], comments: [{ id: 'c1', text: 'PDF kütüphanesi seçildi: pdfmake', createdAt: 1740737200000 }], createdAt: 1740218000000 },
+            { id: 'd602', title: 'Mobil - offline mod', desc: 'İnternet bağlantısı olmadan temel işlevler.', assignee: 'Mert', priority: 'high', col: 'doing', sprintId: 's6', epicId: 'e3', labels: ['feature'], storyPoints: 21, startDate: '2026-02-23', dueDate: '2026-03-18', subtasks: [{ id: 'st40', text: 'AsyncStorage cache', done: true }, { id: 'st41', text: 'Sync algoritması', done: false }, { id: 'st42', text: 'Conflict resolution', done: false }], comments: [], createdAt: 1740218000000 },
+            { id: 'd603', title: 'Takım davet sistemi', desc: 'E-posta ile takım üyesi davet ve rol yönetimi.', assignee: 'Kerem', priority: 'high', col: 'doing', sprintId: 's6', epicId: 'e1', labels: ['feature'], storyPoints: 13, startDate: '2026-03-01', dueDate: '2026-03-14', subtasks: [{ id: 'st43', text: 'Davet maili', done: true }, { id: 'st44', text: 'Rol atama ekranı', done: false }], comments: [], createdAt: 1740218000000 },
+            { id: 'd604', title: 'Bileşen kütüphanesi dökümanı', desc: 'Storybook ile tüm UI bileşenlerinin interaktif dökümantasyonu.', assignee: 'Selin', priority: 'medium', col: 'doing', sprintId: 's6', epicId: 'e6', labels: ['docs', 'design'], storyPoints: 8, startDate: '2026-02-23', dueDate: '2026-03-07', subtasks: [{ id: 'st45', text: 'Button bileşenleri', done: true }, { id: 'st46', text: 'Form bileşenleri', done: true }, { id: 'st47', text: 'Kart bileşenleri', done: false }], comments: [], createdAt: 1740218000000 },
+            { id: 'd605', title: 'Abonelik yönetim ekranı', desc: 'Plan değiştirme, iptal ve fatura geçmişi.', assignee: 'Ayşe', priority: 'high', col: 'todo', sprintId: 's6', epicId: 'e2', labels: ['feature'], storyPoints: 13, startDate: '2026-03-10', dueDate: '2026-03-21', subtasks: [{ id: 'st48', text: 'Plan seçim UI', done: false }, { id: 'st49', text: 'İptal akışı', done: false }, { id: 'st50', text: 'Fatura listesi', done: false }], comments: [], createdAt: 1740218000000 },
+            { id: 'd606', title: 'API v2 geçişi', desc: 'Breaking change\'ler için versiyonlama ve geriye uyumluluk katmanı.', assignee: 'Mert', priority: 'medium', col: 'todo', sprintId: 's6', epicId: 'e5', labels: ['devops', 'task'], storyPoints: 8, startDate: '2026-03-08', dueDate: '2026-03-19', subtasks: [], comments: [], createdAt: 1740218000000 },
+            { id: 'd607', title: 'Erişilebilirlik (a11y) denetimi', desc: 'WCAG 2.1 AA standartlarına uyum ve ekran okuyucu desteği.', assignee: 'Selin', priority: 'medium', col: 'todo', sprintId: 's6', epicId: 'e6', labels: ['test', 'design'], storyPoints: 5, startDate: '2026-03-12', dueDate: '2026-03-21', subtasks: [], comments: [], createdAt: 1740218000000 },
+            { id: 'd608', title: 'Üretim bug: ödeme hatası #429', desc: 'Bazı kullanıcılarda ödeme onayı alınamıyor.', assignee: 'Kerem', priority: 'high', col: 'done', sprintId: 's6', epicId: 'e2', labels: ['bug'], storyPoints: 3, startDate: '2026-02-24', dueDate: '2026-02-26', subtasks: [], comments: [{ id: 'c2', text: 'Webhook endpoint timeout sebebiydi, düzeltildi.', createdAt: 1740477200000 }], createdAt: 1740390000000 },
+            { id: 'd609', title: 'Yük testi raporu', desc: 'k6 ile 10k eşzamanlı kullanıcı simülasyonu.', assignee: 'Kerem', priority: 'medium', col: 'done', sprintId: 's6', epicId: 'e5', labels: ['devops', 'test'], storyPoints: 5, startDate: '2026-02-23', dueDate: '2026-03-01', subtasks: [{ id: 'st51', text: 'Senaryo yazımı', done: true }, { id: 'st52', text: 'Rapor analizi', done: true }], comments: [], createdAt: 1740218000000 },
+        ];
+
+        // ── Render (readonly) ──────────────────────────────────────
+        let currentView = 'board';
+
+        function renderAll() {
+            renderBoard(DEMO_CARDS, DEMO_EPICS, true);
+            if (currentView === 'list') renderListView(DEMO_CARDS, DEMO_EPICS);
+            if (currentView === 'backlog') renderBacklogView(DEMO_CARDS, DEMO_SPRINTS, DEMO_EPICS);
+            if (currentView === 'dashboard') renderDashboard(DEMO_CARDS, DEMO_EPICS, DEMO_SPRINTS);
+            if (currentView === 'gantt') renderGantt(DEMO_CARDS);
+        }
+
+        // ── View tabs ─────────────────────────────────────────────
+        document.querySelectorAll('.view-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentView = btn.dataset.view;
+                document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.view-container').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('view-' + currentView).classList.add('active');
+                renderAll();
+            });
+        });
+
+        // ── Search & filter ───────────────────────────────────────
+        document.getElementById('searchInput').addEventListener('input', () => renderBoard(DEMO_CARDS, DEMO_EPICS, true));
+        document.getElementById('filterAssignee').addEventListener('change', () => renderBoard(DEMO_CARDS, DEMO_EPICS, true));
+        document.getElementById('filterPriority').addEventListener('change', () => renderBoard(DEMO_CARDS, DEMO_EPICS, true));
+
+        // ── Boot ──────────────────────────────────────────────────
+        renderAll();
     </script>
 </body>
 
