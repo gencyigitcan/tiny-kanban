@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiny Kanban – My Board</title>
+    <meta name="description" content="Kişisel proje takip panom">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+
+    <!-- NAV -->
+    <nav class="topnav">
+        <a class="topnav-link active" href="/board.html">📋 My Board</a>
+        <div class="topnav-sep"></div>
+        <a class="topnav-link" href="/demo.html">🎯 Demo</a>
+    </nav>
+
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-brand">
+            <div class="header-logo">K</div>
+            <span class="header-title">My Board</span>
+            <span class="header-subtitle">Kişisel</span>
+        </div>
+
+        <div class="header-search">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="searchInput" placeholder="Kart ara… (başlık, açıklama, kişi)" autocomplete="off">
+        </div>
+
+        <div class="header-filters">
+            <select class="filter-select" id="filterAssignee">
+                <option value="">Tüm kişiler</option>
+            </select>
+            <select class="filter-select" id="filterPriority">
+                <option value="">Tüm öncelikler</option>
+                <option value="high">🔴 Yüksek</option>
+                <option value="medium">🟠 Orta</option>
+                <option value="low">🟢 Düşük</option>
+            </select>
+        </div>
+
+        <div class="header-actions">
+            <button class="btn btn-primary" id="addTaskBtn">
+                <span>✚</span><span class="label">Yeni Görev</span>
+            </button>
+            <button class="btn btn-danger" id="clearBtn">
+                <span>🗑</span><span class="label">Temizle</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- BOARD -->
+    <main class="board-wrap" id="board">
+
+        <!-- TODO -->
+        <section class="column" data-col="todo">
+            <div class="col-header">
+                <div class="col-header-top">
+                    <div class="col-title-wrap">
+                        <span class="col-dot"></span>
+                        <span class="col-title">Yapılacak</span>
+                    </div>
+                    <span class="col-count" data-count="todo">0</span>
+                </div>
+                <div class="wip-badge">Limit yok</div>
+            </div>
+            <div class="col-body" id="col-todo" data-col="todo" ondragover="onDragOver(event)" ondrop="onDrop(event)"
+                ondragleave="onDragLeave(event)">
+                <div class="empty-state">
+                    <div class="empty-icon">📋</div>
+                    <div>Görev yok</div>
+                    <div>Eklemek için <kbd>N</kbd> bas</div>
+                </div>
+            </div>
+            <div class="quick-add">
+                <input class="quick-add-input" type="text" placeholder="+ Hızlı ekle (Enter ile onayla)"
+                    data-col="todo">
+            </div>
+        </section>
+
+        <!-- DOING -->
+        <section class="column" data-col="doing">
+            <div class="col-header">
+                <div class="col-header-top">
+                    <div class="col-title-wrap">
+                        <span class="col-dot"></span>
+                        <span class="col-title">Yapılıyor</span>
+                    </div>
+                    <span class="col-count" data-count="doing">0</span>
+                </div>
+                <div class="wip-badge">Limit yok</div>
+            </div>
+            <div class="col-body" id="col-doing" data-col="doing" ondragover="onDragOver(event)" ondrop="onDrop(event)"
+                ondragleave="onDragLeave(event)">
+                <div class="empty-state">
+                    <div class="empty-icon">⚡</div>
+                    <div>Devam eden görev yok</div>
+                </div>
+            </div>
+            <div class="quick-add">
+                <input class="quick-add-input" type="text" placeholder="+ Hızlı ekle (Enter ile onayla)"
+                    data-col="doing">
+            </div>
+        </section>
+
+        <!-- DONE -->
+        <section class="column" data-col="done">
+            <div class="col-header">
+                <div class="col-header-top">
+                    <div class="col-title-wrap">
+                        <span class="col-dot"></span>
+                        <span class="col-title">Tamamlandı</span>
+                    </div>
+                    <span class="col-count" data-count="done">0</span>
+                </div>
+                <div class="wip-badge">Limit yok</div>
+            </div>
+            <div class="col-body" id="col-done" data-col="done" ondragover="onDragOver(event)" ondrop="onDrop(event)"
+                ondragleave="onDragLeave(event)">
+                <div class="empty-state">
+                    <div class="empty-icon">✅</div>
+                    <div>Tamamlanan görevler burada görünür</div>
+                </div>
+            </div>
+            <div class="quick-add">
+                <input class="quick-add-input" type="text" placeholder="+ Hızlı ekle (Enter ile onayla)"
+                    data-col="done">
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ADD / EDIT MODAL -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            <h2 class="modal-title" id="modalTitle">Yeni Görev</h2>
+            <form id="cardForm" autocomplete="off">
+                <input type="hidden" id="editCardId">
+                <div class="form-group">
+                    <label class="form-label" for="cardTitle">Başlık <span style="color:var(--danger)">*</span></label>
+                    <input class="form-input" type="text" id="cardTitle" placeholder="ör. Login bug düzelt" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cardDesc">Açıklama</label>
+                    <textarea class="form-textarea" id="cardDesc" placeholder="İsteğe bağlı detaylar…"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="cardAssignee">Kişi</label>
+                        <input class="form-input" type="text" id="cardAssignee" placeholder="ör. Ali">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="cardPriority">Öncelik</label>
+                        <select class="form-select" id="cardPriority">
+                            <option value="medium">🟠 Orta</option>
+                            <option value="high">🔴 Yüksek</option>
+                            <option value="low">🟢 Düşük</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cardColumn">Kolon</label>
+                    <select class="form-select" id="cardColumn">
+                        <option value="todo">Yapılacak</option>
+                        <option value="doing">Yapılıyor</option>
+                        <option value="done">Tamamlandı</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelBtn">İptal</button>
+                    <button type="submit" class="btn btn-primary" id="saveBtn">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+    <div class="kbd-hint"><kbd>N</kbd> Yeni görev &nbsp;·&nbsp; <kbd>Esc</kbd> Kapat</div>
+
+    <script src="/js/board.js"></script>
+    <script src="/js/api.js"></script>
+    <script>
+        // ── State ─────────────────────────────────────────────────
+        let cards = [];
+
+        async function loadCards() {
+            try {
+                cards = await API.getCards();
+                renderBoard(cards);
+            } catch (e) {
+                showToast('Sunucuya bağlanılamadı', 'error');
+            }
+        }
+
+        // ── Drag & Drop (server mode) ─────────────────────────────
+        async function onDrop(e) {
+            e.preventDefault();
+            const body = e.currentTarget;
+            const toCol = body.dataset.col;
+            body.classList.remove('drag-over');
+            removePlaceholders();
+            if (!dragId) return;
+            const card = cards.find(c => c.id === dragId);
+            if (!card || card.col === toCol) { dragId = null; return; }
+            try {
+                const updated = await API.updateCard(dragId, { col: toCol });
+                const idx = cards.findIndex(c => c.id === dragId);
+                if (idx !== -1) cards[idx] = updated;
+                renderBoard(cards);
+            } catch { showToast('Taşıma başarısız', 'error'); }
+            dragId = null;
+        }
+
+        // ── Modal ─────────────────────────────────────────────────
+        const overlay = document.getElementById('modalOverlay');
+        const form = document.getElementById('cardForm');
+
+        function openModal(opts = {}) {
+            document.getElementById('modalTitle').textContent = opts.title || 'Yeni Görev';
+            document.getElementById('editCardId').value = opts.id || '';
+            document.getElementById('cardTitle').value = opts.cardTitle || '';
+            document.getElementById('cardDesc').value = opts.cardDesc || '';
+            document.getElementById('cardAssignee').value = opts.cardAssignee || '';
+            document.getElementById('cardPriority').value = opts.cardPriority || 'medium';
+            document.getElementById('cardColumn').value = opts.cardColumn || 'todo';
+            overlay.classList.add('open');
+            document.getElementById('cardTitle').focus();
+        }
+        function closeModal() { overlay.classList.remove('open'); form.reset(); }
+
+        function openEdit(id) {
+            const card = cards.find(c => c.id === id);
+            if (!card) return;
+            openModal({
+                title: 'Görevi Düzenle', id: card.id, cardTitle: card.title,
+                cardDesc: card.desc, cardAssignee: card.assignee, cardPriority: card.priority, cardColumn: card.col
+            });
+        }
+
+        async function doDelete(id) {
+            const card = cards.find(c => c.id === id);
+            if (!card || !confirm(`"${card.title}" silinsin mi?`)) return;
+            try {
+                await API.deleteCard(id);
+                cards = cards.filter(c => c.id !== id);
+                renderBoard(cards);
+                showToast('Görev silindi');
+            } catch { showToast('Silme başarısız', 'error'); }
+        }
+
+        form.addEventListener('submit', async e => {
+            e.preventDefault();
+            const id = document.getElementById('editCardId').value;
+            const payload = {
+                title: document.getElementById('cardTitle').value,
+                desc: document.getElementById('cardDesc').value,
+                assignee: document.getElementById('cardAssignee').value,
+                priority: document.getElementById('cardPriority').value,
+                col: document.getElementById('cardColumn').value
+            };
+            try {
+                if (id) {
+                    const updated = await API.updateCard(id, payload);
+                    const idx = cards.findIndex(c => c.id === id);
+                    if (idx !== -1) cards[idx] = updated;
+                    showToast('Görev güncellendi ✓');
+                } else {
+                    const card = await API.addCard(payload);
+                    cards.push(card);
+                    showToast('Görev eklendi ✓');
+                }
+                closeModal();
+                renderBoard(cards);
+            } catch { showToast('Kaydetme başarısız', 'error'); }
+        });
+
+        document.getElementById('cancelBtn').addEventListener('click', closeModal);
+        overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+        // ── Quick-add ─────────────────────────────────────────────
+        document.querySelectorAll('.quick-add-input').forEach(input => {
+            input.addEventListener('keydown', async e => {
+                if (e.key !== 'Enter') return;
+                const title = input.value.trim();
+                const col = input.dataset.col;
+                if (!title) return;
+                try {
+                    const card = await API.addCard({ title, col });
+                    cards.push(card);
+                    input.value = '';
+                    renderBoard(cards);
+                    showToast('Görev eklendi ✓');
+                } catch { showToast('Eklenemedi', 'error'); }
+            });
+        });
+
+        // ── Header buttons ────────────────────────────────────────
+        document.getElementById('addTaskBtn').addEventListener('click', () => openModal());
+        document.getElementById('clearBtn').addEventListener('click', async () => {
+            if (!cards.length) { showToast('Pano zaten boş'); return; }
+            if (!confirm('Tüm görevler silinsin mi? Bu işlem geri alınamaz.')) return;
+            try {
+                await Promise.all(cards.map(c => API.deleteCard(c.id)));
+                cards = [];
+                renderBoard(cards);
+                showToast('Pano temizlendi');
+            } catch { showToast('Temizleme başarısız', 'error'); }
+        });
+
+        // ── Search & filter ───────────────────────────────────────
+        document.getElementById('searchInput').addEventListener('input', () => renderBoard(cards));
+        document.getElementById('filterAssignee').addEventListener('change', () => renderBoard(cards));
+        document.getElementById('filterPriority').addEventListener('change', () => renderBoard(cards));
+
+        // ── Keyboard shortcuts ────────────────────────────────────
+        document.addEventListener('keydown', e => {
+            const tag = document.activeElement.tagName.toLowerCase();
+            if (['input', 'textarea', 'select'].includes(tag)) return;
+            if (e.key === 'n' || e.key === 'N') openModal();
+            if (e.key === 'Escape') closeModal();
+        });
+        overlay.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+        // ── Boot ──────────────────────────────────────────────────
+        loadCards();
+    </script>
+</body>
+
+</html>

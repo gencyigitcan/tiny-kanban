@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiny Kanban – Demo Panosu</title>
+    <meta name="description" content="Tiny Kanban uygulamasının herkese açık Türkçe demo sayfası">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+
+    <!-- NAV -->
+    <nav class="topnav">
+        <a class="topnav-link" href="/board.html">📋 My Board</a>
+        <div class="topnav-sep"></div>
+        <a class="topnav-link active" href="/demo.html">🎯 Demo</a>
+    </nav>
+
+    <!-- DEMO BANNER -->
+    <div class="demo-banner">
+        🎯 Bu bir demo panosudur — veriler salt okunurdur ve sunucuda kaydedilmez.
+        &nbsp;<a href="/board.html">Kendi panomu aç →</a>
+    </div>
+
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-brand">
+            <div class="header-logo">D</div>
+            <span class="header-title">Demo Panosu</span>
+            <span class="header-subtitle">Örnek Proje</span>
+        </div>
+
+        <div class="header-search">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="searchInput" placeholder="Kart ara…" autocomplete="off">
+        </div>
+
+        <div class="header-filters">
+            <select class="filter-select" id="filterAssignee">
+                <option value="">Tüm kişiler</option>
+            </select>
+            <select class="filter-select" id="filterPriority">
+                <option value="">Tüm öncelikler</option>
+                <option value="high">🔴 Yüksek</option>
+                <option value="medium">🟠 Orta</option>
+                <option value="low">🟢 Düşük</option>
+            </select>
+        </div>
+
+        <div class="header-actions">
+            <a class="btn btn-primary" href="/board.html">
+                <span>📋</span><span class="label">Kendi Panomu Aç</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- BOARD -->
+    <main class="board-wrap" id="board">
+
+        <!-- TODO -->
+        <section class="column" data-col="todo">
+            <div class="col-header">
+                <div class="col-header-top">
+                    <div class="col-title-wrap">
+                        <span class="col-dot"></span>
+                        <span class="col-title">Yapılacak</span>
+                    </div>
+                    <span class="col-count" data-count="todo">0</span>
+                </div>
+                <div class="wip-badge">Demo verisi</div>
+            </div>
+            <div class="col-body" id="col-todo" data-col="todo">
+                <div class="empty-state">
+                    <div class="empty-icon">📋</div>
+                    <div>Görev yok</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- DOING -->
+        <section class="column" data-col="doing">
+            <div class="col-header">
+                <div class="col-header-top">
+                    <div class="col-title-wrap">
+                        <span class="col-dot"></span>
+                        <span class="col-title">Yapılıyor</span>
+                    </div>
+                    <span class="col-count" data-count="doing">0</span>
+                </div>
+                <div class="wip-badge">Demo verisi</div>
+            </div>
+            <div class="col-body" id="col-doing" data-col="doing">
+                <div class="empty-state">
+                    <div class="empty-icon">⚡</div>
+                    <div>Devam eden yok</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- DONE -->
+        <section class="column" data-col="done">
+            <div class="col-header">
+                <div class="col-header-top">
+                    <div class="col-title-wrap">
+                        <span class="col-dot"></span>
+                        <span class="col-title">Tamamlandı</span>
+                    </div>
+                    <span class="col-count" data-count="done">0</span>
+                </div>
+                <div class="wip-badge">Demo verisi</div>
+            </div>
+            <div class="col-body" id="col-done" data-col="done">
+                <div class="empty-state">
+                    <div class="empty-icon">✅</div>
+                    <div>Tamamlanan yok</div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="/js/board.js"></script>
+    <script>
+        // ── Türkçe demo kartları (readonly, sunucuya yazılmaz) ─────
+        const DEMO_CARDS = [
+            // YAPILACAK
+            {
+                id: 'd1', title: 'API servisini yeniden düzenle',
+                desc: 'Ortak HTTP istemcisini ayrı bir modüle çıkar.',
+                assignee: 'Mert', priority: 'medium', col: 'todo'
+            },
+            {
+                id: 'd2', title: 'Staging sunucusunu yayına al',
+                desc: 'Yeni EC2 instance ve nginx konfigürasyonu oluştur.',
+                assignee: 'Deniz', priority: 'high', col: 'todo'
+            },
+            {
+                id: 'd3', title: 'Birim testleri yaz',
+                desc: 'Auth modülü için %80 test coverage hedefi.',
+                assignee: 'Selin', priority: 'medium', col: 'todo'
+            },
+            {
+                id: 'd4', title: 'Mobil tasarımı güncelle',
+                desc: 'Küçük ekranlar için kart düzenini iyileştir.',
+                assignee: 'Ali', priority: 'low', col: 'todo'
+            },
+
+            // YAPILIYOR
+            {
+                id: 'd5', title: 'Giriş hatasını düzelt',
+                desc: 'SSO sağlayıcılarıyla giriş yapılamıyor.',
+                assignee: 'Mert', priority: 'high', col: 'doing'
+            },
+            {
+                id: 'd6', title: 'Ana sayfa hero tasarla',
+                desc: 'Gradyan yazı efektli yeni hero bölümü oluştur.',
+                assignee: 'Selin', priority: 'medium', col: 'doing'
+            },
+            {
+                id: 'd7', title: 'Standup raporunu hazırla',
+                desc: 'Sprint ilerleme özetini PM toplantısı için hazırla.',
+                assignee: 'Deniz', priority: 'low', col: 'doing'
+            },
+
+            // TAMAMLANDI
+            {
+                id: 'd8', title: 'README güncellendi',
+                desc: 'Yeni API endpoint\'leri dokümante edildi.',
+                assignee: 'Ali', priority: 'low', col: 'done'
+            },
+            {
+                id: 'd9', title: 'TypeScript\'e geçiş',
+                desc: 'Eski JS dosyaları .ts formatına dönüştürüldü.',
+                assignee: 'Mert', priority: 'medium', col: 'done'
+            },
+            {
+                id: 'd10', title: 'CI/CD pipeline kuruldu',
+                desc: 'GitHub Actions ile otomatik deploy süreci oluşturuldu.',
+                assignee: 'Selin', priority: 'high', col: 'done'
+            }
+        ];
+
+        // Readonly modda render — düzenleme/silme butonları gösterilmez
+        renderBoard(DEMO_CARDS, true);
+
+        // Search & filter (sadece görsel, sunucu çağrısı yok)
+        document.getElementById('searchInput').addEventListener('input', () => renderBoard(DEMO_CARDS, true));
+        document.getElementById('filterAssignee').addEventListener('change', () => renderBoard(DEMO_CARDS, true));
+        document.getElementById('filterPriority').addEventListener('change', () => renderBoard(DEMO_CARDS, true));
+    </script>
+</body>
+
+</html>
