@@ -1842,3 +1842,276 @@ kbd {
     min-width: 500px;
   }
 }
+
+/* ============================================================
+   EFFORT TRACKING & PROGRESS
+   ============================================================ */
+.effort-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.effort-ok {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid rgba(22, 163, 74, 0.2);
+}
+
+.effort-over {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  animation: pulse-border 2.5s infinite;
+}
+
+@keyframes pulse-border {
+  0% { border-color: rgba(220, 38, 38, 0.2); }
+  50% { border-color: rgba(220, 38, 38, 0.6); }
+  100% { border-color: rgba(220, 38, 38, 0.2); }
+}
+
+.effort-progress-bar {
+  margin-top: 8px;
+  margin-left: 0;
+  width: 100%;
+}
+
+.effort-progress-track {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.effort-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.effort-progress-fill.done {
+  background: var(--success);
+}
+
+.effort-progress-fill.over {
+  background: var(--danger);
+}
+
+/* ============================================================
+   REPORTS VIEW DASHBOARD
+   ============================================================ */
+.reports-dashboard {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.reports-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 16px;
+}
+
+.reports-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.reports-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.reports-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 20px;
+  overflow-x: auto;
+}
+
+.reports-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.reports-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+  min-width: 600px;
+}
+
+.reports-table th {
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--border);
+}
+
+.reports-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.reports-table tr:hover td {
+  background: var(--surface-2);
+}
+
+.reports-row-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (min-width: 1024px) {
+  .reports-row-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.dev-tag {
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  display: inline-block;
+}
+
+.deviation-positive {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.deviation-negative {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.deviation-zero {
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.status-done-badge {
+  background: #dcfce7;
+  color: #15803d;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-planned-badge {
+  background: #f3f4f6;
+  color: #4b5563;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.print-only-header {
+  display: none;
+}
+
+/* ============================================================
+   PRINT AND PDF EXPORT STYLES
+   ============================================================ */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+  }
+  
+  .topnav,
+  .demo-banner,
+  .header,
+  .view-tabs,
+  .no-print,
+  .reports-header-row,
+  .kbd-hint,
+  .modal-overlay,
+  .quick-add {
+    display: none !important;
+  }
+  
+  .view-container {
+    display: none !important;
+  }
+  
+  .view-container.active {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+  .reports-dashboard {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  
+  .reports-card {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    margin-bottom: 24px !important;
+    page-break-inside: avoid !important;
+    padding: 15px !important;
+    background: #fff !important;
+  }
+  
+  .reports-row-grid {
+    display: block !important;
+  }
+  
+  .reports-table {
+    min-width: unset !important;
+    width: 100% !important;
+  }
+  
+  .reports-table th {
+    border-bottom: 2px solid #000 !important;
+    color: #000 !important;
+  }
+  
+  .reports-table td {
+    border-bottom: 1px solid #ddd !important;
+  }
+  
+  .print-only-header {
+    display: block !important;
+    margin-bottom: 24px !important;
+  }
+  
+  .epic-pill {
+    border: 1px solid #ccc !important;
+    background: none !important;
+    color: #000 !important;
+  }
+}

@@ -1,5 +1,5 @@
 // ============================================================
-//  board.js – shared board logic (all views)
+//  board.js – shared board rendering and views logic (v1.3.0)
 // ============================================================
 
 // ── Label definitions ────────────────────────────────────
@@ -20,17 +20,25 @@ function initials(name) {
   if (!name) return '?';
   return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
+
 function escHtml(s) {
   return String(s || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
 function showToast(msg, type = '') {
   const el = document.createElement('div');
   el.className = 'toast' + (type ? ' ' + type : '');
   el.textContent = msg;
-  document.getElementById('toastContainer').appendChild(el);
-  setTimeout(() => el.remove(), 3100);
+  const container = document.getElementById('toastContainer');
+  if (container) {
+    container.appendChild(el);
+    setTimeout(() => el.remove(), 3100);
+  } else {
+    console.log(`[Toast]: ${msg}`);
+  }
 }
+window.showToast = showToast; // Expose for API errors
 
 // ── Due date helpers ─────────────────────────────────────
 function dueBadge(dueDate) {
@@ -47,8 +55,8 @@ function dueBadge(dueDate) {
 function cardHTML(card, epics = [], readonly = false) {
   const epic = epics.find(e => e.id === card.epicId);
   const subtasks = card.subtasks || [];
-  const done = subtasks.filter(s => s.done).length;
-  const pct = subtasks.length ? Math.round((done / subtasks.length) * 100) : 0;
+  const doneSubtasks = subtasks.filter(s => s.done).length;
+  const subtaskPct = subtasks.length ? Math.round((doneSubtasks / subtasks.length) * 100) : 0;
   const priLabel = { high: 'Yüksek', medium: 'Orta', low: 'Düşük' };
   const labels = (card.labels || []).map(id => LABEL_MAP[id]).filter(Boolean);
 
@@ -56,6 +64,31 @@ function cardHTML(card, epics = [], readonly = false) {
     <div class="card-actions">
       <button class="card-btn del" title="Sil" onclick="event.stopPropagation();doDelete('${card.id}')">✕</button>
     </div>`;
+
+  // Effort logic
+  const est = card.estimatedEffort;
+  const spt = card.spentEffort;
+  let effortBadge = '';
+  let effortBar = '';
+
+  if (est != null || spt != null) {
+    const eVal = est || 0;
+    const sVal = spt || 0;
+    const over = sVal > eVal && eVal > 0;
+    const effortClass = over ? 'effort-over' : 'effort-ok';
+    effortBadge = `<span class="effort-badge ${effortClass}" title="Efor: Harcanan / Tahmini">⏱️ ${sVal}/${eVal} sa</span>`;
+
+    if (eVal > 0) {
+      const pct = Math.round((sVal / eVal) * 100);
+      const barClass = over ? 'over' : (pct === 100 ? 'done' : '');
+      effortBar = `
+        <div class="effort-progress-bar" title="Efor Tüketimi: %${pct}">
+          <div class="effort-progress-track">
+            <div class="effort-progress-fill ${barClass}" style="width:${Math.min(100, pct)}%"></div>
+          </div>
+        </div>`;
+    }
+  }
 
   return `
   <div class="card pri-${card.priority}${readonly ? ' readonly' : ''}"
@@ -70,17 +103,22 @@ function cardHTML(card, epics = [], readonly = false) {
     </div>
     ${card.desc ? `<p class="card-desc">${escHtml(card.desc)}</p>` : ''}
     ${labels.length ? `<div class="card-labels">${labels.map(l => `<span class="label-tag" style="background:${l.bg};color:${l.color}">${escHtml(l.name)}</span>`).join('')}</div>` : ''}
+    
     ${subtasks.length ? `
     <div class="subtask-bar">
-      <div class="subtask-bar-label"><span>${done}/${subtasks.length} alt görev</span><span>${pct}%</span></div>
-      <div class="subtask-bar-track"><div class="subtask-bar-fill${pct === 100 ? ' done' : ''}" style="width:${pct}%"></div></div>
+      <div class="subtask-bar-label"><span>${doneSubtasks}/${subtasks.length} alt görev</span><span>${subtaskPct}%</span></div>
+      <div class="subtask-bar-track"><div class="subtask-bar-fill${subtaskPct === 100 ? ' done' : ''}" style="width:${subtaskPct}%"></div></div>
     </div>` : ''}
+    
+    ${effortBar}
+
     <div class="card-footer">
       <div class="card-footer-left">
         ${card.assignee ? `<span class="card-assignee"><span class="assignee-avatar">${escHtml(initials(card.assignee))}</span>${escHtml(card.assignee)}</span>` : '<span></span>'}
         ${dueBadge(card.dueDate)}
       </div>
       <div class="card-footer-right">
+        ${effortBadge}
         ${card.storyPoints != null ? `<span class="sp-badge">${card.storyPoints}</span>` : ''}
         <span class="card-priority-tag">${priLabel[card.priority] || card.priority}</span>
       </div>
@@ -132,7 +170,7 @@ function renderListView(cards, epics = []) {
     const labels = (c.labels || []).map(id => LABEL_MAP[id]).filter(Boolean);
     const subtasks = c.subtasks || [];
     const done = subtasks.filter(s => s.done).length;
-    return `<tr onclick="openCardDetail('${c.id}')">
+    return `<tr onclick="openCardDetail('${c.id}')" style="cursor:pointer">
       <td class="list-title-cell">
         ${epic ? `<div><span class="epic-pill" style="background:${epic.color}20;color:${epic.color};font-size:10px;padding:1px 6px;border-radius:20px;font-weight:600">${escHtml(epic.name)}</span></div>` : ''}
         ${escHtml(c.title)}
@@ -143,15 +181,16 @@ function renderListView(cards, epics = []) {
       <td><span class="card-priority-tag pri-${c.priority}" style="display:inline-block;background:${c.priority === 'high' ? 'var(--pri-high-bg)' : c.priority === 'low' ? 'var(--pri-low-bg)' : 'var(--pri-med-bg)'};color:${c.priority === 'high' ? 'var(--pri-high)' : c.priority === 'low' ? 'var(--pri-low)' : 'var(--pri-med)'}">${c.priority === 'high' ? 'Yüksek' : c.priority === 'low' ? 'Düşük' : 'Orta'}</span></td>
       <td>${c.dueDate ? dueBadge(c.dueDate) : '—'}</td>
       <td>${c.storyPoints != null ? `<span class="sp-badge">${c.storyPoints}</span>` : '—'}</td>
+      <td>${c.spentEffort != null || c.estimatedEffort != null ? `<span class="effort-badge ${c.spentEffort > c.estimatedEffort ? 'effort-over' : 'effort-ok'}">${c.spentEffort || 0}/${c.estimatedEffort || 0} sa</span>` : '—'}</td>
       <td>${subtasks.length ? `${done}/${subtasks.length}` : '—'}</td>
     </tr>`;
   }).join('');
   container.innerHTML = `<div class="list-view">
     <table class="list-table">
       <thead><tr>
-        <th>Başlık</th><th>Durum</th><th>Kişi</th><th>Öncelik</th><th>Bitiş</th><th>SP</th><th>Alt Görev</th>
+        <th>Başlık</th><th>Durum</th><th>Kişi</th><th>Öncelik</th><th>Bitiş</th><th>SP</th><th>Efor (H/T)</th><th>Alt Görev</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-muted)">Görev yok</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">Görev yok</td></tr>'}</tbody>
     </table>
   </div>`;
 }
@@ -166,11 +205,13 @@ function renderBacklogView(cards, sprints, epics = []) {
     const isActive = sprint && sprint.active;
     const rowsHTML = sprintCards.map(c => {
       const epic = epics.find(e => e.id === c.epicId);
+      const over = (c.spentEffort || 0) > (c.estimatedEffort || 0) && (c.estimatedEffort || 0) > 0;
       return `<div class="backlog-row" onclick="openCardDetail('${c.id}')">
         <span class="card-priority-bar" style="position:relative;width:3px;height:16px;border-radius:3px;background:${c.priority === 'high' ? 'var(--pri-high)' : c.priority === 'low' ? 'var(--pri-low)' : 'var(--pri-med)'}"></span>
         <div class="backlog-row-title">${escHtml(c.title)}</div>
         <div class="backlog-row-meta">
           ${epic ? `<span class="epic-pill" style="background:${epic.color}20;color:${epic.color}">${escHtml(epic.name)}</span>` : ''}
+          ${c.spentEffort != null || c.estimatedEffort != null ? `<span class="effort-badge ${over ? 'effort-over' : 'effort-ok'}">⏱️ ${c.spentEffort || 0}/${c.estimatedEffort || 0} sa</span>` : ''}
           ${c.storyPoints != null ? `<span class="sp-badge">${c.storyPoints}</span>` : ''}
           ${dueBadge(c.dueDate)}
           ${c.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="width:18px;height:18px;font-size:9px">${escHtml(initials(c.assignee))}</span></span>` : ''}
@@ -212,7 +253,6 @@ function renderDashboard(cards, epics = [], sprints = []) {
   const container = document.getElementById('dashboardView');
   if (!container) return;
   const total = cards.length;
-  const todo = cards.filter(c => c.col === 'todo').length;
   const doing = cards.filter(c => c.col === 'doing').length;
   const done = cards.filter(c => c.col === 'done').length;
   const high = cards.filter(c => c.priority === 'high').length;
@@ -222,6 +262,11 @@ function renderDashboard(cards, epics = [], sprints = []) {
   const overdue = cards.filter(c => c.dueDate && new Date(c.dueDate) < now && c.col !== 'done');
   const totalSP = cards.reduce((s, c) => (c.storyPoints || 0) + s, 0);
   const donePct = total ? Math.round((done / total) * 100) : 0;
+
+  // Effort totals
+  const totalEst = cards.reduce((sum, c) => sum + (c.estimatedEffort || 0), 0);
+  const totalSpent = cards.reduce((sum, c) => sum + (c.spentEffort || 0), 0);
+  const effortPct = totalEst ? Math.round((totalSpent / totalEst) * 100) : 0;
 
   // overdue rows
   const overdueRows = overdue.slice(0, 6).map(c => {
@@ -268,19 +313,19 @@ function renderDashboard(cards, epics = [], sprints = []) {
         <div class="stat-sub">%${donePct} tamamlandı</div>
       </div>
       <div class="stat-card warning">
-        <div class="stat-label">Yapılıyor</div>
-        <div class="stat-value">${doing}</div>
-        <div class="stat-sub">Aktif görevler</div>
-      </div>
-      <div class="stat-card danger">
-        <div class="stat-label">Geciken</div>
-        <div class="stat-value">${overdue.length}</div>
-        <div class="stat-sub">Vadesi geçmiş</div>
-      </div>
-      <div class="stat-card success">
         <div class="stat-label">Story Points</div>
         <div class="stat-value">${totalSP}</div>
         <div class="stat-sub">Toplam tahmin</div>
+      </div>
+      <div class="stat-card danger">
+        <div class="stat-label">Tahmini Efor</div>
+        <div class="stat-value">${totalEst} <span style="font-size:14px;color:var(--text-secondary)">sa</span></div>
+        <div class="stat-sub">Planlanan efor</div>
+      </div>
+      <div class="stat-card success">
+        <div class="stat-label">Harcanan Efor</div>
+        <div class="stat-value">${totalSpent} <span style="font-size:14px;color:var(--text-secondary)">sa</span></div>
+        <div class="stat-sub">%${effortPct} tüketildi</div>
       </div>
     </div>
     <div class="dash-row">
@@ -378,6 +423,216 @@ function renderGantt(cards) {
   </div></div>`;
 }
 
+// ── Reports view render ──────────────────────────────────
+function renderReports(cards, epics = [], sprints = []) {
+  const container = document.getElementById('reportsView');
+  if (!container) return;
+
+  // 1. Assignee effort allocation calculation
+  const assignees = [...new Set(cards.map(c => c.assignee).filter(Boolean))].sort();
+  // Include unassigned as "Atanmamış" if there are unassigned cards
+  if (cards.some(c => !c.assignee)) {
+    assignees.push('');
+  }
+
+  const assigneeRows = assignees.map(name => {
+    const ac = cards.filter(c => c.assignee === name);
+    const doneCount = ac.filter(c => c.col === 'done').length;
+    const sp = ac.reduce((sum, c) => sum + (c.storyPoints || 0), 0);
+    const est = ac.reduce((sum, c) => sum + (c.estimatedEffort || 0), 0);
+    const spent = ac.reduce((sum, c) => sum + (c.spentEffort || 0), 0);
+    const dev = spent - est;
+    const devClass = dev > 0 ? 'deviation-negative' : (dev < 0 ? 'deviation-positive' : 'deviation-zero');
+    const pct = est ? Math.round((spent / est) * 100) : 0;
+    const barClass = pct > 100 ? 'over' : (pct === 100 ? 'done' : '');
+
+    return `<tr>
+      <td><strong>${escHtml(name || 'Atanmamış')}</strong></td>
+      <td>${ac.length} (${doneCount} tamamlandı)</td>
+      <td><span class="sp-badge">${sp}</span></td>
+      <td>${est} sa</td>
+      <td>${spent} sa</td>
+      <td><span class="dev-tag ${devClass}">${dev > 0 ? '+' : ''}${dev} sa</span></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="subtask-bar-track" style="width:60px;height:6px">
+            <div class="subtask-bar-fill ${barClass}" style="width:${Math.min(100, pct)}%"></div>
+          </div>
+          <span style="font-size:11px;font-weight:600">%${pct}</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // 2. Epic progress and effort calculation
+  const epicRows = epics.map(e => {
+    const ec = cards.filter(c => c.epicId === e.id);
+    const doneCount = ec.filter(c => c.col === 'done').length;
+    const pct = ec.length ? Math.round((doneCount / ec.length) * 100) : 0;
+    const est = ec.reduce((sum, c) => sum + (c.estimatedEffort || 0), 0);
+    const spent = ec.reduce((sum, c) => sum + (c.spentEffort || 0), 0);
+
+    return `<tr>
+      <td><span class="epic-pill" style="background:${e.color}20;color:${e.color}">${escHtml(e.name)}</span></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="subtask-bar-track" style="width:80px;height:6px">
+            <div class="subtask-bar-fill ${pct === 100 ? 'done' : ''}" style="width:${pct}%"></div>
+          </div>
+          <span style="font-size:11px;font-weight:600">%${pct} (${doneCount}/${ec.length})</span>
+        </div>
+      </td>
+      <td>${est} sa</td>
+      <td>${spent} sa</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Epic yok</td></tr>';
+
+  // 3. Sprint performance and velocity
+  const sprintRows = sprints.map(s => {
+    const sc = cards.filter(c => c.sprintId === s.id);
+    const doneCards = sc.filter(c => c.col === 'done');
+    const completedSP = doneCards.reduce((sum, c) => sum + (c.storyPoints || 0), 0);
+    const totalSP = sc.reduce((sum, c) => sum + (c.storyPoints || 0), 0);
+    const est = sc.reduce((sum, c) => sum + (c.estimatedEffort || 0), 0);
+    const spent = sc.reduce((sum, c) => sum + (c.spentEffort || 0), 0);
+    
+    let statusBadge = s.active 
+      ? '<span class="sprint-active-badge">Aktif</span>' 
+      : (new Date(s.endDate) < new Date() ? '<span class="status-done-badge">Tamamlandı</span>' : '<span class="status-planned-badge">Planlandı</span>');
+
+    return `<tr>
+      <td><strong>${escHtml(s.name)}</strong></td>
+      <td>${statusBadge}</td>
+      <td>${s.startDate || '?'} / ${s.endDate || '?'}</td>
+      <td><strong>${completedSP}</strong> / ${totalSP} SP</td>
+      <td>${est} sa</td>
+      <td>${spent} sa</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sprint yok</td></tr>';
+
+  // Render HTML structure
+  container.innerHTML = `
+    <div class="reports-dashboard">
+      <!-- Report Header -->
+      <div class="reports-header-row no-print">
+        <div>
+          <h2>📊 Efor ve Proje İlerleme Raporu</h2>
+          <p class="reports-subtitle">2026 Çalışma Yılı Efor Dağılımları, Hedef Sapmaları ve Performans Analizi</p>
+        </div>
+        <div class="reports-actions">
+          <button class="btn btn-secondary" onclick="exportToCSV(cards, epics, sprints)">📥 CSV Dışa Aktar</button>
+          <button class="btn btn-primary" onclick="window.print()">🖨️ PDF / Raporu Yazdır</button>
+        </div>
+      </div>
+
+      <!-- Printable Only Header -->
+      <div class="print-only-header">
+        <h1>Tiny Kanban Proje Raporu</h1>
+        <p>Tarih: ${new Date().toLocaleDateString('tr-TR')} · Çalışma Dönemi: 2026 Takvim Yılı</p>
+        <hr style="margin:16px 0; border:0; border-top:1px solid #ddd">
+      </div>
+
+      <!-- Section 1: User Efforts -->
+      <div class="reports-card">
+        <h3 class="reports-card-title">👥 Kullanıcı Efor ve İş Yükü Dağılımı</h3>
+        <table class="reports-table">
+          <thead>
+            <tr>
+              <th>Takım Üyesi</th>
+              <th>Görev Sayısı</th>
+              <th>Öngörülen Story Points</th>
+              <th>Planlanan Efor (Saat)</th>
+              <th>Harcanan Efor (Saat)</th>
+              <th>Sapma Değeri</th>
+              <th>Efor Tüketim Oranı</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${assigneeRows}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="reports-row-grid">
+        <!-- Section 2: Epics Progress -->
+        <div class="reports-card">
+          <h3 class="reports-card-title">🏷️ Epic Durumu ve Harcanan Süreler</h3>
+          <table class="reports-table">
+            <thead>
+              <tr>
+                <th>Epic Modülü</th>
+                <th>İlerleme Durumu</th>
+                <th>Tahmini Efor</th>
+                <th>Harcanan Efor</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${epicRows}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Section 3: Sprint Performance -->
+        <div class="reports-card">
+          <h3 class="reports-card-title">⚡ Sprint Hızı (Velocity) ve Efor Takibi</h3>
+          <table class="reports-table">
+            <thead>
+              <tr>
+                <th>Sprint Adı</th>
+                <th>Durum</th>
+                <th>Tarih Aralığı</th>
+                <th>Tamamlanan Hız</th>
+                <th>Planlanan Efor</th>
+                <th>Harcanan Efor</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sprintRows}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── CSV Exporter ──────────────────────────────────────────
+function exportToCSV(cardsList, epicsList, sprintsList) {
+  const headers = ['ID', 'Başlık', 'Durum', 'Kişi', 'Öncelik', 'Story Points', 'Tahmini Efor (Saat)', 'Harcanan Efor (Saat)', 'Başlangıç Tarihi', 'Bitiş Tarihi', 'Epic', 'Sprint'];
+  const rows = cardsList.map(c => {
+    const epic = epicsList.find(e => e.id === c.epicId)?.name || '—';
+    const sprint = sprintsList.find(s => s.id === c.sprintId)?.name || '—';
+    const colLabel = { todo: 'Yapılacak', doing: 'Yapılıyor', done: 'Tamamlandı' }[c.col] || c.col;
+    const priLabel = { high: 'Yüksek', medium: 'Orta', low: 'Düşük' }[c.priority] || c.priority;
+    return [
+      c.id,
+      c.title,
+      colLabel,
+      c.assignee || '—',
+      priLabel,
+      c.storyPoints ?? '0',
+      c.estimatedEffort ?? '0',
+      c.spentEffort ?? '0',
+      c.startDate || '—',
+      c.dueDate || '—',
+      epic,
+      sprint
+    ].map(val => `"${String(val).replace(/"/g, '""')}"`);
+  });
+
+  const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+    + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `tiny-kanban-rapor-${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+window.exportToCSV = exportToCSV;
+
 // ── Filter assignee refresh ──────────────────────────────
 function refreshAssigneeFilter(cards) {
   const sel = document.getElementById('filterAssignee');
@@ -402,11 +657,15 @@ function onDragStart(e) {
   e.dataTransfer.setDragImage(ghost, e.offsetX, e.offsetY);
   setTimeout(() => ghost.remove(), 0);
 }
+window.onDragStart = onDragStart;
+
 function onDragEnd(e) {
   e.currentTarget.classList.remove('dragging');
   document.querySelectorAll('.col-body').forEach(b => b.classList.remove('drag-over'));
   removePlaceholders();
 }
+window.onDragEnd = onDragEnd;
+
 function onDragOver(e) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
@@ -417,14 +676,36 @@ function onDragOver(e) {
   const target = getCardBelow(e.currentTarget, e.clientY);
   target ? e.currentTarget.insertBefore(ph, target) : e.currentTarget.appendChild(ph);
 }
+window.onDragOver = onDragOver;
+
 function onDragLeave(e) {
   e.currentTarget.classList.remove('drag-over');
   removePlaceholders();
 }
+window.onDragLeave = onDragLeave;
+
 function removePlaceholders() {
   document.querySelectorAll('.drop-placeholder').forEach(el => el.remove());
 }
+window.removePlaceholders = removePlaceholders;
+
 function getCardBelow(container, y) {
   return [...container.querySelectorAll('.card:not(.dragging)')]
     .find(c => { const b = c.getBoundingClientRect(); return y < b.top + b.height / 2; }) || null;
 }
+
+// Global modal/delete proxies to bind with window actions
+async function doDelete(id) {
+  const card = cards.find(c => c.id === id);
+  if (!card) return;
+  if (!confirm(`"${card.title}" silinsin mi?`)) return;
+  try {
+    await API.deleteCard(id);
+    cards = cards.filter(c => c.id !== id);
+    renderAll();
+    showToast('Silindi');
+  } catch {
+    showToast('Silinemedi', 'error');
+  }
+}
+window.doDelete = doDelete;

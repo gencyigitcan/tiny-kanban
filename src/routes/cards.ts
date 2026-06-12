@@ -30,6 +30,8 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
         dueDate: body.dueDate ?? null,
         labels: body.labels ?? [],
         storyPoints: body.storyPoints ?? null,
+        estimatedEffort: body.estimatedEffort ?? null,
+        spentEffort: body.spentEffort ?? null,
         subtasks: body.subtasks ?? [],
         comments: [],
         epicId: body.epicId ?? null,
@@ -50,6 +52,7 @@ cardRouter.put('/:id', validate(updateCardSchema), (req, res) => {
     const allowed: (keyof Card)[] = [
         'title', 'desc', 'assignee', 'priority', 'col',
         'startDate', 'dueDate', 'labels', 'storyPoints',
+        'estimatedEffort', 'spentEffort',
         'subtasks', 'comments', 'epicId', 'sprintId',
     ];
     for (const key of allowed) {

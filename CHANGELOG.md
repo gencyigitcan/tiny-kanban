@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.3.0] — 2026-06-12
+
+### 📦 Added
+- **Kullanıcı Efor Takibi (Effort Tracking)**: Kartlar üzerinde tahmini ve harcanan efor saatlerini girip görüntüleme desteği eklendi. Limit aşıldığında görsel uyarı veren efor barları eklendi.
+- **Gelişmiş Raporlar Paneli (Premium Reports Dashboard)**: Kullanıcı iş yükleri, epic durumu ilerlemeleri, sprint hızları (velocity), sapma değerleri ve efor tüketim oranlarını gösteren premium arayüz.
+- **Yazdırılabilir PDF & CSV Dışa Aktarım**: Raporların A4 yazıcı formatına uygun PDF çıktısını alabilme ve MS Excel uyumlu UTF-8 CSV dosyası olarak indirebilme desteği.
+- **Dinamik 2026 Çalışma Yılı Simülasyonu**: Demo ve tarayıcı hafızası modları için güncel tarihe (Haziran 2026) göre otomatik 6 tamamlanmış ve 1 aktif/gelecek sprint dummy verisi üreten seeder.
+- **Otomatik Tarayıcı Hafızası (LocalStorage) Fallback**: Sunucu çevrimdışı olduğunda veya Cloudflare Pages gibi statik hosting ortamlarında tüm CRUD işlemlerini tarayıcı localStorage'ına kaydeden akıllı API katmanı.
+- Efor takibi için `estimatedEffort` ve `spentEffort` Zod şemaları ve TypeScript tip tanımlamaları.
+
+---
+
 ## [1.2.0] — 2026-03-07
 
 ### 🏗 Architecture

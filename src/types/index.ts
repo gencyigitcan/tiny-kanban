@@ -28,6 +28,8 @@ export interface Card {
     dueDate: string | null;
     labels: string[];
     storyPoints: number | null;
+    estimatedEffort: number | null;
+    spentEffort: number | null;
     subtasks: Subtask[];
     comments: Comment[];
     epicId: string | null;

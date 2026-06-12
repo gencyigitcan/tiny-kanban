@@ -31,6 +31,8 @@ export const createCardSchema = z.object({
     dueDate: dateStr,
     labels: z.array(z.string().max(50)).max(10).optional().default([]),
     storyPoints: z.number().int().min(0).max(9999).nullable().optional(),
+    estimatedEffort: z.number().int().min(0).max(9999).nullable().optional(),
+    spentEffort: z.number().int().min(0).max(9999).nullable().optional(),
     subtasks: z.array(subtaskSchema).max(100).optional().default([]),
     epicId: z.string().nullable().optional(),
     sprintId: z.string().nullable().optional(),
