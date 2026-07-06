@@ -37,10 +37,13 @@ cardRouter.get('/', (_req, res) => {
 
 /** POST /api/cards */
 cardRouter.post('/', validate(createCardSchema), (req, res) => {
-    const body = req.body as Omit<Card, 'id' | 'comments' | 'createdAt'>;
+    const body = req.body as Omit<Card, 'id' | 'key' | 'comments' | 'createdAt'>;
     const db = readDb();
+    db.taskCounter = (db.taskCounter ?? 0) + 1;
+    const key = `TK-${db.taskCounter}`;
     const card: Card = {
         id: uid(),
+        key,
         title: body.title,
         desc: body.desc ?? '',
         assignee: body.assignee,

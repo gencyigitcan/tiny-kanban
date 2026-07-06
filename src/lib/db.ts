@@ -10,7 +10,7 @@ import type { DbSchema, User } from '../types/index.js';
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DATA_FILE = path.join(DATA_DIR, 'db.json');
 
-const EMPTY_DB: DbSchema = { cards: [], epics: [], sprints: [], users: [], sessions: [], labels: [], notifications: [] };
+const EMPTY_DB: DbSchema = { cards: [], epics: [], sprints: [], users: [], sessions: [], labels: [], notifications: [], taskCounter: 0 };
 
 function hashPassword(password: string): string {
     const salt = crypto.randomBytes(16).toString('hex');
@@ -37,6 +37,7 @@ export function initDb(): void {
                 sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
                 labels: Array.isArray(parsed.labels) ? parsed.labels : [],
                 notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
+                taskCounter: typeof parsed.taskCounter === 'number' ? parsed.taskCounter : 0
             };
         } catch {
             db = structuredClone(EMPTY_DB);
@@ -88,6 +89,22 @@ export function initDb(): void {
         ];
     }
 
+    // Retroactively assign keys if missing, and sync taskCounter
+    let maxNum = db.taskCounter || 0;
+    db.cards.forEach(c => {
+        if (c.key) {
+            const num = parseInt(c.key.replace('TK-', ''), 10);
+            if (!isNaN(num) && num > maxNum) maxNum = num;
+        }
+    });
+    db.cards.forEach(c => {
+        if (!c.key) {
+            maxNum++;
+            c.key = `TK-${maxNum}`;
+        }
+    });
+    db.taskCounter = maxNum;
+
     writeDbSync(db);
 }
 
@@ -104,6 +121,7 @@ export function readDb(): DbSchema {
             sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
             labels: Array.isArray(parsed.labels) ? parsed.labels : [],
             notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
+            taskCounter: typeof parsed.taskCounter === 'number' ? parsed.taskCounter : 0
         };
     } catch {
         return structuredClone(EMPTY_DB);

@@ -113,6 +113,7 @@ function cardHTML(card, epics = [], readonly = false) {
 
     <div class="card-footer">
       <div class="card-footer-left">
+        ${card.key ? `<span class="card-key-badge">${card.key}</span>` : ''}
         ${card.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="background:${getAssigneeColor(card.assignee)}">${escHtml(initials(card.assignee))}</span>${escHtml(card.assignee)}</span>` : '<span></span>'}
         ${dueBadge(card.dueDate)}
       </div>
@@ -141,7 +142,7 @@ function renderBoard(cards, epics = [], readonly = false) {
     const tmp = document.createElement('div');
     colCards.forEach(card => {
       const hidden = (
-        (q && !card.title.toLowerCase().includes(q) && !(card.desc || '').toLowerCase().includes(q) && !(card.assignee || '').toLowerCase().includes(q)) ||
+        (q && !card.title.toLowerCase().includes(q) && !(card.desc || '').toLowerCase().includes(q) && !(card.assignee || '').toLowerCase().includes(q) && !(card.key || '').toLowerCase().includes(q)) ||
         (fa && (card.assignee || '').toLowerCase() !== fa) ||
         (fp && card.priority !== fp)
       );
@@ -170,6 +171,7 @@ function renderListView(cards, epics = []) {
     const subtasks = c.subtasks || [];
     const done = subtasks.filter(s => s.done).length;
     return `<tr onclick="openCardDetail('${c.id}')" style="cursor:pointer">
+      <td><span class="card-key-badge">${c.key || ''}</span></td>
       <td class="list-title-cell">
         ${epic ? `<div><span class="epic-pill" style="background:${epic.color}20;color:${epic.color};font-size:10px;padding:1px 6px;border-radius:20px;font-weight:600">${escHtml(epic.name)}</span></div>` : ''}
         ${escHtml(c.title)}
@@ -187,9 +189,9 @@ function renderListView(cards, epics = []) {
   container.innerHTML = `<div class="list-view">
     <table class="list-table">
       <thead><tr>
-        <th>Başlık</th><th>Durum</th><th>Kişi</th><th>Öncelik</th><th>Bitiş</th><th>SP</th><th>Efor (H/T)</th><th>Alt Görev</th>
+        <th>Anahtar</th><th>Başlık</th><th>Durum</th><th>Kişi</th><th>Öncelik</th><th>Bitiş</th><th>SP</th><th>Efor (H/T)</th><th>Alt Görev</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">Görev yok</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted)">Görev yok</td></tr>'}</tbody>
     </table>
   </div>`;
 }
@@ -207,7 +209,7 @@ function renderBacklogView(cards, sprints, epics = []) {
       const over = (c.spentEffort || 0) > (c.estimatedEffort || 0) && (c.estimatedEffort || 0) > 0;
       return `<div class="backlog-row" onclick="openCardDetail('${c.id}')">
         <span class="card-priority-bar" style="position:relative;width:3px;height:16px;border-radius:3px;background:${c.priority === 'high' ? 'var(--pri-high)' : c.priority === 'low' ? 'var(--pri-low)' : 'var(--pri-med)'}"></span>
-        <div class="backlog-row-title">${escHtml(c.title)}</div>
+        <div class="backlog-row-title"><span class="backlog-key">${c.key || ''}</span> ${escHtml(c.title)}</div>
         <div class="backlog-row-meta">
           ${epic ? `<span class="epic-pill" style="background:${epic.color}20;color:${epic.color}">${escHtml(epic.name)}</span>` : ''}
           ${c.spentEffort != null || c.estimatedEffort != null ? `<span class="effort-badge ${over ? 'effort-over' : 'effort-ok'}">⏱️ ${c.spentEffort || 0}/${c.estimatedEffort || 0} sa</span>` : ''}

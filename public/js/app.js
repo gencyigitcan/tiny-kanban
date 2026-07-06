@@ -149,7 +149,7 @@ let _editComments = [];
 function openCardDetail(id) {
     const isNew = !id;
     const card = isNew ? null : cards.find(c => c.id === id);
-    document.getElementById('cardModalTitle').textContent = isNew ? 'Yeni Görev' : 'Görevi Düzenle';
+    document.getElementById('cardModalTitle').textContent = isNew ? 'Yeni Görev' : `${card?.key || ''}: Görevi Düzenle`;
     document.getElementById('editCardId').value = id || '';
     document.getElementById('cardTitle').value = card?.title || '';
     document.getElementById('cardDesc').value = card?.desc || '';

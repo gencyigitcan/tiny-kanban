@@ -21,6 +21,7 @@ export type Column = 'todo' | 'doing' | 'done';
 
 export interface Card {
     id: string;
+    key: string;
     title: string;
     desc: string;
     assignee: string;
@@ -98,5 +99,6 @@ export interface DbSchema {
     sessions: Session[];
     labels: Label[];
     notifications: Notification[];
+    taskCounter: number;
 }
 

@@ -2601,3 +2601,22 @@ kbd {
     width: 100%;
   }
 }
+
+/* Card key badge and backlog serial styles */
+.card-key-badge {
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+}
+.backlog-key {
+  color: var(--accent);
+  font-weight: 700;
+  margin-right: 4px;
+}
