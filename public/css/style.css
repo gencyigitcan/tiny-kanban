@@ -2620,3 +2620,17 @@ kbd {
   font-weight: 700;
   margin-right: 4px;
 }
+
+/* Backlog Drag and Drop Styles */
+.backlog-row.backlog-dragging {
+  opacity: 0.4;
+}
+.backlog-list {
+  transition: background-color 0.2s ease, border 0.2s ease;
+  min-height: 50px;
+}
+.backlog-list.drag-over {
+  background-color: var(--surface-2);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-md);
+}

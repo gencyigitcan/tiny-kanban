@@ -207,7 +207,7 @@ function renderBacklogView(cards, sprints, epics = []) {
     const rowsHTML = sprintCards.map(c => {
       const epic = epics.find(e => e.id === c.epicId);
       const over = (c.spentEffort || 0) > (c.estimatedEffort || 0) && (c.estimatedEffort || 0) > 0;
-      return `<div class="backlog-row" onclick="openCardDetail('${c.id}')">
+      return `<div class="backlog-row" draggable="true" ondragstart="onBacklogDragStart(event)" ondragend="onBacklogDragEnd(event)" data-id="${c.id}" onclick="openCardDetail('${c.id}')">
         <span class="card-priority-bar" style="position:relative;width:3px;height:16px;border-radius:3px;background:${c.priority === 'high' ? 'var(--pri-high)' : c.priority === 'low' ? 'var(--pri-low)' : 'var(--pri-med)'}"></span>
         <div class="backlog-row-title"><span class="backlog-key">${c.key || ''}</span> ${escHtml(c.title)}</div>
         <div class="backlog-row-meta">
@@ -234,7 +234,7 @@ function renderBacklogView(cards, sprints, epics = []) {
           <span style="font-size:12px;color:var(--text-muted)">${sprintCards.length} görev</span>
         </div>
       </div>
-      <div class="backlog-list">${rowsHTML}</div>
+      <div class="backlog-list" data-sprint-id="${sprint ? sprint.id : ''}" ondragover="onBacklogDragOver(event)" ondragleave="onBacklogDragLeave(event)" ondrop="onBacklogDrop(event)">${rowsHTML}</div>
     </div>`;
   }
 
@@ -765,3 +765,76 @@ function renderMyTasksView(cards, epics = []) {
   renderCol('my-tasks-done', doneCards);
 }
 window.renderMyTasksView = renderMyTasksView;
+
+// ── Backlog Drag & Drop Handlers ──────────────────────────
+let backlogDragId = null;
+
+function onBacklogDragStart(e) {
+  backlogDragId = e.currentTarget.dataset.id;
+  e.currentTarget.classList.add('backlog-dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', backlogDragId);
+}
+window.onBacklogDragStart = onBacklogDragStart;
+
+function onBacklogDragEnd(e) {
+  e.currentTarget.classList.remove('backlog-dragging');
+  document.querySelectorAll('.backlog-list').forEach(l => l.classList.remove('drag-over'));
+}
+window.onBacklogDragEnd = onBacklogDragEnd;
+
+function onBacklogDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+window.onBacklogDragOver = onBacklogDragOver;
+
+function onBacklogDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+window.onBacklogDragLeave = onBacklogDragLeave;
+
+async function onBacklogDrop(e) {
+  e.preventDefault();
+  const list = e.currentTarget;
+  list.classList.remove('drag-over');
+  
+  if (!backlogDragId) return;
+  const cardId = backlogDragId;
+  backlogDragId = null;
+  
+  const targetSprintId = list.dataset.sprintId || null;
+  
+  const allCards = typeof cards !== 'undefined' ? cards : (window.cards || []);
+  const allSprints = typeof sprints !== 'undefined' ? sprints : (window.sprints || []);
+  
+  const card = allCards.find(c => c.id === cardId);
+  if (!card) return;
+  if (card.sprintId === targetSprintId) return;
+  
+  let sprintName = "Backlog (Sprint'siz)";
+  if (targetSprintId) {
+    const sprint = allSprints.find(s => s.id === targetSprintId);
+    if (sprint) sprintName = sprint.name;
+  }
+  
+  const approved = confirm(`"${card.title}" adlı görevi "${sprintName}" sprintine taşımak istiyor musunuz?`);
+  if (!approved) return;
+  
+  try {
+    const upd = await API.updateCard(cardId, { sprintId: targetSprintId });
+    Object.assign(card, upd);
+    
+    if (typeof renderAll === 'function') {
+      renderAll();
+    } else if (typeof window.renderAll === 'function') {
+      window.renderAll();
+    }
+    showToast('Görev sprinti güncellendi ✓');
+  } catch (err) {
+    console.error(err);
+    showToast('Taşıma işlemi başarısız', 'error');
+  }
+}
+window.onBacklogDrop = onBacklogDrop;
