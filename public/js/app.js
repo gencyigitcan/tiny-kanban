@@ -300,7 +300,8 @@ document.getElementById('deleteCardBtn').addEventListener('click', async () => {
     const id = document.getElementById('editCardId').value;
     if (!id) return;
     const card = cards.find(c => c.id === id);
-    if (!confirm(`"${card?.title}" silinsin mi?`)) return;
+    const approved = await showConfirm(`"${card?.title}" silinsin mi?`, 'Görevi Sil');
+    if (!approved) return;
     try {
         await API.deleteCard(id);
         cards = cards.filter(c => c.id !== id);
@@ -342,7 +343,8 @@ document.getElementById('filterPriority').addEventListener('change', () => rende
 document.getElementById('addTaskBtn').addEventListener('click', () => openCardDetail(null));
 document.getElementById('clearBtn').addEventListener('click', async () => {
     if (!cards.length) { showToast('Pano zaten boş'); return; }
-    if (!confirm('Tüm görevler silinsin mi?')) return;
+    const approved = await showConfirm('Tüm görevler silinsin mi?', 'Panoyu Temizle');
+    if (!approved) return;
     try {
         await Promise.all(cards.map(c => API.deleteCard(c.id)));
         cards = [];
@@ -390,11 +392,11 @@ if (addEpicBtn) {
 }
 
 async function deleteEpic(id) {
-    if (!confirm('Epic silinsin mi?')) return;
+    const approved = await showConfirm('Epic silinsin mi?', 'Epic Sil');
+    if (!approved) return;
     try {
         await API.deleteEpic(id);
         epics = epics.filter(e => e.id !== id);
-        // Clean epicIds locally
         cards.forEach(c => { if (c.epicId === id) c.epicId = null; });
         renderEpicList();
         renderAll();
@@ -454,11 +456,11 @@ async function activateSprint(id) {
 window.activateSprint = activateSprint;
 
 async function deleteSprint(id) {
-    if (!confirm('Sprint silinsin mi?')) return;
+    const approved = await showConfirm('Sprint silinsin mi?', 'Sprint Sil');
+    if (!approved) return;
     try {
         await API.deleteSprint(id);
         sprints = sprints.filter(s => s.id !== id);
-        // Clean sprintIds locally
         cards.forEach(c => { if (c.sprintId === id) c.sprintId = null; });
         renderSprintList();
         renderAll();
@@ -664,7 +666,8 @@ function renderLabelsList() {
 window.renderLabelsList = renderLabelsList;
 
 async function deleteLabel(id) {
-    if (!confirm('Bu etiketi silmek istediğinize emin misiniz?')) return;
+    const approved = await showConfirm('Bu etiketi silmek istediğinize emin misiniz?', 'Etiketi Sil');
+    if (!approved) return;
     try {
         await API.deleteLabel(id);
         labels = labels.filter(l => l.id !== id);

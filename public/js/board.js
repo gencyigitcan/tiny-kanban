@@ -701,7 +701,8 @@ function getCardBelow(container, y) {
 async function doDelete(id) {
   const card = cards.find(c => c.id === id);
   if (!card) return;
-  if (!confirm(`"${card.title}" silinsin mi?`)) return;
+  const approved = await showConfirm(`"${card.title}" silinsin mi?`, 'Görevi Sil');
+  if (!approved) return;
   try {
     await API.deleteCard(id);
     cards = cards.filter(c => c.id !== id);
@@ -819,7 +820,7 @@ async function onBacklogDrop(e) {
     if (sprint) sprintName = sprint.name;
   }
   
-  const approved = confirm(`"${card.title}" adlı görevi "${sprintName}" sprintine taşımak istiyor musunuz?`);
+  const approved = await showConfirm(`"${card.title}" adlı görevi "${sprintName}" sprintine taşımak istiyor musunuz?`, 'Sprint Güncelleme');
   if (!approved) return;
   
   try {
@@ -838,3 +839,54 @@ async function onBacklogDrop(e) {
   }
 }
 window.onBacklogDrop = onBacklogDrop;
+
+// ── Custom Application Confirm Dialog ──────────────────────
+function showConfirm(message, title = 'Onay Gerekli') {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    
+    const box = document.createElement('div');
+    box.className = 'confirm-box';
+    
+    box.innerHTML = `
+      <div class="confirm-header">
+        <h3 class="confirm-title">${escHtml(title)}</h3>
+        <button class="confirm-close" type="button">✕</button>
+      </div>
+      <div class="confirm-body">
+        <p>${escHtml(message)}</p>
+      </div>
+      <div class="confirm-actions">
+        <button class="btn btn-secondary confirm-cancel-btn" type="button">İptal</button>
+        <button class="btn btn-danger confirm-ok-btn" type="button">Onayla</button>
+      </div>
+    `;
+    
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    
+    setTimeout(() => {
+      overlay.classList.add('open');
+      box.classList.add('open');
+    }, 10);
+    
+    const close = (approved) => {
+      overlay.classList.remove('open');
+      box.classList.remove('open');
+      setTimeout(() => {
+        overlay.remove();
+        resolve(approved);
+      }, 200);
+    };
+    
+    box.querySelector('.confirm-close').onclick = () => close(false);
+    box.querySelector('.confirm-cancel-btn').onclick = () => close(false);
+    box.querySelector('.confirm-ok-btn').onclick = () => close(true);
+    
+    overlay.onclick = (e) => {
+      if (e.target === overlay) close(false);
+    };
+  });
+}
+window.showConfirm = showConfirm;
