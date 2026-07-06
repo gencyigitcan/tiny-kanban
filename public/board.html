@@ -43,9 +43,32 @@
         </div>
         <div class="header-actions">
             <button class="btn btn-primary" id="addTaskBtn">✚ <span class="label">Yeni Görev</span></button>
-            <button class="btn btn-secondary" id="manageEpicsBtn">🏷 <span class="label">Epics</span></button>
+            <button class="btn btn-secondary" id="manageLabelsBtn">🏷 <span class="label">Etiketler</span></button>
+            <button class="btn btn-secondary" id="manageEpicsBtn">🎨 <span class="label">Epics</span></button>
             <button class="btn btn-secondary" id="manageSprintsBtn">⚡ <span class="label">Sprints</span></button>
             <button class="btn btn-danger" id="clearBtn">🗑 <span class="label">Temizle</span></button>
+        </div>
+        <div class="header-user" id="headerUser" style="display: none;">
+            <div class="notification-container">
+                <button class="btn-notification" id="notifBellBtn" title="Bildirimler" type="button">
+                    🔔
+                    <span class="notif-badge" id="notifBadge" style="display: none;">0</span>
+                </button>
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-header">
+                        <span>Bildirimler</span>
+                        <button class="btn-link" id="notifReadAllBtn" type="button">Tümünü Oku</button>
+                    </div>
+                    <div class="notif-list" id="notifList">
+                        <div class="notif-empty">Yeni bildirim yok</div>
+                    </div>
+                </div>
+            </div>
+            <div class="user-profile-badge" id="userProfileBadge">??</div>
+            <div class="user-profile-info">
+                <span class="user-profile-name" id="userProfileName">Misafir</span>
+                <button class="btn-logout" id="logoutBtn">Çıkış</button>
+            </div>
         </div>
     </header>
 
@@ -57,6 +80,7 @@
         <button class="view-tab" data-view="dashboard">📊 Dashboard</button>
         <button class="view-tab" data-view="gantt">📅 Gantt</button>
         <button class="view-tab" data-view="reports">📈 Raporlar</button>
+        <button class="view-tab" data-view="my-tasks">👤 Görevlerim</button>
     </div>
 
     <!-- BOARD VIEW -->
@@ -147,6 +171,42 @@
         <div id="reportsView"></div>
     </div>
 
+    <!-- MY TASKS VIEW -->
+    <div class="view-container" id="view-my-tasks">
+        <div class="my-tasks-dashboard">
+            <div class="my-tasks-summary-card">
+                <div class="summary-left">
+                    <h3 class="summary-title">Kişisel Görev Durumu</h3>
+                    <div class="summary-stats">
+                        <span id="myTasksTotal">0 Görev</span> &nbsp;·&nbsp; 
+                        <span class="text-success" id="myTasksDone">0 Tamamlandı</span> &nbsp;·&nbsp; 
+                        <span class="text-warning" id="myTasksRemaining">0 Kaldı</span>
+                    </div>
+                </div>
+                <div class="summary-right">
+                    <div class="progress-bar-label">Tamamlanma Oranı: <span id="myTasksPct">0%</span></div>
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill" id="myTasksBarFill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="my-tasks-board-wrap">
+                <section class="my-tasks-column" data-col="todo">
+                    <div class="col-header"><span class="col-dot" style="background:#6b7280"></span>Yapılacak (<span id="myTasksTodoCount">0</span>)</div>
+                    <div class="col-body" id="my-tasks-todo"></div>
+                </section>
+                <section class="my-tasks-column" data-col="doing">
+                    <div class="col-header"><span class="col-dot" style="background:#f59e0b"></span>Yapılıyor (<span id="myTasksDoingCount">0</span>)</div>
+                    <div class="col-body" id="my-tasks-doing"></div>
+                </section>
+                <section class="my-tasks-column" data-col="done">
+                    <div class="col-header"><span class="col-dot" style="background:#10b981"></span>Tamamlandı (<span id="myTasksDoneCount">0</span>)</div>
+                    <div class="col-body" id="my-tasks-done"></div>
+                </section>
+            </div>
+        </div>
+    </div>
+
     <!-- ============================================================
      CARD DETAIL MODAL
      ============================================================ -->
@@ -171,7 +231,9 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Kişi</label>
-                            <input class="form-input" type="text" id="cardAssignee" placeholder="ör. Ali">
+                            <select class="form-select" id="cardAssignee">
+                                <option value="">— Atanmamış —</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Öncelik</label>
@@ -269,6 +331,27 @@
     </div>
 
     <!-- ============================================================
+     LABEL MANAGER MODAL
+     ============================================================ -->
+    <div class="modal-overlay" id="labelModal">
+        <div class="modal" style="max-width:460px">
+            <div class="modal-header">
+                <h2 class="modal-title">🏷 Etiket Yönetimi</h2>
+                <button class="modal-close" onclick="closeModal('labelModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="manager-list" id="labelList"></div>
+                <div class="form-row" style="margin-top:16px">
+                    <input class="form-input" type="text" id="newLabelName" placeholder="Etiket adı… (ör. Finans)">
+                    <input class="form-input" type="color" id="newLabelColor" value="#6366f1"
+                        style="width:48px;padding:4px 6px;cursor:pointer">
+                    <button class="btn btn-primary btn-sm" id="addLabelBtn">Ekle</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
      EPIC MANAGER MODAL
      ============================================================ -->
     <div class="modal-overlay" id="epicModal">
@@ -321,6 +404,60 @@
 
     <div class="toast-container" id="toastContainer"></div>
     <div class="kbd-hint"><kbd>N</kbd> Yeni görev &nbsp;·&nbsp; <kbd>Esc</kbd> Kapat</div>
+
+    <!-- ============================================================
+     AUTH VIEW OVERLAY
+     ============================================================ -->
+    <div class="auth-overlay" id="authOverlay">
+        <div class="auth-card">
+            <div class="auth-brand">
+                <div class="auth-logo">K</div>
+                <h1 class="auth-title">Tiny Kanban</h1>
+                <p class="auth-subtitle">Küçük ekipler için Jira-like iş takip tahtası</p>
+            </div>
+            
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tabLogin">Giriş Yap</button>
+                <button class="auth-tab" id="tabRegister">Kayıt Ol</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form active">
+                <div class="form-group">
+                    <label class="form-label" for="loginUser">Kullanıcı Adı</label>
+                    <input class="form-input" type="text" id="loginUser" required placeholder="ör. admin" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="loginPassword">Şifre</label>
+                    <input class="form-input" type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password">
+                </div>
+                <div class="auth-error" id="loginError"></div>
+                <button type="submit" class="btn btn-primary auth-submit-btn">Giriş Yap</button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="registerForm" class="auth-form">
+                <div class="form-group">
+                    <label class="form-label" for="regName">Tam Adınız</label>
+                    <input class="form-input" type="text" id="regName" required placeholder="ör. Zeynep Kaya">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="regUser">Kullanıcı Adı</label>
+                    <input class="form-input" type="text" id="regUser" required placeholder="ör. zeynep" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="regPassword">Şifre</label>
+                    <input class="form-input" type="password" id="regPassword" required placeholder="En az 6 karakter" autocomplete="new-password">
+                </div>
+                <div class="auth-error" id="registerError"></div>
+                <button type="submit" class="btn btn-primary auth-submit-btn">Hesap Oluştur</button>
+            </form>
+
+            <div class="auth-footer-note">
+                Varsayılan hesaplar: <code>admin</code>, <code>zeynep</code>, <code>mehmet</code> (Şifre: <code>password</code>)
+            </div>
+        </div>
+    </div>
 
     <script src="js/api.js"></script>
     <script src="js/seeder.js"></script>

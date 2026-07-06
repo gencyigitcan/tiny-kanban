@@ -18,13 +18,15 @@ const commentSchema = z.object({
     id: z.string(),
     text: z.string().min(1).max(2000),
     createdAt: z.number(),
+    author: z.string().max(100).optional(),
+    authorId: z.string().optional(),
 });
 
 // ── Cards ────────────────────────────────────────────────────
 export const createCardSchema = z.object({
     title: z.string().min(1, 'Başlık boş olamaz').max(200).trim(),
     desc: z.string().max(2000).optional().default(''),
-    assignee: z.string().max(100).optional().default(''),
+    assignee: z.string().min(1, 'Kişi seçimi zorunludur').max(100).trim(),
     priority: priority.optional().default('medium'),
     col: column.optional().default('todo'),
     startDate: dateStr,
@@ -61,7 +63,32 @@ export const updateSprintSchema = createSprintSchema.partial().extend({
     active: z.boolean().optional(),
 });
 
+// ── Auth ─────────────────────────────────────────────────────
+export const registerSchema = z.object({
+    username: z.string().min(3, 'Kullanıcı adı en az 3 karakter olmalıdır').max(30).regex(/^[a-zA-Z0-9_]+$/, 'Geçersiz kullanıcı adı (sadece harf, sayı ve alt çizgi)'),
+    password: z.string().min(6, 'Şifre en az 6 karakter olmalıdır').max(100),
+    name: z.string().min(1, 'İsim boş olamaz').max(100).trim(),
+});
+
+export const loginSchema = z.object({
+    username: z.string().min(1, 'Kullanıcı adı gerekli'),
+    password: z.string().min(1, 'Şifre gerekli'),
+});
+
+// ── Labels ───────────────────────────────────────────────────
+export const createLabelSchema = z.object({
+    name: z.string().min(1, 'Etiket adı boş olamaz').max(50).trim(),
+    color: hexColor.default('#6366f1'),
+});
+
+export const updateLabelSchema = createLabelSchema.partial();
+
 export type CreateCardInput = z.infer<typeof createCardSchema>;
 export type UpdateCardInput = z.infer<typeof updateCardSchema>;
 export type CreateEpicInput = z.infer<typeof createEpicSchema>;
 export type CreateSprintInput = z.infer<typeof createSprintSchema>;
+export type RegisterInput = z.infer<typeof registerSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;
+export type CreateLabelInput = z.infer<typeof createLabelSchema>;
+export type UpdateLabelInput = z.infer<typeof updateLabelSchema>;
+

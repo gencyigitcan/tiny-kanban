@@ -12,6 +12,8 @@ export interface Comment {
     id: string;
     text: string;
     createdAt: number;
+    author?: string;
+    authorId?: string;
 }
 
 export type Priority = 'high' | 'medium' | 'low';
@@ -53,8 +55,48 @@ export interface Sprint {
     createdAt: number;
 }
 
+export interface User {
+    id: string;
+    username: string;
+    name: string;
+    passwordHash: string;
+    avatarColor: string;
+    createdAt: number;
+}
+
+export interface Session {
+    token: string;
+    userId: string;
+    expiresAt: number;
+}
+
+export interface Label {
+    id: string;
+    name: string;
+    color: string;
+    bg: string;
+    createdAt: number;
+}
+
+export interface Notification {
+    id: string;
+    userId: string;
+    senderId: string;
+    senderName: string;
+    cardId: string;
+    cardTitle: string;
+    text: string;
+    read: boolean;
+    createdAt: number;
+}
+
 export interface DbSchema {
     cards: Card[];
     epics: Epic[];
     sprints: Sprint[];
+    users: User[];
+    sessions: Session[];
+    labels: Label[];
+    notifications: Notification[];
 }
+

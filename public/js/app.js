@@ -6,17 +6,53 @@
 let cards = [];
 let epics = [];
 let sprints = [];
+let users = [];
+let labels = [];
+let notifications = [];
+let currentUser = null;
 let currentView = 'board';
+let syncIntervalId = null;
 
 // ── Boot ──────────────────────────────────────────────────
+// ── Boot ──────────────────────────────────────────────────
 async function boot() {
+    const token = localStorage.getItem('tiny_kanban_token');
+    
+    // Switch to local storage mode only if we are on demo page or explicitly offline
+    if (!token && !window.isLocalStorageMode) {
+        showAuthScreen();
+        return;
+    }
+
     try {
-        // Probe and initialize localStorage mode if appropriate
-        [cards, epics, sprints] = await Promise.all([
+        if (token && !window.isLocalStorageMode) {
+            try {
+                currentUser = await API.getMe();
+                updateUserHeader();
+            } catch (e) {
+                console.error('Session verify failed, showing login screen:', e);
+                showAuthScreen();
+                return;
+            }
+        }
+
+        // Fetch core data
+        [cards, epics, sprints, users, labels, notifications] = await Promise.all([
             API.getCards(),
             API.getEpics(),
-            API.getSprints()
+            API.getSprints(),
+            API.getUsers(),
+            API.getLabels(),
+            API.getNotifications()
         ]);
+        window.LABELS = labels;
+        window.LABEL_MAP = Object.fromEntries(labels.map(l => [l.id, l]));
+        
+        // Setup dropdown elements with registered users list
+        populateAssigneeSelects();
+
+        // Render notifications in header
+        renderNotifications();
         
         // If in localStorage mode, verify if demo needs seeding
         if (window.isLocalStorageMode) {
@@ -32,7 +68,11 @@ async function boot() {
             }
         }
         
+        hideAuthScreen();
         renderAll();
+        
+        // Initialize background sync poll
+        setupBackgroundSync();
     } catch (err) {
         console.error('Boot error:', err);
         showToast('Sunucuya bağlanılamadı. Tarayıcı önbelleği yükleniyor...', 'warn');
@@ -55,6 +95,7 @@ function renderAll() {
     if (currentView === 'dashboard') renderDashboard(cards, epics, sprints);
     if (currentView === 'gantt') renderGantt(cards);
     if (currentView === 'reports') renderReports(cards, epics, sprints);
+    if (currentView === 'my-tasks') renderMyTasksView(cards, epics);
     updateSprintBadge();
 }
 
@@ -133,7 +174,7 @@ function openCardDetail(id) {
 
     // Labels
     const selectedLabels = new Set(card?.labels || []);
-    document.getElementById('labelsGrid').innerHTML = LABELS.map(l =>
+    document.getElementById('labelsGrid').innerHTML = labels.map(l =>
         `<div class="label-chip${selectedLabels.has(l.id) ? ' selected' : ''}" style="background:${l.bg};color:${l.color}" data-lid="${l.id}" onclick="toggleLabel(this)">${escHtml(l.name)}</div>`
     ).join('');
 
@@ -164,11 +205,24 @@ function renderSubtasksList() {
 }
 
 function renderCommentsList() {
-    document.getElementById('commentsList').innerHTML = _editComments.map(c => `
-        <div class="comment-row">
-            <div class="comment-meta">${new Date(c.createdAt).toLocaleString('tr-TR')}</div>
-            <div class="comment-body">${escHtml(c.text)}</div>
-        </div>`).join('');
+    document.getElementById('commentsList').innerHTML = _editComments.map(c => {
+        const authorName = c.author || 'Misafir';
+        const init = initials(authorName);
+        const hue = [...authorName].reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360;
+        const avatarBg = `hsl(${hue}, 60%, 50%)`;
+        
+        return `
+            <div class="comment-row">
+                <div class="comment-avatar" style="background:${avatarBg}">${escHtml(init)}</div>
+                <div class="comment-content">
+                    <div class="comment-meta">
+                        <span class="comment-author">${escHtml(authorName)}</span>
+                        <span class="comment-time">${new Date(c.createdAt).toLocaleString('tr-TR')}</span>
+                    </div>
+                    <div class="comment-body">${escHtml(c.text)}</div>
+                </div>
+            </div>`;
+    }).join('');
 }
 
 document.getElementById('addSubtaskBtn').addEventListener('click', () => {
@@ -188,7 +242,13 @@ document.getElementById('addCommentBtn').addEventListener('click', () => {
     const inp = document.getElementById('newComment');
     const text = inp.value.trim();
     if (!text) return;
-    _editComments.push({ id: Date.now().toString(36), text, createdAt: Date.now() });
+    _editComments.push({
+        id: Date.now().toString(36),
+        text,
+        createdAt: Date.now(),
+        author: currentUser ? currentUser.name : 'Misafir',
+        authorId: currentUser ? currentUser.id : ''
+    });
     renderCommentsList();
     inp.value = '';
 });
@@ -424,6 +484,299 @@ document.addEventListener('keydown', e => {
     if (['input', 'textarea', 'select'].includes(tag)) return;
     if (e.key === 'n' || e.key === 'N') openCardDetail(null);
     if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+});
+
+// ── Authentication UI Helpers and Event Handlers ─────────
+window.addEventListener('unauthorized', () => {
+    showAuthScreen();
+});
+
+function showAuthScreen() {
+    document.getElementById('authOverlay').classList.add('open');
+    document.getElementById('headerUser').style.display = 'none';
+    if (syncIntervalId) {
+        clearInterval(syncIntervalId);
+        syncIntervalId = null;
+    }
+}
+
+function hideAuthScreen() {
+    document.getElementById('authOverlay').classList.remove('open');
+    if (currentUser) {
+        document.getElementById('headerUser').style.display = 'flex';
+    }
+}
+
+function updateUserHeader() {
+    if (!currentUser) return;
+    document.getElementById('userProfileName').textContent = currentUser.name;
+    const badge = document.getElementById('userProfileBadge');
+    if (badge) {
+        badge.textContent = initials(currentUser.name);
+        badge.style.backgroundColor = currentUser.avatarColor || '#4f46e5';
+    }
+}
+
+function populateAssigneeSelects() {
+    const select = document.getElementById('cardAssignee');
+    if (select) {
+        select.innerHTML = '<option value="">— Atanmamış —</option>' +
+            users.map(u => `<option value="${escHtml(u.name)}">${escHtml(u.name)}</option>`).join('');
+    }
+    // Also update board assignee filter
+    const filter = document.getElementById('filterAssignee');
+    if (filter) {
+        filter.innerHTML = '<option value="">Tüm kişiler</option>' +
+            users.map(u => `<option value="${escHtml(u.name).toLowerCase()}">${escHtml(u.name)}</option>`).join('');
+    }
+}
+
+function setupBackgroundSync() {
+    if (window.isLocalStorageMode) return;
+    if (syncIntervalId) return;
+    
+    syncIntervalId = setInterval(async () => {
+        const modalOpen = document.querySelector('.modal-overlay.open');
+        const isFocusInput = ['input', 'textarea', 'select'].includes(document.activeElement?.tagName?.toLowerCase());
+        
+        if (!modalOpen && !isFocusInput && (typeof dragId === 'undefined' || !dragId)) {
+            try {
+                const [newCards, newEpics, newSprints, newLabels, newNotifications] = await Promise.all([
+                    API.getCards(),
+                    API.getEpics(),
+                    API.getSprints(),
+                    API.getLabels(),
+                    API.getNotifications()
+                ]);
+                
+                // Compare and notify if new unread notifications are received
+                const currentUnreadIds = new Set(notifications.filter(n => !n.read).map(n => n.id));
+                const newUnread = newNotifications.filter(n => !n.read && !currentUnreadIds.has(n.id));
+                if (newUnread.length > 0) {
+                    newUnread.forEach(n => {
+                        showToast(`🔔 ${n.text}`);
+                    });
+                }
+                
+                let changed = false;
+                if (JSON.stringify(newCards) !== JSON.stringify(cards) ||
+                    JSON.stringify(newEpics) !== JSON.stringify(epics) ||
+                    JSON.stringify(newSprints) !== JSON.stringify(sprints) ||
+                    JSON.stringify(newLabels) !== JSON.stringify(labels) ||
+                    JSON.stringify(newNotifications) !== JSON.stringify(notifications)) {
+                    changed = true;
+                }
+                
+                if (changed) {
+                    cards = newCards;
+                    epics = newEpics;
+                    sprints = newSprints;
+                    labels = newLabels;
+                    notifications = newNotifications;
+                    window.LABELS = labels;
+                    window.LABEL_MAP = Object.fromEntries(labels.map(l => [l.id, l]));
+                    
+                    renderNotifications();
+                    renderAll();
+                }
+            } catch (e) {
+                console.debug('Background collaborative sync check skipped:', e);
+            }
+        }
+    }, 5000);
+}
+
+// ── Auth Tab Switch ──────────────────────────────────────
+document.getElementById('tabLogin').addEventListener('click', () => {
+    document.getElementById('tabLogin').classList.add('active');
+    document.getElementById('tabRegister').classList.remove('active');
+    document.getElementById('loginForm').classList.add('active');
+    document.getElementById('registerForm').classList.remove('active');
+});
+
+document.getElementById('tabRegister').addEventListener('click', () => {
+    document.getElementById('tabRegister').classList.add('active');
+    document.getElementById('tabLogin').classList.remove('active');
+    document.getElementById('registerForm').classList.add('active');
+    document.getElementById('loginForm').classList.remove('active');
+});
+
+// ── Auth Submission Actions ──────────────────────────────
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const userVal = document.getElementById('loginUser').value.trim();
+    const passVal = document.getElementById('loginPassword').value;
+    const errorDiv = document.getElementById('loginError');
+    errorDiv.textContent = '';
+    
+    try {
+        const res = await API.login(userVal, passVal);
+        currentUser = res.user;
+        updateUserHeader();
+        await boot();
+        showToast(`Hoş geldiniz, ${currentUser.name}!`);
+    } catch (err) {
+        errorDiv.textContent = err.message || 'Kullanıcı adı veya şifre hatalı';
+    }
+});
+
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nameVal = document.getElementById('regName').value.trim();
+    const userVal = document.getElementById('regUser').value.trim();
+    const passVal = document.getElementById('regPassword').value;
+    const errorDiv = document.getElementById('registerError');
+    errorDiv.textContent = '';
+    
+    try {
+        const res = await API.register(userVal, passVal, nameVal);
+        currentUser = res.user;
+        updateUserHeader();
+        await boot();
+        showToast('Kayıt başarılı! Hoş geldiniz.');
+    } catch (err) {
+        errorDiv.textContent = err.message || 'Kayıt sırasında bir hata oluştu';
+    }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await API.logout();
+    currentUser = null;
+    showAuthScreen();
+    showToast('Oturum kapatıldı');
+});
+
+// ── Custom Labels Management UI ───────────────────────────
+document.getElementById('manageLabelsBtn').addEventListener('click', () => {
+    renderLabelsList();
+    openModal('labelModal');
+});
+
+function renderLabelsList() {
+    const list = document.getElementById('labelList');
+    if (!list) return;
+    list.innerHTML = labels.map(l => `
+        <div class="manager-item" style="border-left: 4px solid ${l.color}">
+            <span>${escHtml(l.name)}</span>
+            <button class="btn btn-danger btn-sm" onclick="deleteLabel('${l.id}')">✕</button>
+        </div>`).join('') || '<div class="manager-empty">Etiket bulunmamaktadır.</div>';
+}
+window.renderLabelsList = renderLabelsList;
+
+async function deleteLabel(id) {
+    if (!confirm('Bu etiketi silmek istediğinize emin misiniz?')) return;
+    try {
+        await API.deleteLabel(id);
+        labels = labels.filter(l => l.id !== id);
+        window.LABELS = labels;
+        window.LABEL_MAP = Object.fromEntries(labels.map(l => [l.id, l]));
+        renderLabelsList();
+        renderAll();
+        showToast('Etiket silindi');
+    } catch {
+        showToast('Etiket silinemedi', 'error');
+    }
+}
+window.deleteLabel = deleteLabel;
+
+document.getElementById('addLabelBtn').addEventListener('click', async () => {
+    const nameInp = document.getElementById('newLabelName');
+    const colorInp = document.getElementById('newLabelColor');
+    const name = nameInp.value.trim();
+    const color = colorInp.value;
+    if (!name) { showToast('Etiket adı boş bırakılamaz', 'warn'); return; }
+    try {
+        const l = await API.addLabel({ name, color });
+        labels.push(l);
+        window.LABELS = labels;
+        window.LABEL_MAP = Object.fromEntries(labels.map(lbl => [lbl.id, lbl]));
+        renderLabelsList();
+        renderAll();
+        showToast('Etiket eklendi ✓');
+        nameInp.value = '';
+    } catch (err) {
+        showToast(err.message || 'Etiket eklenemedi', 'error');
+    }
+});
+
+// ── Notifications Management UI ───────────────────────────
+document.getElementById('notifBellBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('notifDropdown').classList.toggle('open');
+});
+
+document.addEventListener('click', () => {
+    const dd = document.getElementById('notifDropdown');
+    if (dd) dd.classList.remove('open');
+});
+
+document.getElementById('notifDropdown').addEventListener('click', (e) => {
+    e.stopPropagation();
+});
+
+function renderNotifications() {
+    const badge = document.getElementById('notifBadge');
+    const list = document.getElementById('notifList');
+    if (!badge || !list) return;
+    
+    const unread = notifications.filter(n => !n.read);
+    if (unread.length > 0) {
+        badge.textContent = unread.length;
+        badge.style.display = 'inline-flex';
+    } else {
+        badge.style.display = 'none';
+    }
+    
+    if (notifications.length === 0) {
+        list.innerHTML = '<div class="notif-empty">Yeni bildirim yok</div>';
+        return;
+    }
+    
+    list.innerHTML = notifications.map(n => `
+        <div class="notif-item${n.read ? '' : ' unread'}" onclick="clickNotification('${n.id}', '${n.cardId}')">
+            <div class="notif-item-text">${escHtml(n.text)}</div>
+            <div class="notif-item-time">${new Date(n.createdAt).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}</div>
+        </div>`).join('');
+}
+window.renderNotifications = renderNotifications;
+
+async function clickNotification(id, cardId) {
+    document.getElementById('notifDropdown').classList.remove('open');
+    try {
+        await API.readNotification(id);
+        const n = notifications.find(x => x.id === id);
+        if (n) n.read = true;
+        renderNotifications();
+        
+        // Open card details modal
+        const card = cards.find(c => c.id === cardId);
+        if (card) {
+            openCardDetail(cardId);
+        } else {
+            showToast('Görev bulunamadı (silinmiş olabilir)');
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+window.clickNotification = clickNotification;
+
+document.getElementById('notifReadAllBtn').addEventListener('click', async () => {
+    try {
+        await API.readAllNotifications();
+        notifications.forEach(n => n.read = true);
+        renderNotifications();
+        showToast('Tüm bildirimler okundu');
+    } catch (e) {
+        showToast('İşlem başarısız', 'error');
+    }
+});
+
+// Expose click listener to view-tabs for my-tasks
+document.querySelectorAll('.view-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (btn.dataset.view === 'my-tasks') renderMyTasksView(cards, epics);
+    });
 });
 
 // ── Boot Application ──────────────────────────────────────

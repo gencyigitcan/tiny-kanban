@@ -2,23 +2,22 @@
 //  board.js – shared board rendering and views logic (v1.3.0)
 // ============================================================
 
-// ── Label definitions ────────────────────────────────────
-const LABELS = [
-  { id: 'bug', name: 'Bug', color: '#ef4444', bg: '#fef2f2' },
-  { id: 'feature', name: 'Özellik', color: '#6366f1', bg: '#eef2ff' },
-  { id: 'task', name: 'Görev', color: '#3b82f6', bg: '#eff6ff' },
-  { id: 'design', name: 'Tasarım', color: '#8b5cf6', bg: '#f5f3ff' },
-  { id: 'devops', name: 'DevOps', color: '#0891b2', bg: '#ecfeff' },
-  { id: 'test', name: 'Test', color: '#16a34a', bg: '#f0fdf4' },
-  { id: 'docs', name: 'Belge', color: '#ca8a04', bg: '#fefce8' },
-  { id: 'urgent', name: 'Acil', color: '#dc2626', bg: '#fff1f2' },
-];
-const LABEL_MAP = Object.fromEntries(LABELS.map(l => [l.id, l]));
+// ── Label definitions (loaded dynamically) ────────────────
+window.LABELS = [];
+window.LABEL_MAP = {};
 
 // ── Utilities ────────────────────────────────────────────
 function initials(name) {
   if (!name) return '?';
   return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function getAssigneeColor(name) {
+  if (!name) return '';
+  const u = (window.users || []).find(x => x.name === name);
+  if (u && u.avatarColor) return u.avatarColor;
+  const hue = [...name].reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360;
+  return `hsl(${hue}, 60%, 50%)`;
 }
 
 function escHtml(s) {
@@ -58,7 +57,7 @@ function cardHTML(card, epics = [], readonly = false) {
   const doneSubtasks = subtasks.filter(s => s.done).length;
   const subtaskPct = subtasks.length ? Math.round((doneSubtasks / subtasks.length) * 100) : 0;
   const priLabel = { high: 'Yüksek', medium: 'Orta', low: 'Düşük' };
-  const labels = (card.labels || []).map(id => LABEL_MAP[id]).filter(Boolean);
+  const labels = (card.labels || []).map(id => window.LABEL_MAP[id]).filter(Boolean);
 
   const actionsHTML = readonly ? '' : `
     <div class="card-actions">
@@ -114,7 +113,7 @@ function cardHTML(card, epics = [], readonly = false) {
 
     <div class="card-footer">
       <div class="card-footer-left">
-        ${card.assignee ? `<span class="card-assignee"><span class="assignee-avatar">${escHtml(initials(card.assignee))}</span>${escHtml(card.assignee)}</span>` : '<span></span>'}
+        ${card.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="background:${getAssigneeColor(card.assignee)}">${escHtml(initials(card.assignee))}</span>${escHtml(card.assignee)}</span>` : '<span></span>'}
         ${dueBadge(card.dueDate)}
       </div>
       <div class="card-footer-right">
@@ -167,7 +166,7 @@ function renderListView(cards, epics = []) {
   const colBadge = { todo: 'col-badge-todo', doing: 'col-badge-doing', done: 'col-badge-done' };
   const rows = cards.map(c => {
     const epic = epics.find(e => e.id === c.epicId);
-    const labels = (c.labels || []).map(id => LABEL_MAP[id]).filter(Boolean);
+    const labels = (c.labels || []).map(id => window.LABEL_MAP[id]).filter(Boolean);
     const subtasks = c.subtasks || [];
     const done = subtasks.filter(s => s.done).length;
     return `<tr onclick="openCardDetail('${c.id}')" style="cursor:pointer">
@@ -177,7 +176,7 @@ function renderListView(cards, epics = []) {
         ${labels.length ? `<div style="margin-top:4px;display:flex;gap:3px;flex-wrap:wrap">${labels.map(l => `<span class="label-tag" style="background:${l.bg};color:${l.color}">${escHtml(l.name)}</span>`).join('')}</div>` : ''}
       </td>
       <td><span class="col-badge ${colBadge[c.col]}">${colLabel[c.col]}</span></td>
-      <td>${c.assignee ? `<span class="card-assignee"><span class="assignee-avatar">${escHtml(initials(c.assignee))}</span>${escHtml(c.assignee)}</span>` : '—'}</td>
+      <td>${c.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="background:${getAssigneeColor(c.assignee)}">${escHtml(initials(c.assignee))}</span>${escHtml(c.assignee)}</span>` : '—'}</td>
       <td><span class="card-priority-tag pri-${c.priority}" style="display:inline-block;background:${c.priority === 'high' ? 'var(--pri-high-bg)' : c.priority === 'low' ? 'var(--pri-low-bg)' : 'var(--pri-med-bg)'};color:${c.priority === 'high' ? 'var(--pri-high)' : c.priority === 'low' ? 'var(--pri-low)' : 'var(--pri-med)'}">${c.priority === 'high' ? 'Yüksek' : c.priority === 'low' ? 'Düşük' : 'Orta'}</span></td>
       <td>${c.dueDate ? dueBadge(c.dueDate) : '—'}</td>
       <td>${c.storyPoints != null ? `<span class="sp-badge">${c.storyPoints}</span>` : '—'}</td>
@@ -214,7 +213,7 @@ function renderBacklogView(cards, sprints, epics = []) {
           ${c.spentEffort != null || c.estimatedEffort != null ? `<span class="effort-badge ${over ? 'effort-over' : 'effort-ok'}">⏱️ ${c.spentEffort || 0}/${c.estimatedEffort || 0} sa</span>` : ''}
           ${c.storyPoints != null ? `<span class="sp-badge">${c.storyPoints}</span>` : ''}
           ${dueBadge(c.dueDate)}
-          ${c.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="width:18px;height:18px;font-size:9px">${escHtml(initials(c.assignee))}</span></span>` : ''}
+          ${c.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="width:18px;height:18px;font-size:9px;background:${getAssigneeColor(c.assignee)}">${escHtml(initials(c.assignee))}</span></span>` : ''}
         </div>
       </div>`;
     }).join('') || `<div class="backlog-empty">Bu sprint'te görev yok</div>`;
@@ -638,7 +637,9 @@ function refreshAssigneeFilter(cards) {
   const sel = document.getElementById('filterAssignee');
   if (!sel) return;
   const cur = sel.value;
-  const names = [...new Set(cards.map(c => c.assignee).filter(Boolean))].sort();
+  const names = window.users && window.users.length ? 
+    window.users.map(u => u.name) : 
+    [...new Set(cards.map(c => c.assignee).filter(Boolean))].sort();
   sel.innerHTML = '<option value="">Tüm kişiler</option>' +
     names.map(n => `<option value="${n.toLowerCase()}" ${cur.toLowerCase() === n.toLowerCase() ? 'selected' : ''}>${escHtml(n)}</option>`).join('');
 }
@@ -709,3 +710,56 @@ async function doDelete(id) {
   }
 }
 window.doDelete = doDelete;
+
+// ── Personal Tasks (Görevlerim) Rendering ────────────────
+function renderMyTasksView(cards, epics = []) {
+  const myName = (window.currentUser || {}).name || '';
+  const myCards = cards.filter(c => c.assignee && c.assignee.toLowerCase() === myName.toLowerCase());
+  
+  const todoCards = myCards.filter(c => c.col === 'todo');
+  const doingCards = myCards.filter(c => c.col === 'doing');
+  const doneCards = myCards.filter(c => c.col === 'done');
+  
+  const total = myCards.length;
+  const done = doneCards.length;
+  const remaining = total - done;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  
+  const totalEl = document.getElementById('myTasksTotal');
+  const doneEl = document.getElementById('myTasksDone');
+  const remainingEl = document.getElementById('myTasksRemaining');
+  const pctEl = document.getElementById('myTasksPct');
+  const barEl = document.getElementById('myTasksBarFill');
+  
+  if (totalEl) totalEl.textContent = `${total} Görev`;
+  if (doneEl) doneEl.textContent = `${done} Tamamlandı`;
+  if (remainingEl) remainingEl.textContent = `${remaining} Kaldı`;
+  if (pctEl) pctEl.textContent = `${pct}%`;
+  if (barEl) barEl.style.width = `${pct}%`;
+  
+  const todoCnt = document.getElementById('myTasksTodoCount');
+  const doingCnt = document.getElementById('myTasksDoingCount');
+  const doneCnt = document.getElementById('myTasksDoneCount');
+  
+  if (todoCnt) todoCnt.textContent = todoCards.length;
+  if (doingCnt) doingCnt.textContent = doingCards.length;
+  if (doneCnt) doneCnt.textContent = doneCards.length;
+  
+  const renderCol = (elId, list) => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    if (list.length === 0) {
+      el.innerHTML = `
+        <div class="empty-state" style="padding:16px;font-size:12px;color:var(--text-muted);text-align:center">
+          Görev yok
+        </div>`;
+    } else {
+      el.innerHTML = list.map(c => cardHTML(c, epics, true)).join('');
+    }
+  };
+  
+  renderCol('my-tasks-todo', todoCards);
+  renderCol('my-tasks-doing', doingCards);
+  renderCol('my-tasks-done', doneCards);
+}
+window.renderMyTasksView = renderMyTasksView;

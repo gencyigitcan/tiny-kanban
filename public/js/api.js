@@ -45,12 +45,28 @@ async function request(url, options = {}) {
         throw new Error('Local storage mode active');
     }
     try {
+        const token = localStorage.getItem('tiny_kanban_token');
+        if (token) {
+            options.headers = {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`
+            };
+        }
         const r = await fetch(url, options);
+        if (r.status === 401) {
+            localStorage.removeItem('tiny_kanban_token');
+            window.dispatchEvent(new Event('unauthorized'));
+            throw new Error('Unauthorized');
+        }
         if (!r.ok) {
-            throw new Error(`Server returned status ${r.status}`);
+            const errBody = await r.json().catch(() => ({}));
+            throw new Error(errBody.error || `Server returned status ${r.status}`);
         }
         return await r.json();
     } catch (e) {
+        if (e.message === 'Unauthorized') {
+            throw e;
+        }
         // Fall back to LocalStorage on connection error (except on clean exit / aborted fetches)
         if (!IS_DEMO && !window.isLocalStorageMode) {
             console.warn('API server is offline. Switching to client-side LocalStorage mode.', e);
@@ -279,6 +295,119 @@ const API = {
                 if (c.sprintId === id) c.sprintId = null;
             });
             saveLocalData(db);
+            return { success: true };
+        }
+    },
+    // ── Authentication ──────────────────────────────────────
+    async login(username, password) {
+        const res = await request('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        if (res.token) {
+            localStorage.setItem('tiny_kanban_token', res.token);
+        }
+        return res;
+    },
+    async register(username, password, name) {
+        const res = await request('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, name })
+        });
+        if (res.token) {
+            localStorage.setItem('tiny_kanban_token', res.token);
+        }
+        return res;
+    },
+    async logout() {
+        try {
+            await request('/api/auth/logout', { method: 'POST' });
+        } catch (e) {
+            console.warn('Logout server request failed:', e);
+        } finally {
+            localStorage.removeItem('tiny_kanban_token');
+        }
+    },
+    async getMe() {
+        return await request('/api/auth/me');
+    },
+    async getUsers() {
+        try {
+            return await request('/api/users');
+        } catch (e) {
+            // Local fallback users
+            return [
+                { id: 'usr-1', username: 'admin', name: 'Ali Yılmaz', avatarColor: '#4f46e5' },
+                { id: 'usr-2', username: 'zeynep', name: 'Zeynep Kaya', avatarColor: '#0ea5e9' },
+                { id: 'usr-3', username: 'mehmet', name: 'Mehmet Demir', avatarColor: '#10b981' }
+            ];
+        }
+    },
+    // ── Custom Labels ────────────────────────────────────────
+    async getLabels() {
+        try {
+            return await request('/api/labels');
+        } catch {
+            return getLocalData().labels || [];
+        }
+    },
+    async addLabel(payload) {
+        try {
+            return await request('/api/labels', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } catch {
+            const db = getLocalData();
+            db.labels = db.labels || [];
+            const hex = payload.color || '#6366f1';
+            const newLabel = {
+                id: localUid(),
+                name: payload.name.trim(),
+                color: hex,
+                bg: `${hex}1a`,
+                createdAt: Date.now()
+            };
+            db.labels.push(newLabel);
+            saveLocalData(db);
+            return newLabel;
+        }
+    },
+    async deleteLabel(id) {
+        try {
+            return await request(`/api/labels/${id}`, { method: 'DELETE' });
+        } catch {
+            const db = getLocalData();
+            db.labels = (db.labels || []).filter(l => l.id !== id);
+            db.cards.forEach(c => {
+                if (c.labels) c.labels = c.labels.filter(lid => lid !== id);
+            });
+            saveLocalData(db);
+            return { success: true };
+        }
+    },
+    // ── Notifications ────────────────────────────────────────
+    async getNotifications() {
+        try {
+            return await request('/api/notifications');
+        } catch {
+            return [];
+        }
+    },
+    async readNotification(id) {
+        try {
+            return await request(`/api/notifications/${id}/read`, { method: 'POST' });
+        } catch {
+            return { success: true };
+        }
+    },
+    async readAllNotifications() {
+        try {
+            return await request('/api/notifications/read-all', { method: 'POST' });
+        } catch {
             return { success: true };
         }
     }

@@ -9,10 +9,14 @@ import cors from 'cors';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 
-import { initDb } from './lib/db.js';
+import { initDb, readDb } from './lib/db.js';
 import { cardRouter } from './routes/cards.js';
 import { epicRouter } from './routes/epics.js';
 import { sprintRouter } from './routes/sprints.js';
+import { authRouter } from './routes/auth.js';
+import { labelsRouter } from './routes/labels.js';
+import { notificationsRouter } from './routes/notifications.js';
+import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/error.js';
 
 // ── Init ───────────────────────────────────────────────────
@@ -50,9 +54,24 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.static(path.join(process.cwd(), 'public')));
 
 // ── API Routes ─────────────────────────────────────────────
-app.use('/api/cards', cardRouter);
-app.use('/api/epics', epicRouter);
-app.use('/api/sprints', sprintRouter);
+app.use('/api/auth', authRouter);
+app.get('/api/users', requireAuth, (_req, res) => {
+    const db = readDb();
+    const publicUsers = db.users.map(u => ({
+        id: u.id,
+        username: u.username,
+        name: u.name,
+        avatarColor: u.avatarColor
+    }));
+    res.json(publicUsers);
+});
+
+app.use('/api/labels', requireAuth, labelsRouter);
+app.use('/api/notifications', requireAuth, notificationsRouter);
+
+app.use('/api/cards', requireAuth, cardRouter);
+app.use('/api/epics', requireAuth, epicRouter);
+app.use('/api/sprints', requireAuth, sprintRouter);
 
 // ── Root redirect ─────────────────────────────────────────
 app.get('/', (_req, res) => res.redirect('/board.html'));
@@ -67,8 +86,9 @@ app.use(errorHandler);
 
 // ── Start ─────────────────────────────────────────────────
 app.listen(PORT, () => {
-    console.log(`\n  🟣 Tiny Kanban v1.2.0\n`);
+    console.log(`\n  🟣 Tiny Kanban v1.3.0\n`);
     console.log(`     My Board  → http://localhost:${PORT}/board.html`);
     console.log(`     Demo      → http://localhost:${PORT}/demo.html`);
     console.log(`     API       → http://localhost:${PORT}/api/cards\n`);
 });
+
