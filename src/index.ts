@@ -105,6 +105,13 @@ export default {
                 port: PORT
             });
         }
+
+        const url = new URL(request.url);
+        // Serve static assets directly from Cloudflare Pages CDN
+        if (!url.pathname.startsWith('/api/')) {
+            return env.ASSETS.fetch(request);
+        }
+
         const db = await loadDbFromD1(env.DB);
         return dbContext.run(db, async () => {
             const response = await server.fetch(request, env, ctx);
