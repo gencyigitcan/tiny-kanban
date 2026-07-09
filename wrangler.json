@@ -1,6 +1,6 @@
 {
   "name": "tiny-kanban",
-  "main": "dist/index.js",
+  "main": "public/_worker.js",
   "compatibility_date": "2026-06-12",
   "compatibility_flags": [
     "nodejs_compat"

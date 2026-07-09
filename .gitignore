@@ -3,4 +3,4 @@ data/db.json
 .DS_Store
 *.log
 .wrangler/
-dist/
+public/_worker.js

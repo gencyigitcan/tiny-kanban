@@ -4,7 +4,7 @@ const path = require('path');
 esbuild.build({
   entryPoints: [path.join(__dirname, 'src/index.ts')],
   bundle: true,
-  outfile: path.join(__dirname, 'dist/index.js'),
+  outfile: path.join(__dirname, 'public/_worker.js'),
   platform: 'node',
   format: 'esm',
   target: 'es2022',
