@@ -143,7 +143,7 @@ function renderBoard(cards, epics = [], readonly = false) {
     colCards.forEach(card => {
       const hidden = (
         (q && !card.title.toLowerCase().includes(q) && !(card.desc || '').toLowerCase().includes(q) && !(card.assignee || '').toLowerCase().includes(q) && !(card.key || '').toLowerCase().includes(q)) ||
-        (fa && (card.assignee || '').toLowerCase() !== fa) ||
+        (fa && (card.assignee || '').trim().toLowerCase() !== fa.trim()) ||
         (fp && card.priority !== fp)
       );
       tmp.innerHTML = cardHTML(card, epics, readonly);
@@ -717,7 +717,7 @@ window.doDelete = doDelete;
 // ── Personal Tasks (Görevlerim) Rendering ────────────────
 function renderMyTasksView(cards, epics = []) {
   const myName = (window.currentUser || {}).name || '';
-  const myCards = cards.filter(c => c.assignee && c.assignee.toLowerCase() === myName.toLowerCase());
+  const myCards = cards.filter(c => c.assignee && c.assignee.trim().toLowerCase() === myName.trim().toLowerCase());
   
   const todoCards = myCards.filter(c => c.col === 'todo');
   const doingCards = myCards.filter(c => c.col === 'doing');
@@ -890,3 +890,56 @@ function showConfirm(message, title = 'Onay Gerekli') {
   });
 }
 window.showConfirm = showConfirm;
+
+// ── Custom Application Alert Dialog ────────────────────────
+function showAlert(message, title = 'Bilgi') {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    
+    const box = document.createElement('div');
+    box.className = 'confirm-box';
+    
+    const lines = message.split('\n');
+    const formattedMessage = lines.map(line => escHtml(line)).join('<br>');
+    
+    box.innerHTML = `
+      <div class="confirm-header">
+        <h3 class="confirm-title">${escHtml(title)}</h3>
+        <button class="confirm-close" type="button">✕</button>
+      </div>
+      <div class="confirm-body">
+        <p>${formattedMessage}</p>
+      </div>
+      <div class="confirm-actions">
+        <button class="btn btn-primary confirm-ok-btn" type="button" style="padding: 6px 16px;">Kapat</button>
+      </div>
+    `;
+    
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    
+    setTimeout(() => {
+      overlay.classList.add('open');
+      box.classList.add('open');
+    }, 10);
+    
+    const close = () => {
+      overlay.classList.remove('open');
+      box.classList.remove('open');
+      setTimeout(() => {
+        overlay.remove();
+        resolve();
+      }, 200);
+    };
+    
+    box.querySelector('.confirm-close').onclick = close;
+    box.querySelector('.confirm-ok-btn').onclick = close;
+    
+    overlay.onclick = (e) => {
+      if (e.target === overlay) close();
+    };
+  });
+}
+window.showAlert = showAlert;
+

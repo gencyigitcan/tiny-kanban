@@ -38,6 +38,10 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
         throw new AppError('Unauthorized: User not found', 401);
     }
 
+    if (user.expiresAt && Date.now() > user.expiresAt) {
+        throw new AppError('Unauthorized: Account expired', 401);
+    }
+
     req.user = user;
     next();
 }

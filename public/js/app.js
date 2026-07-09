@@ -10,6 +10,7 @@ let users = [];
 let labels = [];
 let notifications = [];
 let currentUser = null;
+window.currentUser = null;
 let currentView = 'board';
 let syncIntervalId = null;
 
@@ -28,6 +29,7 @@ async function boot() {
         if (token && !window.isLocalStorageMode) {
             try {
                 currentUser = await API.getMe();
+                window.currentUser = currentUser;
                 updateUserHeader();
             } catch (e) {
                 console.error('Session verify failed, showing login screen:', e);
@@ -614,6 +616,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     try {
         const res = await API.login(userVal, passVal);
         currentUser = res.user;
+        window.currentUser = currentUser;
         updateUserHeader();
         await boot();
         showToast(`Hoş geldiniz, ${currentUser.name}!`);
@@ -633,6 +636,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     try {
         const res = await API.register(userVal, passVal, nameVal);
         currentUser = res.user;
+        window.currentUser = currentUser;
         updateUserHeader();
         await boot();
         showToast('Kayıt başarılı! Hoş geldiniz.');
@@ -644,6 +648,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
 document.getElementById('logoutBtn').addEventListener('click', async () => {
     await API.logout();
     currentUser = null;
+    window.currentUser = null;
     showAuthScreen();
     showToast('Oturum kapatıldı');
 });
@@ -735,15 +740,55 @@ function renderNotifications() {
         return;
     }
     
-    list.innerHTML = notifications.map(n => `
-        <div class="notif-item${n.read ? '' : ' unread'}" onclick="clickNotification('${n.id}', '${n.cardId}')">
-            <div class="notif-item-text">${escHtml(n.text)}</div>
-            <div class="notif-item-time">${new Date(n.createdAt).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}</div>
-        </div>`).join('');
+    list.innerHTML = notifications.map(n => {
+        let actionHtml = '';
+        if (n.type === 'demo-request' && n.demoStatus === 'pending') {
+            actionHtml = `
+                <div class="notif-actions" style="margin-top: 8px;">
+                    <button class="btn btn-primary" style="padding: 4px 10px; font-size: 11px; font-weight: 600; line-height: 1;" onclick="approveDemoRequest(event, '${n.id}')">Onayla</button>
+                </div>
+            `;
+        }
+        return `
+            <div class="notif-item${n.read ? '' : ' unread'}" onclick="clickNotification(event, '${n.id}', '${n.cardId}')">
+                <div class="notif-item-text">${escHtml(n.text)}</div>
+                ${actionHtml}
+                <div class="notif-item-time" style="margin-top: 4px;">${new Date(n.createdAt).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}</div>
+            </div>
+        `;
+    }).join('');
 }
 window.renderNotifications = renderNotifications;
 
-async function clickNotification(id, cardId) {
+async function approveDemoRequest(event, notificationId) {
+    event.stopPropagation();
+    try {
+        const res = await fetch('/api/auth/approve-demo', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('tiny_kanban_token')}`
+            },
+            body: JSON.stringify({ notificationId })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.error || 'Onaylanamadı');
+        }
+        
+        await showAlert(`Kullanıcı Onaylandı!\n\nGiriş Bilgileri:\nKullanıcı Adı: ${data.username}\nŞifre: ${data.password}\n\nBu hesap 30 gün geçerlidir.`, 'Talep Onaylandı');
+        
+        // Refresh notifications
+        notifications = await API.getNotifications();
+        renderNotifications();
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+window.approveDemoRequest = approveDemoRequest;
+
+async function clickNotification(event, id, cardId) {
+    if (event.target.tagName === 'BUTTON') return;
     document.getElementById('notifDropdown').classList.remove('open');
     try {
         await API.readNotification(id);
@@ -751,12 +796,14 @@ async function clickNotification(id, cardId) {
         if (n) n.read = true;
         renderNotifications();
         
-        // Open card details modal
-        const card = cards.find(c => c.id === cardId);
-        if (card) {
-            openCardDetail(cardId);
-        } else {
-            showToast('Görev bulunamadı (silinmiş olabilir)');
+        if (cardId) {
+            // Open card details modal
+            const card = cards.find(c => c.id === cardId);
+            if (card) {
+                openCardDetail(cardId);
+            } else {
+                showToast('Görev bulunamadı (silinmiş olabilir)');
+            }
         }
     } catch (e) {
         console.error(e);

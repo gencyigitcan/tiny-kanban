@@ -73,8 +73,10 @@ app.use('/api/cards', requireAuth, cardRouter);
 app.use('/api/epics', requireAuth, epicRouter);
 app.use('/api/sprints', requireAuth, sprintRouter);
 
-// ── Root redirect ─────────────────────────────────────────
-app.get('/', (_req, res) => res.redirect('/board.html'));
+// ── Serve Landing Page at Root ────────────────────────────
+app.get('/', (_req, res) => {
+    res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+});
 
 // ── 404 catch-all (API) ───────────────────────────────────
 app.use('/api/*path', (_req, res) => {

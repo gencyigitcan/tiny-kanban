@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiny Kanban – Bireysel Geliştirici Proje Sunumu ve Teknik İnceleme</title>
+    <meta name="description" content="Tiny Kanban – Kendi bilgisayarımda veya sunucumda çalıştırdığım, bulut bağımlılığı olmayan, hafif ve kişisel Kanban iş takip panom. Geliştirme detayları ve mimari incelemesi.">
+    <link rel="stylesheet" href="css/landing.css">
+</head>
+<body>
+
+    <!-- ============================================================
+     NAVBAR
+     ============================================================ -->
+    <header>
+        <div class="container nav-wrapper">
+            <a href="#" class="logo-container">
+                <div class="logo-icon">K</div>
+                <span class="logo-text">Tiny Kanban Project</span>
+            </a>
+            <nav class="nav-links">
+                <a href="#about" class="nav-link">Hakkında</a>
+                <a href="#board-view" class="nav-link">Kanban</a>
+                <a href="#gantt-view" class="nav-link">Gantt Görünümü</a>
+                <a href="#dashboard-view" class="nav-link">İstatistikler</a>
+                <a href="#backlog-view" class="nav-link">Sprint Planlama</a>
+                <a href="#architecture" class="nav-link">Mimari</a>
+            </nav>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <a href="/board.html" class="btn btn-secondary">Panoya Git ➔</a>
+                <a href="#demo-request" class="btn btn-primary">Demo Talep Et</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============================================================
+     HERO SECTION
+     ============================================================ -->
+    <section class="hero container" id="about">
+        <div class="badge-private">
+            <span>🛡️</span> Kişisel & Bireysel Geliştirici Projesi
+        </div>
+        <h1 class="hero-title">
+            Bulut Bağımlılığı Olmayan<br><span>Kişisel Kanban Panosu</span>
+        </h1>
+        <p class="hero-subtitle">
+            Karmaşık SaaS araçları yerine; kendi sunucumda kolayca barındırabildiğim, verilerin tamamen benim kontrolümde olduğu ve diske güvenle saklandığı TypeScript tabanlı minimalist bir Kanban panosu geliştirdim.
+        </p>
+        <div class="hero-actions" style="display: flex; gap: 12px; justify-content: center;">
+            <a href="/board.html" class="btn btn-secondary" style="padding: 12px 24px;">Panoya Git ➔</a>
+            <a href="#demo-request" class="btn btn-primary" style="padding: 12px 24px;">Demo Hesabı Talep Et</a>
+        </div>
+    </section>
+
+    <!-- ============================================================
+     KANBAN SHOWCASE SECTION
+     ============================================================ -->
+    <section class="showcase-section" id="board-view">
+        <div class="container split-layout">
+            
+            <div class="spec-info">
+                <span class="spec-badge">Görünüm 1</span>
+                <h2 class="spec-title">Kanban Panosu & Canlı Durum Simülasyonu</h2>
+                <p class="spec-desc">
+                    Kartların durum geçişlerini ve veri senkronizasyonunu test etmek amacıyla hazırladığım canlı teknik simülasyon. Her görevin benzersiz ID (Key) numarası ve atanan kişi bilgisi üzerinden iş takibi yapılabilmektedir.
+                </p>
+                <div class="spec-bullets">
+                    <div class="spec-bullet">
+                        <span class="bullet-icon">◼</span>
+                        <div class="bullet-text">
+                            <h4>İş Kimlikleri (Task Keys)</h4>
+                            <p>Projedeki her görev, takip edilmeyi kolaylaştıran <code>TK-11</code>, <code>TK-12</code> gibi tekil ID'lerle kimliklendirilir.</p>
+                        </div>
+                    </div>
+                    <div class="spec-bullet">
+                        <span class="bullet-icon">◼</span>
+                        <div class="bullet-text">
+                            <h4>Sprint Rotasyonu</h4>
+                            <p>Simülasyon her sıfırlandığında farklı bir sprint dönemi (Altyapı, Mobil, Raporlar) yüklenerek dinamik veri yapısı test edilir.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="spec-visual">
+                <div class="demo-header">
+                    <div class="demo-title-wrapper">
+                        <span class="demo-indicator"></span>
+                        <span class="demo-title-text" id="sim-title-text">Arayüz Simülasyonu</span>
+                    </div>
+                    <div class="demo-controls">
+                        <input type="text" id="input-task-title" class="demo-input" placeholder="Görevi simülasyona ekle...">
+                        <button id="btn-add-task" class="btn btn-primary" style="padding: 4px 10px; font-size: 10px;">Ekle</button>
+                        <button id="btn-speed" class="demo-btn">⏱ Normal</button>
+                        <button id="btn-reset" class="demo-btn">🔄 Sıfırla</button>
+                    </div>
+                </div>
+
+                <div class="demo-dashboard">
+                    <div class="dash-card">
+                        <div class="dash-val" id="stat-total-tasks">4</div>
+                        <div class="dash-lbl">Görevler</div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-val" id="stat-done-tasks">1</div>
+                        <div class="dash-lbl">Tamamlandı</div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-val" id="stat-overdue" style="color: #f87171;">0</div>
+                        <div class="dash-lbl">Gecikenler</div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-val" id="stat-velocity">3 SP</div>
+                        <div class="dash-lbl">Sprint Hızı</div>
+                    </div>
+                </div>
+
+                <div class="board-grid">
+                    <div class="board-col col-todo">
+                        <div class="col-header">
+                            <span class="col-title">📋 Yapılacak</span>
+                            <span class="col-badge" id="sim-todo-count">2</span>
+                        </div>
+                        <div class="cards-container" id="sim-col-todo"></div>
+                    </div>
+                    <div class="board-col col-doing">
+                        <div class="col-header">
+                            <span class="col-title">⚡ Yapılıyor</span>
+                            <span class="col-badge" id="sim-doing-count">1</span>
+                        </div>
+                        <div class="cards-container" id="sim-col-doing"></div>
+                    </div>
+                    <div class="board-col col-done">
+                        <div class="col-header">
+                            <span class="col-title">✅ Tamamlandı</span>
+                            <span class="col-badge" id="sim-done-count">1</span>
+                        </div>
+                        <div class="cards-container" id="sim-col-done"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ============================================================
+     GANTT SHOWCASE SECTION
+     ============================================================ -->
+    <section class="showcase-section" id="gantt-view">
+        <div class="container split-layout reverse">
+            
+            <div class="spec-info">
+                <span class="spec-badge">Görünüm 2</span>
+                <h2 class="spec-title">Dinamik Gantt Zaman Çizelgesi</h2>
+                <p class="spec-desc">
+                    Herhangi bir harici kütüphaneye bağımlı kalmadan, görev kartlarının başlangıç ve bitiş tarihlerini okuyarak DOM üzerinde yatay zaman çizgileri (Gantt) ürettim. 
+                </p>
+                <div class="spec-bullets">
+                    <div class="spec-bullet">
+                        <span class="bullet-icon">◼</span>
+                        <div class="bullet-text">
+                            <h4>Otomatik Takvim Yerleşimi</h4>
+                            <p>Seçilen tarih aralığına göre CSS Grid kolonları otomatik hesaplanır ve görev çubukları takvim alanına yerleşir.</p>
+                        </div>
+                    </div>
+                    <div class="spec-bullet">
+                        <span class="bullet-icon">◼</span>
+                        <div class="bullet-text">
+                            <h4>İlerleme Oranı (Progress) Entegrasyonu</h4>
+                            <p>Gantt çubukları, kart altındaki alt görevlerin tamamlanma oranına bağlı olarak kendi içlerinde renk dolgusu alır.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="spec-visual">
+                <div class="gantt-widget">
+                    <div class="gantt-header">
+                        <div class="gantt-hdr-lbl">Görev Bilgisi</div>
+                        <div class="gantt-hdr-col">1. Hafta</div>
+                        <div class="gantt-hdr-col">2. Hafta</div>
+                        <div class="gantt-hdr-col">3. Hafta</div>
+                        <div class="gantt-hdr-col">4. Hafta</div>
+                    </div>
+                    <div class="gantt-rows">
+                        <div class="gantt-row">
+                            <div class="gantt-task-meta">
+                                <span class="gantt-task-title">OAuth Entegrasyonu</span>
+                                <span class="gantt-task-key">TK-12</span>
+                            </div>
+                            <div class="gantt-track">
+                                <div class="gantt-bar bar-1">Süreç Planı</div>
+                            </div>
+                        </div>
+                        <div class="gantt-row">
+                            <div class="gantt-task-meta">
+                                <span class="gantt-task-title">Kredi Kartı Saklama</span>
+                                <span class="gantt-task-key">TK-21</span>
+                            </div>
+                            <div class="gantt-track">
+                                <div class="gantt-bar bar-2">Analiz & Kodlama</div>
+                            </div>
+                        </div>
+                        <div class="gantt-row">
+                            <div class="gantt-task-meta">
+                                <span class="gantt-task-title">Excel Aktarım Modülü</span>
+                                <span class="gantt-task-key">TK-32</span>
+                            </div>
+                            <div class="gantt-track">
+                                <div class="gantt-bar bar-3">Test & Dağıtım</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ============================================================
+     DASHBOARD SHOWCASE SECTION
+     ============================================================ -->
+    <section class="showcase-section" id="dashboard-view">
+        <div class="container split-layout">
+            
+            <div class="spec-info">
+                <span class="spec-badge">Görünüm 3</span>
+                <h2 class="spec-title">Analitik Raporlar & İstatistikler</h2>
+                <p class="spec-desc">
+                    Projelerin genel gidişatını, darboğazları ve iş dağılımlarını anlık gözlemlemek için tasarlanan dashboard paneli.
+                </p>
+                <div class="spec-bullets">
+                    <div class="spec-bullet">
+                        <span class="bullet-icon">◼</span>
+                        <div class="bullet-text">
+                            <h4>Sprint Hızı (Velocity) Hesaplama</h4>
+                            <p>Tamamlanan görevlerin Story Point (SP) değerleri anlık toplanarak ekibin gerçek üretim hızı ölçülür.</p>
+                        </div>
+                    </div>
+                    <div class="spec-bullet">
+                        <span class="bullet-icon">◼</span>
+                        <div class="bullet-text">
+                            <h4>Öncelik Seviyesi Dağılımları</h4>
+                            <p>Görevlerin Acil, Orta ve Düşük kırılımları grafikler üzerinden gösterilerek risk analizi kolaylaştırılır.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="spec-visual">
+                <div class="chart-widget">
+                    <div class="chart-header-title">Öncelik Kırılım Analizi (Görev Yüzdeleri)</div>
+                    <div class="chart-bars">
+                        <div class="chart-row-item">
+                            <div class="chart-row-header">
+                                <span class="chart-row-lbl">🔴 Yüksek (Acil)</span>
+                                <span class="chart-row-val">%25</span>
+                            </div>
+                            <div class="chart-row-track">
+                                <div class="chart-row-fill chart-fill-high"></div>
+                            </div>
+                        </div>
+                        <div class="chart-row-item">
+                            <div class="chart-row-header">
+                                <span class="chart-row-lbl">🟠 Orta Öncelik</span>
+                                <span class="chart-row-val">%50</span>
+                            </div>
+                            <div class="chart-row-track">
+                                <div class="chart-row-fill chart-fill-medium"></div>
+                            </div>
+                        </div>
+                        <div class="chart-row-item">
+                            <div class="chart-row-header">
+                                <span class="chart-row-lbl">🟢 Düşük Öncelik</span>
+                                <span class="chart-row-val">%25</span>
+                            </div>
+                            <div class="chart-row-track">
+                                <div class="chart-row-fill chart-fill-low"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ============================================================
+     SPRINT SHOWCASE SECTION
+     ============================================================ -->
+    <section class="showcase-section" id="backlog-view">
+        <div class="container split-layout reverse">
+            
+            <div class="spec-info">
+                <span class="spec-badge">Görünüm 4</span>
+                <h2 class="spec-title">Backlog & Sprint Planlama</h2>
+                <p class="spec-desc">
+                    Hataları ve özellikleri sıraya dizdiğimiz backlog alanı ile sprintlerin kapsamını belirlediğimiz planlama paneli.
+                </p>
+                <div class="spec-bullets">
+                    <div class="spec-bullet">
+                        <span class="bullet-icon">◼</span>
+                        <div class="bullet-text">
+                            <h4>Tek-Aktif Sprint Koruması</h4>
+                            <p>Sistemde veri tutarsızlığını engellemek ve odağı korumak amacıyla aynı anda sadece tek bir sprintin aktif olabilmesini sağlayan bir iş kuralı kurguladım.</p>
+                        </div>
+                    </div>
+                    <div class="spec-bullet">
+                        <span class="bullet-icon">◼</span>
+                        <div class="bullet-text">
+                            <h4>Story Point Planlaması</h4>
+                            <p>Her sprinte atanmış toplam puan sınırları takip edilerek ekibin kapasite aşımı yapması önlenir.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="spec-visual">
+                <div class="sprints-widget">
+                    
+                    <div class="sprint-header-block">
+                        <span class="sprint-block-title">🟢 Aktif Sprint: Sprint 1</span>
+                        <span class="sprint-block-dates">05 Oca - 18 Oca</span>
+                    </div>
+                    <div class="sprint-widget-cards">
+                        <div class="sprint-widget-card">
+                            <span class="sprint-wcard-title">OAuth 2.0 Entegrasyonu (TK-12)</span>
+                            <div class="sprint-wcard-meta">
+                                <span class="avatar-badge" style="background:#0ea5e9">ZK</span>
+                                <span class="card-epic" style="background:#6366f120; color:#6366f1; font-size:8px;">5 SP</span>
+                            </div>
+                        </div>
+                        <div class="sprint-widget-card">
+                            <span class="sprint-wcard-title">Redis Cache Kurulumu (TK-13)</span>
+                            <div class="sprint-wcard-meta">
+                                <span class="avatar-badge" style="background:#10b981">MD</span>
+                                <span class="card-epic" style="background:#6366f120; color:#6366f1; font-size:8px;">3 SP</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sprint-header-block" style="background:rgba(255,255,255,0.02); border-color:var(--border-color)">
+                        <span class="sprint-block-title" style="color:var(--text-secondary)">📁 Gelecek Planlar (Backlog)</span>
+                        <span class="sprint-block-dates">Planlanmamış</span>
+                    </div>
+                    <div class="sprint-widget-cards">
+                        <div class="sprint-widget-card" style="opacity:0.6">
+                            <span class="sprint-wcard-title">Kredi Kartı Saklama (TK-21)</span>
+                            <div class="sprint-wcard-meta">
+                                <span class="avatar-badge" style="background:#10b981">MD</span>
+                                <span class="card-epic" style="background:#6366f120; color:#6366f1; font-size:8px;">13 SP</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ============================================================
+     ARCHITECTURE & SPECIFICATION
+     ============================================================ -->
+    <section class="architecture-section container" id="architecture">
+        <div class="arch-card glass">
+            <div class="arch-content">
+                <h2>Gizlilik ve Sunucu Bağımsızlığı</h2>
+                <p>Bu proje, büyük SaaS araçlarının oluşturduğu veri izleme ağlarından kaçınmak ve kişisel görevlerimi tamamen kendi kontrolüm altında yönetebilmek amacıyla geliştirilmiştir.</p>
+                
+                <div class="arch-points">
+                    <div class="arch-point">
+                        <span class="point-icon">🔒</span>
+                        <div class="point-text">
+                            <h4>%100 Kişisel Veri Gizliliği</h4>
+                            <p>Hiçbir dış API'ye veri sızdırmaz, tüm kullanıcı doğrulama ve veri saklama işlemleri sunucuda yerel olarak sonlanır.</p>
+                        </div>
+                    </div>
+                    <div class="arch-point">
+                        <span class="point-icon">⚡</span>
+                        <div class="point-text">
+                            <h4>Hafif Çalışma Mantığı</h4>
+                            <p>Derleme adımı olmayan arayüzü sayesinde tarayıcıya ek bir paket indirme yükü bindirmez ve hızlı açılır.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tech-grid" id="tech">
+                <div class="tech-item">
+                    <div class="tech-name">TypeScript 5</div>
+                    <div class="tech-desc">Tip güvenliği altyapısı</div>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-name">Express 4</div>
+                    <div class="tech-desc">Hafif API sunucusu</div>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-name">Zod</div>
+                    <div class="tech-desc">Şema doğrulamaları</div>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-name">Vanilla JS</div>
+                    <div class="tech-desc">ES modül yapısı</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================
+     DEMO REQUEST & FOOTER
+     ============================================================ -->
+    <section class="cta-footer" id="demo-request">
+        <div class="container" style="max-width: 600px; display: flex; flex-direction: column; align-items: center;">
+            <h2 class="cta-title">Demo Hesabı Talep Edin</h2>
+            <p class="cta-desc" style="margin-bottom: 24px; font-size: 15px; color: var(--text-secondary);">Adınızı ve e-posta adresinizi bırakın. Yöneticimiz talebinizi onayladığında 30 günlük deneme hesabınız oluşturulacaktır.</p>
+            
+            <form id="demoRequestForm" class="glass" style="width: 100%; padding: 28px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 16px; text-align: left; background: rgba(22, 31, 48, 0.4);">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Ad Soyad</label>
+                    <input type="text" id="req-name" required placeholder="ör. Ali Yılmaz" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 14px; color: white; font-size: 14px; outline: none; transition: var(--transition);">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 12px; font-weight: 600; color: var(--text-primary);">E-posta Adresi</label>
+                    <input type="email" id="req-email" required placeholder="ör. ali@example.com" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 14px; color: white; font-size: 14px; outline: none; transition: var(--transition);">
+                </div>
+                <div id="demo-req-message" style="font-size: 13px; display: none; padding: 10px; border-radius: 6px; background: rgba(0,0,0,0.2);"></div>
+                <button type="submit" class="btn btn-primary" style="padding: 12px; font-size: 14px; width: 100%;">Demo Talebi Gönder</button>
+            </form>
+            
+            <div class="footer-bottom" style="width: 100%;">
+                <span>Tiny Kanban – Geliştirici Sunumu</span>
+                <div>
+                    <a href="https://github.com/gencyigitcan" target="_blank" class="footer-link">GitHub Profilini Ziyaret Et</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Script to drive the live simulation -->
+    <script src="js/landing.js"></script>
+</body>
+</html>

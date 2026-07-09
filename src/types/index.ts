@@ -63,6 +63,7 @@ export interface User {
     passwordHash: string;
     avatarColor: string;
     createdAt: number;
+    expiresAt?: number;
 }
 
 export interface Session {
@@ -89,6 +90,10 @@ export interface Notification {
     text: string;
     read: boolean;
     createdAt: number;
+    type?: string;
+    email?: string;
+    name?: string;
+    demoStatus?: 'pending' | 'approved';
 }
 
 export interface DbSchema {

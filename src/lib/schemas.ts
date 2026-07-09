@@ -92,3 +92,9 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateLabelInput = z.infer<typeof createLabelSchema>;
 export type UpdateLabelInput = z.infer<typeof updateLabelSchema>;
 
+export const requestDemoSchema = z.object({
+    name: z.string().min(2, 'Ad soyad en az 2 karakter olmalıdır').max(100).trim(),
+    email: z.string().email('Geçersiz e-posta adresi').trim(),
+});
+export type RequestDemoInput = z.infer<typeof requestDemoSchema>;
+

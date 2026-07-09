@@ -7,7 +7,7 @@ import { readDb, writeDbSync, uid } from '../lib/db.js';
 import { validate } from '../middleware/validate.js';
 import { AppError } from '../middleware/error.js';
 import { requireAuth } from '../middleware/auth.js';
-import { registerSchema, loginSchema } from '../lib/schemas.js';
+import { registerSchema, loginSchema, requestDemoSchema } from '../lib/schemas.js';
 import type { User, Session } from '../types/index.js';
 
 export const authRouter = Router();
@@ -93,6 +93,10 @@ authRouter.post('/login', validate(loginSchema), (req, res) => {
         throw new AppError('Kullanıcı adı veya şifre hatalı', 401);
     }
 
+    if (user.expiresAt && Date.now() > user.expiresAt) {
+        throw new AppError('Bu demo hesabının kullanım süresi (30 gün) dolmuştur.', 401);
+    }
+
     const token = crypto.randomBytes(24).toString('hex');
     const newSession: Session = {
         token,
@@ -146,4 +150,96 @@ authRouter.get('/list', requireAuth, (_req, res) => {
         avatarColor: u.avatarColor
     }));
     res.json(publicUsers);
+});
+
+/** POST /api/auth/request-demo */
+authRouter.post('/request-demo', validate(requestDemoSchema), (req, res) => {
+    const { name, email } = req.body;
+    const db = readDb();
+
+    const emailLower = email.toLowerCase().trim();
+    
+    // Check if user already exists
+    if (db.users.some(u => u.username.toLowerCase() === emailLower)) {
+        throw new AppError('Bu e-posta adresiyle kayıtlı bir kullanıcı zaten mevcut', 400);
+    }
+
+    // Check if there is an active pending notification for this email
+    db.notifications = db.notifications || [];
+    const hasPending = db.notifications.some(n => n.type === 'demo-request' && n.email === emailLower && n.demoStatus === 'pending');
+    if (hasPending) {
+        throw new AppError('Bu e-posta adresiyle yapılmış bekleyen bir demo talebi zaten mevcut', 400);
+    }
+
+    // Create notification for admin (usr-1)
+    const newNotif = {
+        id: 'ntf-' + uid(),
+        userId: 'usr-1',
+        senderId: 'visitor',
+        senderName: name.trim(),
+        cardId: '',
+        cardTitle: '',
+        text: `${name.trim()} (${email.trim()}) yeni bir demo hesabı talep etti.`,
+        read: false,
+        createdAt: Date.now(),
+        type: 'demo-request',
+        email: emailLower,
+        name: name.trim(),
+        demoStatus: 'pending' as const
+    };
+
+    db.notifications.push(newNotif);
+    writeDbSync(db);
+
+    res.status(201).json({ ok: true, message: 'Demo talebi başarıyla oluşturuldu.' });
+});
+
+/** POST /api/auth/approve-demo */
+authRouter.post('/approve-demo', requireAuth, (req, res) => {
+    const { notificationId } = req.body;
+    const db = readDb();
+
+    // Only admin can approve
+    if (req.user!.id !== 'usr-1') {
+        throw new AppError('Yetkisiz işlem: Sadece yönetici demo taleplerini onaylayabilir', 403);
+    }
+
+    db.notifications = db.notifications || [];
+    const notification = db.notifications.find(n => n.id === notificationId);
+    if (!notification || notification.type !== 'demo-request') {
+        throw new AppError('Talep bulunamadı', 404);
+    }
+
+    if (notification.demoStatus === 'approved') {
+        throw new AppError('Bu talep zaten onaylanmış', 400);
+    }
+
+    // Generate random 6-character password
+    const tempPassword = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const randomColor = PASTEL_COLORS[Math.floor(Math.random() * PASTEL_COLORS.length)];
+
+    const newUser: User = {
+        id: 'usr-' + uid(),
+        username: notification.email!,
+        name: notification.name!,
+        passwordHash: hashPassword(tempPassword),
+        avatarColor: randomColor,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days
+    };
+
+    db.users.push(newUser);
+
+    // Update notification status & text
+    notification.demoStatus = 'approved' as const;
+    notification.text = `${notification.name} (${notification.email}) demo talebi onaylandı. Giriş: ${notification.email} (Şifre: ${tempPassword})`;
+    
+    writeDbSync(db);
+
+    res.json({
+        ok: true,
+        username: newUser.username,
+        password: tempPassword,
+        expiresAt: newUser.expiresAt
+    });
 });
