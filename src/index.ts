@@ -19,9 +19,6 @@ import { notificationsRouter } from './routes/notifications.js';
 import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/error.js';
 
-// @ts-ignore
-import { httpServerHandler } from 'cloudflare:node';
-
 // ── Init & Environment Check ──────────────────────────────
 const isNode = typeof process !== 'undefined' && process.release?.name === 'node' && typeof globalThis.caches === 'undefined';
 if (isNode) {
@@ -97,12 +94,17 @@ app.use('/api/*path', (_req, res) => {
 app.use(errorHandler);
 
 // ── Cloudflare Workers Export ──────────────────────────────
-const server = httpServerHandler({
-    port: PORT
-});
+let server: any = null;
 
 export default {
     async fetch(request: Request, env: any, ctx: any) {
+        if (!server) {
+            // @ts-ignore
+            const { httpServerHandler } = await import('cloudflare:node');
+            server = httpServerHandler({
+                port: PORT
+            });
+        }
         const db = await loadDbFromD1(env.DB);
         return dbContext.run(db, async () => {
             const response = await server.fetch(request, env, ctx);
