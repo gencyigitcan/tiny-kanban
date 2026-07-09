@@ -6,7 +6,7 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc --noEmit",
+    "build": "tsc --noEmit && node build.js",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -23,6 +23,7 @@
     "@types/express": "^5.0.6",
     "@types/morgan": "^1.9.10",
     "@types/write-file-atomic": "^4.0.3",
+    "esbuild": "^0.28.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

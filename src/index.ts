@@ -9,7 +9,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 
-import { initDb, readDb } from './lib/db.js';
+import { initDb, readDb, dbContext, loadDbFromD1, saveDbToD1 } from './lib/db.js';
 import { cardRouter } from './routes/cards.js';
 import { epicRouter } from './routes/epics.js';
 import { sprintRouter } from './routes/sprints.js';
@@ -19,8 +19,14 @@ import { notificationsRouter } from './routes/notifications.js';
 import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/error.js';
 
-// ── Init ───────────────────────────────────────────────────
-initDb();
+// @ts-ignore
+import { httpServerHandler } from 'cloudflare:node';
+
+// ── Init & Environment Check ──────────────────────────────
+const isNode = typeof process !== 'undefined' && process.release?.name === 'node' && typeof globalThis.caches === 'undefined';
+if (isNode) {
+    initDb();
+}
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -36,19 +42,23 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }));
 
-// ── Rate limiting (API only) ───────────────────────────────
-const apiLimiter = rateLimit({
-    windowMs: 60_000,       // 1 minute
-    max: 200,          // 200 requests / minute
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Too many requests, please slow down.' },
-});
-app.use('/api/', apiLimiter);
+// ── Rate limiting (API only - Node.js local mode only) ─────
+if (isNode) {
+    const apiLimiter = rateLimit({
+        windowMs: 60_000,       // 1 minute
+        max: 200,          // 200 requests / minute
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: 'Too many requests, please slow down.' },
+    });
+    app.use('/api/', apiLimiter);
+}
 
 // ── Request parsing & logging ─────────────────────────────
 app.use(express.json({ limit: '128kb' }));
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+if (isNode) {
+    app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+}
 
 // ── Static files ──────────────────────────────────────────
 app.use(express.static(path.join(process.cwd(), 'public')));
@@ -86,7 +96,26 @@ app.use('/api/*path', (_req, res) => {
 // ── Global error handler (must be last) ───────────────────
 app.use(errorHandler);
 
-// ── Start ─────────────────────────────────────────────────
+// ── Cloudflare Workers Export ──────────────────────────────
+const server = httpServerHandler({
+    port: PORT
+});
+
+export default {
+    async fetch(request: Request, env: any, ctx: any) {
+        const db = await loadDbFromD1(env.DB);
+        return dbContext.run(db, async () => {
+            const response = await server.fetch(request, env, ctx);
+            const store = dbContext.getStore();
+            if (store && store._dirty) {
+                await saveDbToD1(env.DB, store);
+            }
+            return response;
+        });
+    }
+};
+
+// ── Server Start ───────────────────────────────────────────
 app.listen(PORT, () => {
     console.log(`\n  🟣 Tiny Kanban v1.3.0\n`);
     console.log(`     My Board  → http://localhost:${PORT}/board.html`);

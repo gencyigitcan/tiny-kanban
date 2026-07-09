@@ -13,7 +13,11 @@
         "noUnusedLocals": true,
         "noUnusedParameters": true,
         "noImplicitReturns": true,
-        "exactOptionalPropertyTypes": false
+        "exactOptionalPropertyTypes": false,
+        "baseUrl": "./src",
+        "paths": {
+            "iconv-lite": ["stubs/iconv-lite-mock.ts"]
+        }
     },
     "include": [
         "src/**/*"

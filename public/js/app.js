@@ -3,6 +3,11 @@
 // ============================================================
 
 // ── App state ──────────────────────────────────────────────
+function safeAddListener(id, event, callback) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(event, callback);
+}
+
 let cards = [];
 let epics = [];
 let sprints = [];
@@ -227,8 +232,9 @@ function renderCommentsList() {
     }).join('');
 }
 
-document.getElementById('addSubtaskBtn').addEventListener('click', () => {
+safeAddListener('addSubtaskBtn', 'click', () => {
     const inp = document.getElementById('newSubtask');
+    if (!inp) return;
     const text = inp.value.trim();
     if (!text) return;
     _editSubtasks.push({ id: Date.now().toString(36), text, done: false });
@@ -236,12 +242,13 @@ document.getElementById('addSubtaskBtn').addEventListener('click', () => {
     inp.value = '';
 });
 
-document.getElementById('newSubtask').addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addSubtaskBtn').click(); }
+safeAddListener('newSubtask', 'keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); const btn = document.getElementById('addSubtaskBtn'); if (btn) btn.click(); }
 });
 
-document.getElementById('addCommentBtn').addEventListener('click', () => {
+safeAddListener('addCommentBtn', 'click', () => {
     const inp = document.getElementById('newComment');
+    if (!inp) return;
     const text = inp.value.trim();
     if (!text) return;
     _editComments.push({
@@ -255,7 +262,7 @@ document.getElementById('addCommentBtn').addEventListener('click', () => {
     inp.value = '';
 });
 
-document.getElementById('cardSaveBtn').addEventListener('click', async () => {
+safeAddListener('cardSaveBtn', 'click', async () => {
     const id = document.getElementById('editCardId').value;
     const title = document.getElementById('cardTitle').value.trim();
     if (!title) { showToast('Başlık boş olamaz', 'warn'); return; }
@@ -298,7 +305,7 @@ document.getElementById('cardSaveBtn').addEventListener('click', async () => {
     }
 });
 
-document.getElementById('deleteCardBtn').addEventListener('click', async () => {
+safeAddListener('deleteCardBtn', 'click', async () => {
     const id = document.getElementById('editCardId').value;
     if (!id) return;
     const card = cards.find(c => c.id === id);
@@ -313,8 +320,8 @@ document.getElementById('deleteCardBtn').addEventListener('click', async () => {
     } catch { showToast('Silinemedi', 'error'); }
 });
 
-document.getElementById('cardCancelBtn').addEventListener('click', () => closeModal('cardModal'));
-document.getElementById('cardModalClose').addEventListener('click', () => closeModal('cardModal'));
+safeAddListener('cardCancelBtn', 'click', () => closeModal('cardModal'));
+safeAddListener('cardModalClose', 'click', () => closeModal('cardModal'));
 
 // Expose modal binding globally for board clicks
 window.openCardDetail = openCardDetail;
@@ -337,13 +344,13 @@ document.querySelectorAll('.quick-add-input').forEach(input => {
 });
 
 // ── Search & Filter ───────────────────────────────────────
-document.getElementById('searchInput').addEventListener('input', () => renderAll());
-document.getElementById('filterAssignee').addEventListener('change', () => renderAll());
-document.getElementById('filterPriority').addEventListener('change', () => renderAll());
+safeAddListener('searchInput', 'input', () => renderAll());
+safeAddListener('filterAssignee', 'change', () => renderAll());
+safeAddListener('filterPriority', 'change', () => renderAll());
 
 // ── Header buttons ────────────────────────────────────────
-document.getElementById('addTaskBtn').addEventListener('click', () => openCardDetail(null));
-document.getElementById('clearBtn').addEventListener('click', async () => {
+safeAddListener('addTaskBtn', 'click', () => openCardDetail(null));
+safeAddListener('clearBtn', 'click', async () => {
     if (!cards.length) { showToast('Pano zaten boş'); return; }
     const approved = await showConfirm('Tüm görevler silinsin mi?', 'Panoyu Temizle');
     if (!approved) return;
@@ -591,27 +598,35 @@ function setupBackgroundSync() {
 }
 
 // ── Auth Tab Switch ──────────────────────────────────────
-document.getElementById('tabLogin').addEventListener('click', () => {
-    document.getElementById('tabLogin').classList.add('active');
-    document.getElementById('tabRegister').classList.remove('active');
-    document.getElementById('loginForm').classList.add('active');
-    document.getElementById('registerForm').classList.remove('active');
+safeAddListener('tabLogin', 'click', () => {
+    const tabLogin = document.getElementById('tabLogin');
+    const tabRegister = document.getElementById('tabRegister');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    if (tabLogin) tabLogin.classList.add('active');
+    if (tabRegister) tabRegister.classList.remove('active');
+    if (loginForm) loginForm.classList.add('active');
+    if (registerForm) registerForm.classList.remove('active');
 });
 
-document.getElementById('tabRegister').addEventListener('click', () => {
-    document.getElementById('tabRegister').classList.add('active');
-    document.getElementById('tabLogin').classList.remove('active');
-    document.getElementById('registerForm').classList.add('active');
-    document.getElementById('loginForm').classList.remove('active');
+safeAddListener('tabRegister', 'click', () => {
+    const tabLogin = document.getElementById('tabLogin');
+    const tabRegister = document.getElementById('tabRegister');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    if (tabRegister) tabRegister.classList.add('active');
+    if (tabLogin) tabLogin.classList.remove('active');
+    if (registerForm) registerForm.classList.add('active');
+    if (loginForm) loginForm.classList.remove('active');
 });
 
 // ── Auth Submission Actions ──────────────────────────────
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
+safeAddListener('loginForm', 'submit', async (e) => {
     e.preventDefault();
     const userVal = document.getElementById('loginUser').value.trim();
     const passVal = document.getElementById('loginPassword').value;
     const errorDiv = document.getElementById('loginError');
-    errorDiv.textContent = '';
+    if (errorDiv) errorDiv.textContent = '';
     
     try {
         const res = await API.login(userVal, passVal);
@@ -621,17 +636,17 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         await boot();
         showToast(`Hoş geldiniz, ${currentUser.name}!`);
     } catch (err) {
-        errorDiv.textContent = err.message || 'Kullanıcı adı veya şifre hatalı';
+        if (errorDiv) errorDiv.textContent = err.message || 'Kullanıcı adı veya şifre hatalı';
     }
 });
 
-document.getElementById('registerForm').addEventListener('submit', async (e) => {
+safeAddListener('registerForm', 'submit', async (e) => {
     e.preventDefault();
     const nameVal = document.getElementById('regName').value.trim();
     const userVal = document.getElementById('regUser').value.trim();
     const passVal = document.getElementById('regPassword').value;
     const errorDiv = document.getElementById('registerError');
-    errorDiv.textContent = '';
+    if (errorDiv) errorDiv.textContent = '';
     
     try {
         const res = await API.register(userVal, passVal, nameVal);
@@ -641,11 +656,11 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         await boot();
         showToast('Kayıt başarılı! Hoş geldiniz.');
     } catch (err) {
-        errorDiv.textContent = err.message || 'Kayıt sırasında bir hata oluştu';
+        if (errorDiv) errorDiv.textContent = err.message || 'Kayıt sırasında bir hata oluştu';
     }
 });
 
-document.getElementById('logoutBtn').addEventListener('click', async () => {
+safeAddListener('logoutBtn', 'click', async () => {
     await API.logout();
     currentUser = null;
     window.currentUser = null;
@@ -654,7 +669,7 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
 });
 
 // ── Custom Labels Management UI ───────────────────────────
-document.getElementById('manageLabelsBtn').addEventListener('click', () => {
+safeAddListener('manageLabelsBtn', 'click', () => {
     renderLabelsList();
     openModal('labelModal');
 });
@@ -687,9 +702,10 @@ async function deleteLabel(id) {
 }
 window.deleteLabel = deleteLabel;
 
-document.getElementById('addLabelBtn').addEventListener('click', async () => {
+safeAddListener('addLabelBtn', 'click', async () => {
     const nameInp = document.getElementById('newLabelName');
     const colorInp = document.getElementById('newLabelColor');
+    if (!nameInp || !colorInp) return;
     const name = nameInp.value.trim();
     const color = colorInp.value;
     if (!name) { showToast('Etiket adı boş bırakılamaz', 'warn'); return; }
@@ -708,9 +724,10 @@ document.getElementById('addLabelBtn').addEventListener('click', async () => {
 });
 
 // ── Notifications Management UI ───────────────────────────
-document.getElementById('notifBellBtn').addEventListener('click', (e) => {
+safeAddListener('notifBellBtn', 'click', (e) => {
     e.stopPropagation();
-    document.getElementById('notifDropdown').classList.toggle('open');
+    const dd = document.getElementById('notifDropdown');
+    if (dd) dd.classList.toggle('open');
 });
 
 document.addEventListener('click', () => {
@@ -718,7 +735,7 @@ document.addEventListener('click', () => {
     if (dd) dd.classList.remove('open');
 });
 
-document.getElementById('notifDropdown').addEventListener('click', (e) => {
+safeAddListener('notifDropdown', 'click', (e) => {
     e.stopPropagation();
 });
 
@@ -811,7 +828,7 @@ async function clickNotification(event, id, cardId) {
 }
 window.clickNotification = clickNotification;
 
-document.getElementById('notifReadAllBtn').addEventListener('click', async () => {
+safeAddListener('notifReadAllBtn', 'click', async () => {
     try {
         await API.readAllNotifications();
         notifications.forEach(n => n.read = true);
