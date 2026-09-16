@@ -29,6 +29,11 @@ export const EMPTY_DB: DbSchema = {
     logs: []
 };
 
+// ── Cloudflare Workers Runtime Detection ─────────────────────
+export function isNodeRuntime(): boolean {
+    return typeof process !== 'undefined' && process.release?.name === 'node' && typeof (globalThis as any).caches === 'undefined';
+}
+
 // ── Password Hashing Helpers ─────────────────────────────────
 export function hashPassword(password: string): string {
     const salt = crypto.randomBytes(16).toString('hex');
@@ -244,126 +249,112 @@ export function createDefaultTestDb(): DbSchema {
 
 // ── Startup Initialization (Local Node.js) ───────────────────
 export function initDb(): void {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    if (!fs.existsSync(TENANTS_DIR)) fs.mkdirSync(TENANTS_DIR, { recursive: true });
+    if (!isNodeRuntime()) return;
+    try {
+        if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+        if (!fs.existsSync(TENANTS_DIR)) fs.mkdirSync(TENANTS_DIR, { recursive: true });
 
-    // ── 1. PERSONAL DATABASE (db.json) - MUST PRESERVE EXISTING DATA ──
-    let personalDb: DbSchema;
-    if (!fs.existsSync(PERSONAL_DATA_FILE)) {
-        personalDb = structuredClone(EMPTY_DB);
-    } else {
-        try {
-            const raw = fs.readFileSync(PERSONAL_DATA_FILE, 'utf8');
-            personalDb = JSON.parse(raw);
-        } catch {
+        // ── 1. PERSONAL DATABASE (db.json) - MUST PRESERVE EXISTING DATA ──
+        let personalDb: DbSchema;
+        if (!fs.existsSync(PERSONAL_DATA_FILE)) {
             personalDb = structuredClone(EMPTY_DB);
+        } else {
+            try {
+                const raw = fs.readFileSync(PERSONAL_DATA_FILE, 'utf8');
+                personalDb = JSON.parse(raw);
+            } catch {
+                personalDb = structuredClone(EMPTY_DB);
+            }
         }
-    }
 
-    // Ensure Super Admin gencyigitcan exists in personal DB
-    let superUser = personalDb.users.find(u => u.username.toLowerCase() === 'gencyigitcan');
-    if (!superUser) {
-        superUser = {
-            id: 'usr-superadmin',
-            username: 'gencyigitcan',
-            name: 'Yiğitcan Genç',
-            passwordHash: hashPassword('Ygt150294'),
-            avatarColor: '#6366f1',
-            role: 'superadmin',
-            tenantId: 'personal',
-            workspaces: ['personal'],
-            createdAt: Date.now()
-        };
-        personalDb.users.unshift(superUser);
-    } else {
-        superUser.role = 'superadmin';
-        superUser.tenantId = 'personal';
-        if (!superUser.workspaces) superUser.workspaces = ['personal'];
-    }
+        if (!personalDb.labels || personalDb.labels.length === 0) {
+            personalDb.labels = DEFAULT_LABELS;
+        }
 
-    if (!personalDb.labels || personalDb.labels.length === 0) {
-        personalDb.labels = DEFAULT_LABELS;
-    }
+        if (!personalDb.workspaces || personalDb.workspaces.length === 0) {
+            personalDb.workspaces = [
+                { id: 'personal', name: 'Kişisel Çalışma Alanı', type: 'personal', ownerId: 'usr-superadmin', createdAt: Date.now() }
+            ];
+        }
+        writeTenantDbFileSync('personal', 'production', personalDb);
 
-    if (!personalDb.workspaces || personalDb.workspaces.length === 0) {
-        personalDb.workspaces = [
-            { id: 'personal', name: 'Kişisel Çalışma Alanı', type: 'personal', ownerId: 'usr-superadmin', createdAt: Date.now() }
-        ];
-    }
-    writeTenantDbFileSync('personal', 'production', personalDb);
-
-    // ── 2. DEMO DATABASE (demo_db.json) ──────────────────────
-    let demoDb: DbSchema;
-    if (!fs.existsSync(DEMO_DATA_FILE)) {
-        demoDb = structuredClone(EMPTY_DB);
-    } else {
-        try {
-            const raw = fs.readFileSync(DEMO_DATA_FILE, 'utf8');
-            demoDb = JSON.parse(raw);
-        } catch {
+        // ── 2. DEMO DATABASE (demo_db.json) ──────────────────────
+        let demoDb: DbSchema;
+        if (!fs.existsSync(DEMO_DATA_FILE)) {
             demoDb = structuredClone(EMPTY_DB);
+        } else {
+            try {
+                const raw = fs.readFileSync(DEMO_DATA_FILE, 'utf8');
+                demoDb = JSON.parse(raw);
+            } catch {
+                demoDb = structuredClone(EMPTY_DB);
+            }
         }
-    }
 
-    if (demoDb.users.length === 0) {
-        demoDb.users = [
-            { id: 'usr-1', username: 'admin', name: 'Ali Yılmaz', passwordHash: hashPassword('password'), avatarColor: '#4f46e5', role: 'admin', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
-            { id: 'usr-2', username: 'zeynep', name: 'Zeynep Kaya', passwordHash: hashPassword('password'), avatarColor: '#0ea5e9', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
-            { id: 'usr-3', username: 'mehmet', name: 'Mehmet Demir', passwordHash: hashPassword('password'), avatarColor: '#10b981', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() }
-        ];
-    }
-    if (!demoDb.labels || demoDb.labels.length === 0) {
-        demoDb.labels = DEFAULT_LABELS.slice(0, 3);
-    }
-    if (!demoDb.workspaces || demoDb.workspaces.length === 0) {
-        demoDb.workspaces = [
-            { id: 'demo', name: 'Demo Panosu', type: 'team', ownerId: 'usr-1', createdAt: Date.now() }
-        ];
-    }
-    writeTenantDbFileSync('demo', 'production', demoDb);
+        if (demoDb.users.length === 0) {
+            demoDb.users = [
+                { id: 'usr-1', username: 'admin', name: 'Ali Yılmaz', passwordHash: hashPassword('password'), avatarColor: '#4f46e5', role: 'admin', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
+                { id: 'usr-2', username: 'zeynep', name: 'Zeynep Kaya', passwordHash: hashPassword('password'), avatarColor: '#0ea5e9', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
+                { id: 'usr-3', username: 'mehmet', name: 'Mehmet Demir', passwordHash: hashPassword('password'), avatarColor: '#10b981', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() }
+            ];
+        }
+        if (!demoDb.labels || demoDb.labels.length === 0) {
+            demoDb.labels = DEFAULT_LABELS.slice(0, 3);
+        }
+        if (!demoDb.workspaces || demoDb.workspaces.length === 0) {
+            demoDb.workspaces = [
+                { id: 'demo', name: 'Demo Panosu', type: 'team', ownerId: 'usr-1', createdAt: Date.now() }
+            ];
+        }
+        writeTenantDbFileSync('demo', 'production', demoDb);
 
-    // ── 3. TEST DATABASE (test_db.json) ──────────────────────
-    const testDbPath = path.join(DATA_DIR, 'test_db.json');
-    if (!fs.existsSync(testDbPath)) {
-        writeTenantDbFileSync('personal', 'test', createDefaultTestDb());
-    }
+        // ── 3. TEST DATABASE (test_db.json) ──────────────────────
+        const testDbPath = path.join(DATA_DIR, 'test_db.json');
+        if (!fs.existsSync(testDbPath)) {
+            writeTenantDbFileSync('personal', 'test', createDefaultTestDb());
+        }
 
-    // Initialize Tenant Index files
-    initTenantIndexFiles();
+        // Initialize Tenant Index files
+        initTenantIndexFiles();
+    } catch (e) {
+        console.warn('initDb skipped:', e);
+    }
 }
 
 // ── Tenant Index Helpers ─────────────────────────────────────
 function initTenantIndexFiles(): void {
-    const prodIndexPath = path.join(DATA_DIR, 'tenants_index.json');
-    if (!fs.existsSync(prodIndexPath)) {
-        const prodIndex: TenantIndex = {
-            workspaces: [
-                { id: 'personal', name: 'Kişisel Çalışma Alanı', type: 'personal', ownerId: 'usr-superadmin', createdAt: Date.now() },
-                { id: 'demo', name: 'Demo Panosu', type: 'team', ownerId: 'usr-1', createdAt: Date.now() }
-            ],
-            userToTenants: {
-                'gencyigitcan': ['personal'],
-                'admin': ['demo'],
-                'zeynep': ['demo'],
-                'mehmet': ['demo']
-            }
-        };
-        writeFileAtomic.sync(prodIndexPath, JSON.stringify(prodIndex, null, 2));
-    }
+    if (!isNodeRuntime()) return;
+    try {
+        const prodIndexPath = path.join(DATA_DIR, 'tenants_index.json');
+        if (!fs.existsSync(prodIndexPath)) {
+            const prodIndex: TenantIndex = {
+                workspaces: [
+                    { id: 'personal', name: 'Kişisel Çalışma Alanı', type: 'personal', ownerId: 'usr-superadmin', createdAt: Date.now() },
+                    { id: 'demo', name: 'Demo Panosu', type: 'team', ownerId: 'usr-1', createdAt: Date.now() }
+                ],
+                userToTenants: {
+                    'admin': ['demo'],
+                    'zeynep': ['demo'],
+                    'mehmet': ['demo']
+                }
+            };
+            writeFileAtomic.sync(prodIndexPath, JSON.stringify(prodIndex, null, 2));
+        }
 
-    const testIndexPath = path.join(DATA_DIR, 'test_tenants_index.json');
-    if (!fs.existsSync(testIndexPath)) {
-        const testIndex: TenantIndex = {
-            workspaces: [
-                { id: 'personal', name: 'Test Ortamı Panosu', type: 'team', ownerId: 'usr-testadmin', createdAt: Date.now() }
-            ],
-            userToTenants: {
-                'testadmin': ['personal'],
-                'tester': ['personal']
-            }
-        };
-        writeFileAtomic.sync(testIndexPath, JSON.stringify(testIndex, null, 2));
-    }
+        const testIndexPath = path.join(DATA_DIR, 'test_tenants_index.json');
+        if (!fs.existsSync(testIndexPath)) {
+            const testIndex: TenantIndex = {
+                workspaces: [
+                    { id: 'personal', name: 'Test Ortamı Panosu', type: 'team', ownerId: 'usr-testadmin', createdAt: Date.now() }
+                ],
+                userToTenants: {
+                    'testadmin': ['personal'],
+                    'tester': ['personal']
+                }
+            };
+            writeFileAtomic.sync(testIndexPath, JSON.stringify(testIndex, null, 2));
+        }
+    } catch {}
 }
 
 export async function getTenantIndex(env: Environment, d1Binding?: any): Promise<TenantIndex> {
@@ -447,10 +438,12 @@ export async function saveTenantIndex(index: TenantIndex, env: Environment, d1Bi
         }
     }
 
-    try {
-        if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-        await writeFileAtomic(filePath, JSON.stringify(index, null, 2));
-    } catch { }
+    if (isNodeRuntime()) {
+        try {
+            if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+            await writeFileAtomic(filePath, JSON.stringify(index, null, 2));
+        } catch { }
+    }
 }
 
 // ── AsyncLocalStorage Request Context ────────────────────────
@@ -502,13 +495,15 @@ export function writeDbSync(data: DbSchema, scopeOrReq?: DbScope | { dbScope?: D
         }
 
         // If not running on Cloudflare (native node), also write to disk
-        if (!store.d1Binding) {
+        if (isNodeRuntime() && !store.d1Binding) {
             writeTenantDbFileSync(tId, env, data);
         }
         return;
     }
 
-    writeTenantDbFileSync(tId, env, data);
+    if (isNodeRuntime()) {
+        writeTenantDbFileSync(tId, env, data);
+    }
 }
 
 export async function writeDb(data: DbSchema, scopeOrReq?: DbScope | { dbScope?: DbScope; tenantId?: string; environment?: Environment } | string): Promise<void> {
@@ -517,6 +512,10 @@ export async function writeDb(data: DbSchema, scopeOrReq?: DbScope | { dbScope?:
 
 // ── File System Helpers ──────────────────────────────────────
 export function readTenantDbFileSync(tenantId: string, env: Environment): DbSchema {
+    if (!isNodeRuntime()) {
+        if (env === 'test') return createDefaultTestDb();
+        return structuredClone(EMPTY_DB);
+    }
     const filePath = resolveFilePath(tenantId, env);
     try {
         if (!fs.existsSync(filePath)) {
@@ -544,10 +543,13 @@ export function readTenantDbFileSync(tenantId: string, env: Environment): DbSche
 }
 
 export function writeTenantDbFileSync(tenantId: string, env: Environment, data: DbSchema): void {
-    const filePath = resolveFilePath(tenantId, env);
-    const parentDir = path.dirname(filePath);
-    if (!fs.existsSync(parentDir)) fs.mkdirSync(parentDir, { recursive: true });
-    writeFileAtomic.sync(filePath, JSON.stringify(data, null, 2));
+    if (!isNodeRuntime()) return;
+    try {
+        const filePath = resolveFilePath(tenantId, env);
+        const parentDir = path.dirname(filePath);
+        if (!fs.existsSync(parentDir)) fs.mkdirSync(parentDir, { recursive: true });
+        writeFileAtomic.sync(filePath, JSON.stringify(data, null, 2));
+    } catch { }
 }
 
 // ── Cloudflare D1 Load & Save Helpers ────────────────────────
@@ -574,29 +576,14 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                 logs: Array.isArray(parsed.logs) ? parsed.logs : []
             };
 
-            // In production personal DB, ensure gencyigitcan / yigitcangenc@gmail.com Super Admin is present
+            // In production personal DB, if superUser exists, ensure email & workspaces
             if (env === 'production' && tenantId === 'personal') {
                 let superUser = db.users.find(u =>
                     u.username.toLowerCase() === 'gencyigitcan' ||
                     (u.email && u.email.toLowerCase() === 'yigitcangenc@gmail.com') ||
                     u.id === 'usr-superadmin'
                 );
-                if (!superUser) {
-                    superUser = {
-                        id: 'usr-superadmin',
-                        username: 'gencyigitcan',
-                        email: 'yigitcangenc@gmail.com',
-                        name: 'Yiğitcan Genç',
-                        passwordHash: hashPassword('Ygt150294'),
-                        avatarColor: '#6366f1',
-                        role: 'superadmin',
-                        status: 'approved',
-                        tenantId: 'personal',
-                        workspaces: ['personal'],
-                        createdAt: Date.now()
-                    };
-                    db.users.unshift(superUser);
-                } else {
+                if (superUser) {
                     superUser.email = 'yigitcangenc@gmail.com';
                     superUser.status = 'approved';
                     if (!superUser.workspaces || !superUser.workspaces.includes('personal')) {
@@ -717,7 +704,9 @@ export async function createWorkspace(
     if (binding) {
         await saveTenantDbToD1(binding, key, newDb);
     }
-    writeTenantDbFileSync(wsId, env, newDb);
+    if (isNodeRuntime()) {
+        writeTenantDbFileSync(wsId, env, newDb);
+    }
 
     // Update Tenant Index
     const index = await getTenantIndex(env, binding);
