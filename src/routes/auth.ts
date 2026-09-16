@@ -12,7 +12,8 @@ import {
     getEnvironment,
     getTenantIndex,
     saveTenantIndex,
-    createWorkspace
+    createWorkspace,
+    logActivity
 } from '../lib/db.js';
 import { validate } from '../middleware/validate.js';
 import { AppError, asyncHandler } from '../middleware/error.js';
@@ -72,7 +73,8 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
         name: name.trim(),
         passwordHash: hashPassword(password),
         avatarColor: randomColor,
-        role: isOwnerUser ? 'superadmin' : 'admin',
+        role: isOwnerUser ? 'superadmin' : 'user',
+        status: isOwnerUser ? 'approved' : 'pending',
         tenantId,
         workspaces: isOwnerUser ? ['personal', tenantId] : [tenantId],
         company: company ? company.trim() : undefined,
@@ -96,6 +98,7 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
         if (superIdx >= 0) {
             personalDb.users[superIdx].passwordHash = newUser.passwordHash;
             personalDb.users[superIdx].email = 'yigitcangenc@gmail.com';
+            personalDb.users[superIdx].status = 'approved';
             personalDb.users[superIdx].workspaces = Array.from(new Set([...(personalDb.users[superIdx].workspaces || []), 'personal', tenantId]));
         } else {
             personalDb.users.unshift(newUser);
@@ -105,40 +108,102 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
         index.userToTenants['yigitcangenc@gmail.com'] = Array.from(new Set([...(index.userToTenants['yigitcangenc@gmail.com'] || []), 'personal', tenantId]));
         index.userToTenants['gencyigitcan'] = Array.from(new Set([...(index.userToTenants['gencyigitcan'] || []), 'personal', tenantId]));
         await saveTenantIndex(index, env);
+
+        // Create session token scoped to this workspace
+        const randomBytes = crypto.randomBytes(24).toString('hex');
+        const token = `${tenantId}:${randomBytes}`;
+        const newSession: Session = {
+            token,
+            userId: newUser.id,
+            tenantId,
+            expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
+        };
+        db.sessions.push(newSession);
+        writeDbSync(db, { tenantId, environment: env });
+
+        logActivity({
+            userId: newUser.id,
+            username: newUser.username,
+            name: newUser.name,
+            userRole: 'superadmin',
+            action: 'REGISTER_REQUEST',
+            entityType: 'auth',
+            entityId: newUser.id,
+            details: `Super Admin hesabı oluşturuldu: ${newUser.name} (${newUser.username})`,
+            workspaceId: tenantId,
+            environment: env
+        }, req);
+
+        const wsNameMap = Object.fromEntries(index.workspaces.map(w => [w.id, w.name]));
+        const accessibleWorkspaces = (newUser.workspaces || [tenantId]).map(id => ({
+            id,
+            name: wsNameMap[id] || (id === 'personal' ? 'Kişisel Çalışma Alanı' : id)
+        }));
+
+        res.status(201).json({
+            token,
+            user: {
+                id: newUser.id,
+                username: newUser.username,
+                email: newUser.email,
+                name: newUser.name,
+                avatarColor: newUser.avatarColor,
+                role: newUser.role,
+                status: newUser.status,
+                tenantId,
+                workspaces: accessibleWorkspaces
+            },
+            workspaces: accessibleWorkspaces,
+            activeWorkspaceId: tenantId
+        });
+        return;
     }
 
-    // Create session token scoped to this workspace
-    const randomBytes = crypto.randomBytes(24).toString('hex');
-    const token = `${tenantId}:${randomBytes}`;
-    const newSession: Session = {
-        token,
+    // NON-SUPERADMIN USER: Requires Super Admin Approval!
+    // Send notification to Super Admin
+    const personalDb = readDb({ tenantId: 'personal', environment: env });
+    personalDb.notifications = personalDb.notifications || [];
+    personalDb.notifications.push({
+        id: 'ntf-' + uid(),
+        userId: 'usr-superadmin',
+        senderId: newUser.id,
+        senderName: newUser.name,
+        cardId: '',
+        cardTitle: '',
+        text: `${newUser.name} (${newUser.username}) sisteme kayıt oldu ve Super Admin onayınızı bekliyor.`,
+        read: false,
+        createdAt: Date.now(),
+        type: 'user-signup-request',
+        email: newUser.email || newUser.username,
+        name: newUser.name,
+        pendingUserId: newUser.id,
+        requestStatus: 'pending'
+    });
+    writeDbSync(personalDb, { tenantId: 'personal', environment: env });
+
+    logActivity({
         userId: newUser.id,
-        tenantId,
-        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
-    };
-    db.sessions.push(newSession);
-    writeDbSync(db, { tenantId, environment: env });
+        username: newUser.username,
+        name: newUser.name,
+        userRole: 'user',
+        action: 'REGISTER_REQUEST',
+        entityType: 'auth',
+        entityId: newUser.id,
+        details: `${newUser.name} (${newUser.username}) sisteme kayıt talebinde bulundu. Super Admin onayı bekleniyor.`,
+        workspaceId: tenantId,
+        environment: env
+    }, req);
 
-    const wsNameMap = Object.fromEntries(index.workspaces.map(w => [w.id, w.name]));
-    const accessibleWorkspaces = (newUser.workspaces || [tenantId]).map(id => ({
-        id,
-        name: wsNameMap[id] || (id === 'personal' ? 'Kişisel Çalışma Alanı' : id)
-    }));
-
-    res.status(201).json({
-        token,
+    res.status(202).json({
+        pending: true,
+        message: 'Kayıt talebiniz Super Admin onayına iletildi. Onaylandıktan sonra giriş yapabilirsiniz.',
         user: {
             id: newUser.id,
             username: newUser.username,
             email: newUser.email,
             name: newUser.name,
-            avatarColor: newUser.avatarColor,
-            role: newUser.role,
-            tenantId,
-            workspaces: accessibleWorkspaces
-        },
-        workspaces: accessibleWorkspaces,
-        activeWorkspaceId: tenantId
+            status: 'pending'
+        }
     });
 }));
 
@@ -214,6 +279,18 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
         throw new AppError('Bu hesabın kullanım süresi dolmuştur.', 401);
     }
 
+    // CHECK APPROVAL STATUS
+    if (user.status === 'pending') {
+        throw new AppError('Hesabınız Super Admin onayını beklemektedir. Onaylandıktan sonra giriş yapabilirsiniz.', 403);
+    }
+    if (user.status === 'rejected') {
+        throw new AppError('Hesap başvurunuz Super Admin tarafından reddedilmiştir.', 403);
+    }
+
+    // Update lastLoginAt
+    user.lastLoginAt = Date.now();
+    writeDbSync(db, { tenantId: activeTenantId, environment: env });
+
     // Get all workspaces accessible by this user
     const directWsIds = index.userToTenants[normalizedUsername] || [];
     const aliasWsIds = (normalizedUsername === 'yigitcangenc@gmail.com' ? index.userToTenants['gencyigitcan'] : 
@@ -243,6 +320,19 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
     };
     db.sessions.push(newSession);
     writeDbSync(db, { tenantId: activeTenantId, environment: env });
+
+    logActivity({
+        userId: user.id,
+        username: user.username,
+        name: user.name,
+        userRole: user.role || 'user',
+        action: 'LOGIN',
+        entityType: 'auth',
+        entityId: user.id,
+        details: `${user.name} (${user.username}) sisteme giriş yaptı.`,
+        workspaceId: activeTenantId,
+        environment: env
+    }, req);
 
     res.json({
         token,

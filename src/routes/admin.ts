@@ -11,7 +11,9 @@ import {
     getEnvironment,
     getTenantIndex,
     saveTenantIndex,
-    createWorkspace
+    createWorkspace,
+    logActivity,
+    type Environment
 } from '../lib/db.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -27,6 +29,68 @@ function checkAdminPermission(req: any) {
     if (role !== 'superadmin' && role !== 'admin') {
         throw new AppError('Bu işlem için yönetici yetkisi gereklidir', 403);
     }
+}
+
+// Helper to gather all users across all workspace DBs and personal DB
+function getAllUsersAcrossTenants(env: Environment, index: any): User[] {
+    const userMap = new Map<string, User>();
+
+    // 1. Personal DB
+    try {
+        const personalDb = readDb({ tenantId: 'personal', environment: env });
+        for (const u of personalDb.users || []) {
+            userMap.set(u.id, { ...u });
+        }
+    } catch {}
+
+    // 2. All Workspaces
+    for (const ws of index.workspaces || []) {
+        try {
+            const wsDb = readDb({ tenantId: ws.id, environment: env });
+            for (const u of wsDb.users || []) {
+                if (!userMap.has(u.id)) {
+                    userMap.set(u.id, { ...u });
+                } else {
+                    const existing = userMap.get(u.id)!;
+                    if (u.status && !existing.status) existing.status = u.status;
+                    if (u.lastLoginAt && !existing.lastLoginAt) existing.lastLoginAt = u.lastLoginAt;
+                }
+            }
+        } catch {}
+    }
+
+    return Array.from(userMap.values());
+}
+
+// Helper to update a user across all tenant DBs where they reside
+function updateUserAcrossTenants(userId: string, updater: (u: User) => void, env: Environment, index: any): User | null {
+    let targetUser: User | null = null;
+
+    // 1. Personal DB
+    try {
+        const personalDb = readDb({ tenantId: 'personal', environment: env });
+        const u = personalDb.users?.find(u => u.id === userId);
+        if (u) {
+            updater(u);
+            targetUser = { ...u };
+            writeDbSync(personalDb, { tenantId: 'personal', environment: env });
+        }
+    } catch {}
+
+    // 2. All Workspaces
+    for (const ws of index.workspaces || []) {
+        try {
+            const wsDb = readDb({ tenantId: ws.id, environment: env });
+            const u = wsDb.users?.find(u => u.id === userId);
+            if (u) {
+                updater(u);
+                if (!targetUser) targetUser = { ...u };
+                writeDbSync(wsDb, { tenantId: ws.id, environment: env });
+            }
+        } catch {}
+    }
+
+    return targetUser;
 }
 
 // ── GET /api/admin/workspaces ────────────────────────────────
@@ -70,6 +134,19 @@ adminRouter.post('/workspaces', validate(createWorkspaceSchema), asyncHandler(as
         workspace.description = description;
     }
 
+    logActivity({
+        userId: req.user!.id,
+        username: req.user!.username,
+        name: req.user!.name,
+        userRole: req.user!.role || 'admin',
+        action: 'WORKSPACE_CREATE',
+        entityType: 'workspace',
+        entityId: workspace.id,
+        details: `'${workspace.name}' isimli yeni çalışma alanı oluşturuldu.`,
+        workspaceId: workspace.id,
+        environment: env
+    }, req);
+
     res.status(201).json({
         ok: true,
         workspace
@@ -93,16 +170,170 @@ adminRouter.get('/users', asyncHandler(async (req, res) => {
         name: u.name,
         avatarColor: u.avatarColor,
         role: u.role || 'user',
+        status: u.status || 'approved',
         tenantId: u.tenantId || req.tenantId || 'personal',
         workspaces: (index.userToTenants[u.username.toLowerCase()] || [u.tenantId || 'personal']).map(id => ({
             id,
             name: wsNameMap[id] || id
         })),
         createdAt: u.createdAt,
+        lastLoginAt: u.lastLoginAt,
         expiresAt: u.expiresAt
     }));
 
     res.json(userList);
+}));
+
+// ── GET /api/admin/users/detailed ────────────────────────────
+adminRouter.get('/users/detailed', asyncHandler(async (req, res) => {
+    checkAdminPermission(req);
+    const env = req.environment || getEnvironment(req);
+    const index = await getTenantIndex(env);
+    const wsNameMap = Object.fromEntries(index.workspaces.map(w => [w.id, w.name]));
+    const allUsers = getAllUsersAcrossTenants(env, index);
+
+    const detailed = allUsers.map(u => ({
+        id: u.id,
+        username: u.username,
+        name: u.name,
+        email: u.email,
+        avatarColor: u.avatarColor,
+        role: u.role || 'user',
+        status: u.status || 'approved',
+        tenantId: u.tenantId || 'personal',
+        workspaces: (index.userToTenants[u.username.toLowerCase()] || u.workspaces || [u.tenantId || 'personal']).map(id => ({
+            id,
+            name: wsNameMap[id] || (id === 'personal' ? 'Kişisel Çalışma Alanı' : id)
+        })),
+        createdAt: u.createdAt,
+        lastLoginAt: u.lastLoginAt,
+        expiresAt: u.expiresAt
+    }));
+
+    res.json({ users: detailed });
+}));
+
+// ── GET /api/admin/pending-users ─────────────────────────────
+adminRouter.get('/pending-users', asyncHandler(async (req, res) => {
+    checkAdminPermission(req);
+    const env = req.environment || getEnvironment(req);
+    const index = await getTenantIndex(env);
+    const allUsers = getAllUsersAcrossTenants(env, index);
+    const pendingUsers = allUsers.filter(u => u.status === 'pending');
+    res.json(pendingUsers);
+}));
+
+// ── POST /api/admin/users/:id/approve ────────────────────────
+adminRouter.post('/users/:id/approve', asyncHandler(async (req, res) => {
+    checkAdminPermission(req);
+    const env = req.environment || getEnvironment(req);
+    const index = await getTenantIndex(env);
+
+    const targetUserId = String(req.params.id);
+    const updatedUser = updateUserAcrossTenants(targetUserId, (u) => {
+        u.status = 'approved';
+    }, env, index);
+
+    if (!updatedUser) {
+        throw new AppError('Onaylanacak kullanıcı bulunamadı', 404);
+    }
+
+    // Update notifications in personalDb
+    const personalDb = readDb({ tenantId: 'personal', environment: env });
+    if (personalDb.notifications) {
+        let changed = false;
+        for (const n of personalDb.notifications) {
+            if (n.pendingUserId === req.params.id || n.senderId === req.params.id) {
+                n.requestStatus = 'approved';
+                n.read = true;
+                changed = true;
+            }
+        }
+        if (changed) {
+            writeDbSync(personalDb, { tenantId: 'personal', environment: env });
+        }
+    }
+
+    logActivity({
+        userId: req.user!.id,
+        username: req.user!.username,
+        name: req.user!.name,
+        userRole: req.user!.role || 'superadmin',
+        action: 'USER_APPROVED',
+        entityType: 'user',
+        entityId: updatedUser.id,
+        details: `${updatedUser.name} (${updatedUser.username}) adlı kullanıcının kaydı Super Admin tarafından onaylandı.`,
+        workspaceId: req.tenantId || 'personal',
+        environment: env
+    }, req);
+
+    res.json({
+        ok: true,
+        message: `${updatedUser.name} başarıyla onaylandı. Artık sisteme giriş yapabilir.`,
+        user: updatedUser
+    });
+}));
+
+// ── POST /api/admin/users/:id/reject ─────────────────────────
+adminRouter.post('/users/:id/reject', asyncHandler(async (req, res) => {
+    checkAdminPermission(req);
+    const env = req.environment || getEnvironment(req);
+    const index = await getTenantIndex(env);
+
+    const targetUserId = String(req.params.id);
+    const updatedUser = updateUserAcrossTenants(targetUserId, (u) => {
+        u.status = 'rejected';
+    }, env, index);
+
+    if (!updatedUser) {
+        throw new AppError('Reddedilecek kullanıcı bulunamadı', 404);
+    }
+
+    // Update notifications in personalDb
+    const personalDb = readDb({ tenantId: 'personal', environment: env });
+    if (personalDb.notifications) {
+        let changed = false;
+        for (const n of personalDb.notifications) {
+            if (n.pendingUserId === req.params.id || n.senderId === req.params.id) {
+                n.requestStatus = 'rejected';
+                n.read = true;
+                changed = true;
+            }
+        }
+        if (changed) {
+            writeDbSync(personalDb, { tenantId: 'personal', environment: env });
+        }
+    }
+
+    logActivity({
+        userId: req.user!.id,
+        username: req.user!.username,
+        name: req.user!.name,
+        userRole: req.user!.role || 'superadmin',
+        action: 'USER_REJECTED',
+        entityType: 'user',
+        entityId: updatedUser.id,
+        details: `${updatedUser.name} (${updatedUser.username}) adlı kullanıcının kayıt başvurusu Super Admin tarafından reddedildi.`,
+        workspaceId: req.tenantId || 'personal',
+        environment: env
+    }, req);
+
+    res.json({
+        ok: true,
+        message: `${updatedUser.name} başvurusu reddedildi.`,
+        user: updatedUser
+    });
+}));
+
+// ── GET /api/admin/logs ──────────────────────────────────────
+adminRouter.get('/logs', asyncHandler(async (req, res) => {
+    if (req.user?.role !== 'superadmin') {
+        throw new AppError('Aktivite günlüğünü görüntüleme yetkisi sadece Super Admin kullanıcıya aittir', 403);
+    }
+    const env = req.environment || getEnvironment(req);
+    const personalDb = readDb({ tenantId: 'personal', environment: env });
+    const logs = (personalDb.logs || []).slice().reverse();
+    res.json({ logs });
 }));
 
 // ── POST /api/admin/users ────────────────────────────────────
@@ -141,6 +372,7 @@ adminRouter.post('/users', validate(createUserSchema), asyncHandler(async (req, 
         passwordHash: hashPassword(password),
         avatarColor: '#4f46e5',
         role,
+        status: 'approved', // Admin-created users are directly approved
         createdAt: Date.now()
     };
 
@@ -195,6 +427,19 @@ adminRouter.post('/users', validate(createUserSchema), asyncHandler(async (req, 
         await saveTenantIndex(index, env);
     }
 
+    logActivity({
+        userId: req.user!.id,
+        username: req.user!.username,
+        name: req.user!.name,
+        userRole: req.user!.role || 'admin',
+        action: 'USER_CREATED',
+        entityType: 'user',
+        entityId: newUser.id,
+        details: `${newUser.name} (${newUser.username}) adlı kullanıcı oluşturuldu. Rol: ${newUser.role}`,
+        workspaceId: assignedWorkspaceId,
+        environment: env
+    }, req);
+
     res.status(201).json({
         ok: true,
         user: {
@@ -202,6 +447,7 @@ adminRouter.post('/users', validate(createUserSchema), asyncHandler(async (req, 
             username: newUser.username,
             name: newUser.name,
             role: newUser.role,
+            status: newUser.status,
             tenantId: assignedWorkspaceId,
             workspaces: [assignedWorkspaceId]
         }
@@ -263,6 +509,19 @@ adminRouter.delete('/users/:id', asyncHandler(async (req, res) => {
     const index = await getTenantIndex(env);
     delete index.userToTenants[removedUser.username.toLowerCase()];
     await saveTenantIndex(index, env);
+
+    logActivity({
+        userId: req.user!.id,
+        username: req.user!.username,
+        name: req.user!.name,
+        userRole: req.user!.role || 'admin',
+        action: 'USER_DELETED',
+        entityType: 'user',
+        entityId: String(req.params.id),
+        details: `${removedUser.name} (${removedUser.username}) adlı kullanıcı silindi.`,
+        workspaceId: req.tenantId || 'personal',
+        environment: env
+    }, req);
 
     res.json({ ok: true });
 }));

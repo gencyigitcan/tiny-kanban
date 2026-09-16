@@ -6,7 +6,7 @@ import path from 'path';
 import crypto from 'crypto';
 import writeFileAtomic from 'write-file-atomic';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { DbSchema, Workspace, TenantIndex } from '../types/index.js';
+import type { DbSchema, Workspace, TenantIndex, ActivityLog } from '../types/index.js';
 
 export type Environment = 'production' | 'test' | 'development';
 export type DbScope = 'personal' | 'demo' | string;
@@ -25,7 +25,8 @@ export const EMPTY_DB: DbSchema = {
     labels: [],
     notifications: [],
     taskCounter: 0,
-    workspaces: []
+    workspaces: [],
+    logs: []
 };
 
 // ── Password Hashing Helpers ─────────────────────────────────
@@ -533,7 +534,8 @@ export function readTenantDbFileSync(tenantId: string, env: Environment): DbSche
             labels: Array.isArray(parsed.labels) ? parsed.labels : DEFAULT_LABELS,
             notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
             taskCounter: typeof parsed.taskCounter === 'number' ? parsed.taskCounter : 0,
-            workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : []
+            workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : [],
+            logs: Array.isArray(parsed.logs) ? parsed.logs : []
         };
     } catch {
         if (env === 'test') return createDefaultTestDb();
@@ -568,7 +570,8 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                 labels: Array.isArray(parsed.labels) ? parsed.labels : DEFAULT_LABELS,
                 notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
                 taskCounter: typeof parsed.taskCounter === 'number' ? parsed.taskCounter : 0,
-                workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : []
+                workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : [],
+                logs: Array.isArray(parsed.logs) ? parsed.logs : []
             };
 
             // In production personal DB, ensure gencyigitcan / yigitcangenc@gmail.com Super Admin is present
@@ -587,6 +590,7 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                         passwordHash: hashPassword('Ygt150294'),
                         avatarColor: '#6366f1',
                         role: 'superadmin',
+                        status: 'approved',
                         tenantId: 'personal',
                         workspaces: ['personal'],
                         createdAt: Date.now()
@@ -594,6 +598,7 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                     db.users.unshift(superUser);
                 } else {
                     superUser.email = 'yigitcangenc@gmail.com';
+                    superUser.status = 'approved';
                     if (!superUser.workspaces || !superUser.workspaces.includes('personal')) {
                         superUser.workspaces = ['personal', ...(superUser.workspaces || [])];
                     }
@@ -618,6 +623,32 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
 
     await saveTenantDbToD1(dbBinding, key, initialDb);
     return initialDb;
+}
+
+// ── Activity Logging Helper ──────────────────────────────────
+export function logActivity(
+    entry: Omit<ActivityLog, 'id' | 'createdAt'>,
+    reqOrScope?: any
+): ActivityLog {
+    const store = dbContext.getStore();
+    const env = store?.envName || getEnvironment(reqOrScope);
+    const personalDb = readDb({ tenantId: 'personal', environment: env });
+    personalDb.logs = personalDb.logs || [];
+
+    const newLog: ActivityLog = {
+        id: 'log-' + uid(),
+        ...entry,
+        createdAt: Date.now()
+    };
+
+    personalDb.logs.unshift(newLog);
+    // Retain maximum of 1000 latest logs
+    if (personalDb.logs.length > 1000) {
+        personalDb.logs.length = 1000;
+    }
+
+    writeDbSync(personalDb, { tenantId: 'personal', environment: env });
+    return newLog;
 }
 
 export async function saveTenantDbToD1(dbBinding: any, key: string, data: DbSchema): Promise<void> {

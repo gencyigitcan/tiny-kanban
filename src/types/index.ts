@@ -80,7 +80,9 @@ export interface User {
     passwordHash: string;
     avatarColor: string;
     role?: 'superadmin' | 'admin' | 'user';
+    status?: 'pending' | 'approved' | 'rejected';
     createdAt: number;
+    lastLoginAt?: number;
     expiresAt?: number;
     tenantId?: string;
     workspaces?: string[];
@@ -116,6 +118,38 @@ export interface Notification {
     email?: string;
     name?: string;
     demoStatus?: 'pending' | 'approved';
+    pendingUserId?: string;
+    requestStatus?: 'pending' | 'approved' | 'rejected';
+}
+
+export type ActivityAction =
+    | 'LOGIN'
+    | 'LOGOUT'
+    | 'REGISTER_REQUEST'
+    | 'USER_APPROVED'
+    | 'USER_REJECTED'
+    | 'USER_CREATED'
+    | 'USER_DELETED'
+    | 'CARD_CREATE'
+    | 'CARD_UPDATE'
+    | 'CARD_DELETE'
+    | 'CARD_MOVE'
+    | 'WORKSPACE_SWITCH'
+    | 'WORKSPACE_CREATE';
+
+export interface ActivityLog {
+    id: string;
+    userId: string;
+    username: string;
+    name: string;
+    userRole: string;
+    action: ActivityAction;
+    entityType: 'auth' | 'card' | 'workspace' | 'user';
+    entityId?: string;
+    details: string;
+    workspaceId?: string;
+    environment: string;
+    createdAt: number;
 }
 
 export interface DbSchema {
@@ -128,6 +162,7 @@ export interface DbSchema {
     notifications: Notification[];
     taskCounter: number;
     workspaces?: Workspace[];
+    logs?: ActivityLog[];
 }
 
 export interface TenantMeta {
@@ -142,4 +177,5 @@ export interface TenantIndex {
     workspaces: Workspace[];
     userToTenants: Record<string, string[]>; // username -> workspaceIds
 }
+
 

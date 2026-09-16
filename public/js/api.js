@@ -379,6 +379,21 @@ const API = {
     async deleteAdminUser(userId) {
         return await request(`/api/admin/users/${userId}`, { method: 'DELETE' });
     },
+    async getPendingUsers() {
+        return await request('/api/admin/pending-users');
+    },
+    async approveUser(userId) {
+        return await request(`/api/admin/users/${userId}/approve`, { method: 'POST' });
+    },
+    async rejectUser(userId) {
+        return await request(`/api/admin/users/${userId}/reject`, { method: 'POST' });
+    },
+    async getDetailedUsers() {
+        return await request('/api/admin/users/detailed');
+    },
+    async getAuditLogs() {
+        return await request('/api/admin/logs');
+    },
     async getUsers() {
         try {
             return await request('/api/users');

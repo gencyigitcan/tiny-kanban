@@ -243,9 +243,13 @@ export default {
 };
 
 // ── Server Start ───────────────────────────────────────────
-app.listen(PORT, () => {
-    console.log(`\n  🟣 Kanban v1.3.0\n`);
-    console.log(`     My Board  → http://localhost:${PORT}/board.html`);
-    console.log(`     Demo      → http://localhost:${PORT}/demo.html`);
-    console.log(`     API       → http://localhost:${PORT}/api/cards\n`);
-});
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(PORT, () => {
+        console.log(`\n  🟣 Kanban v1.3.0\n`);
+        console.log(`     My Board  → http://localhost:${PORT}/board.html`);
+        console.log(`     Demo      → http://localhost:${PORT}/demo.html`);
+        console.log(`     API       → http://localhost:${PORT}/api/cards\n`);
+    });
+}
+
+export { app };

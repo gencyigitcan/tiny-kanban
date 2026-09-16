@@ -680,17 +680,35 @@ safeAddListener('registerForm', 'submit', async (e) => {
     const passVal = document.getElementById('regPassword').value;
     const compVal = document.getElementById('regCompany') ? document.getElementById('regCompany').value.trim() : '';
     const errorDiv = document.getElementById('registerError');
-    if (errorDiv) errorDiv.textContent = '';
+    const successBox = document.getElementById('regSuccessBox');
+    if (errorDiv) { errorDiv.textContent = ''; errorDiv.style.display = 'none'; }
+    if (successBox) { successBox.textContent = ''; successBox.style.display = 'none'; }
     
     try {
         const res = await API.register(userVal, passVal, nameVal, compVal);
+        if (res.pending) {
+            if (successBox) {
+                successBox.innerHTML = `
+                    <div style="font-weight: 700; margin-bottom: 4px;">🎉 Kayıt Talebiniz Alındı!</div>
+                    <div>${escHtml(res.message || 'Kayıt talebiniz Super Admin onayına iletildi. Onaylandıktan sonra giriş yapabilirsiniz.')}</div>
+                `;
+                successBox.style.display = 'block';
+            }
+            document.getElementById('registerForm').reset();
+            showToast('Kayıt talebiniz Super Admin onayına iletildi', 'info');
+            return;
+        }
+
         currentUser = res.user;
         window.currentUser = currentUser;
         updateUserHeader();
         await boot();
         showToast('Kayıt başarılı! Hoş geldiniz.');
     } catch (err) {
-        if (errorDiv) errorDiv.textContent = err.message || 'Kayıt sırasında bir hata oluştu';
+        if (errorDiv) {
+            errorDiv.textContent = err.message || 'Kayıt sırasında bir hata oluştu';
+            errorDiv.style.display = 'block';
+        }
     }
 });
 
@@ -797,12 +815,33 @@ safeAddListener('createWorkspacePromptBtn', 'click', () => {
 // ── User & Team Management Controller ─────────────────────
 async function loadAdminData() {
     try {
-        const [adminUsers, wsData] = await Promise.all([
-            API.getAdminUsers(),
-            API.getWorkspaces()
+        const isSuperAdmin = currentUser?.role === 'superadmin';
+        const tabLogs = document.getElementById('tabLogs');
+        if (tabLogs) {
+            tabLogs.style.display = isSuperAdmin ? 'inline-block' : 'none';
+        }
+
+        const [adminUsersRes, wsData, pendingUsers] = await Promise.all([
+            API.getDetailedUsers().catch(() => ({ users: [] })),
+            API.getWorkspaces().catch(() => ({ workspaces: [] })),
+            API.getPendingUsers().catch(() => [])
         ]);
 
+        const adminUsers = adminUsersRes.users || [];
         const workspaces = wsData.workspaces || [];
+
+        // Update Pending Users Badge
+        const pendingBadge = document.getElementById('pendingUsersBadge');
+        if (pendingBadge) {
+            if (pendingUsers.length > 0) {
+                pendingBadge.textContent = pendingUsers.length;
+                pendingBadge.style.display = 'inline-block';
+            } else {
+                pendingBadge.style.display = 'none';
+            }
+        }
+
+        // Target workspace select
         const wsSelect = document.getElementById('newUserTargetWorkspace');
         if (wsSelect) {
             wsSelect.innerHTML = workspaces.map(w =>
@@ -810,6 +849,7 @@ async function loadAdminData() {
             ).join('');
         }
 
+        // Render Users List (Tab 1)
         const usersListEl = document.getElementById('adminUsersList');
         if (usersListEl) {
             if (adminUsers.length === 0) {
@@ -820,20 +860,33 @@ async function loadAdminData() {
                     const roleLabel = u.role === 'superadmin' ? 'Süper Admin' : (u.role === 'admin' ? 'Yönetici' : 'Üye');
                     const wsNames = (u.workspaces || []).map(w => w.name || w.id).join(', ') || 'Kişisel';
                     const canDelete = currentUser?.role === 'superadmin' && u.id !== currentUser.id && u.role !== 'superadmin';
+                    
+                    let statusBadge = '<span style="color: #16a34a; background: #dcfce7; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;">Onaylı</span>';
+                    if (u.status === 'pending') {
+                        statusBadge = '<span style="color: #d97706; background: #fef3c7; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;">Onay Bekliyor</span>';
+                    } else if (u.status === 'rejected') {
+                        statusBadge = '<span style="color: #dc2626; background: #fee2e2; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;">Reddedildi</span>';
+                    }
+
+                    const lastLogin = u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('tr-TR') : 'Hiç giriş yapmadı';
+
                     return `
-                        <div class="admin-user-row">
-                            <div class="admin-user-meta">
-                                <div class="user-profile-badge" style="background: ${escHtml(u.avatarColor || '#6366f1')}; width: 32px; height: 32px; font-size: 12px;">
+                        <div class="admin-user-row" style="padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                            <div class="admin-user-meta" style="display: flex; align-items: center; gap: 12px;">
+                                <div class="user-profile-badge" style="background: ${escHtml(u.avatarColor || '#6366f1')}; width: 36px; height: 36px; font-size: 13px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700;">
                                     ${initials(u.name)}
                                 </div>
                                 <div>
-                                    <div style="font-weight: 600; font-size: 13px; color: var(--text-primary);">${escHtml(u.name)} <span style="font-size: 11px; color: var(--text-muted);">(@${escHtml(u.username)})</span></div>
-                                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
-                                        Panolar: <span style="color: var(--accent); font-weight: 500;">${escHtml(wsNames)}</span>
+                                    <div style="font-weight: 600; font-size: 13px; color: var(--text-primary);">
+                                        ${escHtml(u.name)} <span style="font-size: 11px; color: var(--text-muted);">(@${escHtml(u.username)})</span>
+                                    </div>
+                                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 3px;">
+                                        Panolar: <span style="color: var(--accent); font-weight: 500;">${escHtml(wsNames)}</span> · Son Giriş: <span>${escHtml(lastLogin)}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                ${statusBadge}
                                 <span class="admin-user-tag ${roleClass}">${roleLabel}</span>
                                 ${canDelete ? `<button class="btn btn-danger btn-sm" onclick="window.deleteAdminUser('${escHtml(u.id)}')">Sil</button>` : ''}
                             </div>
@@ -843,14 +896,48 @@ async function loadAdminData() {
             }
         }
 
+        // Render Pending Users List (Tab 2)
+        const pendingListEl = document.getElementById('adminPendingUsersList');
+        if (pendingListEl) {
+            if (pendingUsers.length === 0) {
+                pendingListEl.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px;">✓ Bekleyen kullanıcı onay talebi bulunmuyor.</div>';
+            } else {
+                pendingListEl.innerHTML = pendingUsers.map(u => {
+                    const createdDate = new Date(u.createdAt).toLocaleString('tr-TR');
+                    return `
+                        <div class="admin-user-row" style="padding: 14px; border: 1px solid #fef3c7; background: #fffbeb; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                            <div class="admin-user-meta" style="display: flex; align-items: center; gap: 12px;">
+                                <div class="user-profile-badge" style="background: ${escHtml(u.avatarColor || '#d97706')}; width: 36px; height: 36px; font-size: 13px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700;">
+                                    ${initials(u.name)}
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600; font-size: 14px; color: #92400e;">
+                                        ${escHtml(u.name)} <span style="font-size: 12px; color: #b45309;">(@${escHtml(u.username)})</span>
+                                    </div>
+                                    <div style="font-size: 11px; color: #78350f; margin-top: 3px;">
+                                        Kayıt Tarihi: ${escHtml(createdDate)} ${u.company ? `· Şirket/Takım: <strong>${escHtml(u.company)}</strong>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <button class="btn btn-primary btn-sm" style="padding: 6px 14px; font-weight: 600;" onclick="window.approvePendingUser('${escHtml(u.id)}')">✓ Kabul Et</button>
+                                <button class="btn btn-danger btn-sm" style="padding: 6px 14px; font-weight: 600;" onclick="window.rejectPendingUser('${escHtml(u.id)}')">✕ Reddet</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        // Render Teams List (Tab 4)
         const teamsListEl = document.getElementById('adminTeamsList');
         if (teamsListEl) {
             teamsListEl.innerHTML = workspaces.map(w => {
                 const badge = w.type === 'personal' ? 'Kişisel' : (w.type === 'user' ? 'Bireysel' : 'Takım');
                 return `
-                    <div class="admin-user-row">
-                        <div class="admin-user-meta">
-                            <span style="font-size: 18px;">${w.type === 'personal' ? '🛡️' : (w.type === 'user' ? '👤' : '🏢')}</span>
+                    <div class="admin-user-row" style="padding: 12px; border-bottom: 1px solid var(--border);">
+                        <div class="admin-user-meta" style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 20px;">${w.type === 'personal' ? '🛡️' : (w.type === 'user' ? '👤' : '🏢')}</span>
                             <div>
                                 <div style="font-weight: 600; font-size: 13px; color: var(--text-primary);">${escHtml(w.name)}</div>
                                 <div style="font-size: 11px; color: var(--text-muted);">Tip: ${badge} · ID: <code>${escHtml(w.id)}</code></div>
@@ -860,10 +947,90 @@ async function loadAdminData() {
                 `;
             }).join('');
         }
+
+        // Render Audit Logs (Tab 3) - Super Admin only
+        if (isSuperAdmin) {
+            await renderAuditLogs();
+        }
     } catch (e) {
         console.error('Admin data load failed:', e);
     }
 }
+
+async function renderAuditLogs() {
+    const logsContainer = document.getElementById('adminLogsList');
+    if (!logsContainer) return;
+    logsContainer.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-muted);">Loglar yükleniyor…</div>';
+    try {
+        const res = await API.getAuditLogs();
+        const logs = res.logs || [];
+        if (logs.length === 0) {
+            logsContainer.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px;">Henüz aktivite kaydı bulunmuyor.</div>';
+            return;
+        }
+
+        logsContainer.innerHTML = logs.map(l => {
+            const timeStr = new Date(l.createdAt).toLocaleString('tr-TR');
+            const actionBadgeColor = {
+                'LOGIN': '#3b82f6',
+                'LOGOUT': '#6b7280',
+                'REGISTER_REQUEST': '#eab308',
+                'USER_APPROVED': '#10b981',
+                'USER_REJECTED': '#ef4444',
+                'USER_CREATED': '#6366f1',
+                'USER_DELETED': '#dc2626',
+                'CARD_CREATE': '#10b981',
+                'CARD_UPDATE': '#3b82f6',
+                'CARD_DELETE': '#ef4444',
+                'CARD_MOVE': '#8b5cf6',
+                'WORKSPACE_CREATE': '#ec4899',
+                'WORKSPACE_SWITCH': '#64748b'
+            }[l.action] || '#6366f1';
+
+            return `
+                <div style="display: flex; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 12px; align-items: flex-start;">
+                    <span style="background: ${actionBadgeColor}; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; margin-top: 1px;">
+                        ${escHtml(l.action)}
+                    </span>
+                    <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                            <span style="font-weight: 600; color: var(--text-primary);">${escHtml(l.name)} <span style="font-weight: normal; color: var(--text-muted);">(@${escHtml(l.username)}) [${escHtml(l.userRole)}]</span></span>
+                            <span style="font-size: 11px; color: var(--text-muted);">${escHtml(timeStr)}</span>
+                        </div>
+                        <div style="color: var(--text-secondary); margin-top: 3px; font-size: 12px; line-height: 1.4;">
+                            ${escHtml(l.details)}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        logsContainer.innerHTML = `<div style="padding: 16px; color: var(--danger);">${escHtml(err.message || 'Loglar yüklenemedi')}</div>`;
+    }
+}
+
+window.approvePendingUser = async function(userId) {
+    try {
+        const res = await API.approveUser(userId);
+        showToast(res.message || 'Kullanıcı onaylandı!');
+        await loadAdminData();
+        await loadNotifications();
+    } catch (e) {
+        showToast(e.message || 'Kullanıcı onaylanamadı', 'error');
+    }
+};
+
+window.rejectPendingUser = async function(userId) {
+    if (!confirm('Bu kullanıcının başvurusunu reddetmek istediğinize emin misiniz?')) return;
+    try {
+        const res = await API.rejectUser(userId);
+        showToast(res.message || 'Kullanıcı başvurusu reddedildi', 'info');
+        await loadAdminData();
+        await loadNotifications();
+    } catch (e) {
+        showToast(e.message || 'İşlem başarısız', 'error');
+    }
+};
 
 window.deleteAdminUser = async function(userId) {
     if (!confirm('Bu kullanıcıyı silmek istediğinize emin misiniz?')) return;
@@ -881,34 +1048,44 @@ safeAddListener('manageUsersBtn', 'click', () => {
     openModal('userModal');
 });
 
-// Admin Modal Tabs
+// Admin Modal Tabs Helper
+function switchAdminTab(activeTabId, activePanelId) {
+    ['tabUsersList', 'tabPendingUsers', 'tabLogs', 'tabTeamsList', 'tabAddUser'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('active', id === activeTabId);
+    });
+    ['panelUsersList', 'panelPendingUsers', 'panelLogs', 'panelTeamsList', 'panelAddUser'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = (id === activePanelId) ? 'block' : 'none';
+    });
+}
+
 safeAddListener('tabUsersList', 'click', () => {
-    document.getElementById('tabUsersList').classList.add('active');
-    document.getElementById('tabTeamsList').classList.remove('active');
-    document.getElementById('tabAddUser').classList.remove('active');
-    document.getElementById('panelUsersList').style.display = 'block';
-    document.getElementById('panelTeamsList').style.display = 'none';
-    document.getElementById('panelAddUser').style.display = 'none';
+    switchAdminTab('tabUsersList', 'panelUsersList');
     loadAdminData();
 });
 
+safeAddListener('tabPendingUsers', 'click', () => {
+    switchAdminTab('tabPendingUsers', 'panelPendingUsers');
+    loadAdminData();
+});
+
+safeAddListener('tabLogs', 'click', () => {
+    switchAdminTab('tabLogs', 'panelLogs');
+    renderAuditLogs();
+});
+
+safeAddListener('btnRefreshLogs', 'click', () => {
+    renderAuditLogs();
+});
+
 safeAddListener('tabTeamsList', 'click', () => {
-    document.getElementById('tabUsersList').classList.remove('active');
-    document.getElementById('tabTeamsList').classList.add('active');
-    document.getElementById('tabAddUser').classList.remove('active');
-    document.getElementById('panelUsersList').style.display = 'none';
-    document.getElementById('panelTeamsList').style.display = 'block';
-    document.getElementById('panelAddUser').style.display = 'none';
+    switchAdminTab('tabTeamsList', 'panelTeamsList');
     loadAdminData();
 });
 
 safeAddListener('tabAddUser', 'click', () => {
-    document.getElementById('tabUsersList').classList.remove('active');
-    document.getElementById('tabTeamsList').classList.remove('active');
-    document.getElementById('tabAddUser').classList.add('active');
-    document.getElementById('panelUsersList').style.display = 'none';
-    document.getElementById('panelTeamsList').style.display = 'none';
-    document.getElementById('panelAddUser').style.display = 'block';
+    switchAdminTab('tabAddUser', 'panelAddUser');
 });
 
 // Radio change for user workspace mode
@@ -1069,6 +1246,20 @@ function renderNotifications() {
                     <button class="btn btn-primary" style="padding: 4px 10px; font-size: 11px; font-weight: 600; line-height: 1;" onclick="approveDemoRequest(event, '${n.id}')">Onayla</button>
                 </div>
             `;
+        } else if (n.type === 'user-signup-request') {
+            if (n.requestStatus === 'pending') {
+                const targetUid = n.pendingUserId || n.senderId;
+                actionHtml = `
+                    <div class="notif-actions" style="margin-top: 8px; display: flex; gap: 6px;">
+                        <button class="btn btn-primary" style="padding: 4px 10px; font-size: 11px; font-weight: 600; line-height: 1;" onclick="handleNotifApprove(event, '${targetUid}')">✓ Kabul Et</button>
+                        <button class="btn btn-danger" style="padding: 4px 10px; font-size: 11px; font-weight: 600; line-height: 1;" onclick="handleNotifReject(event, '${targetUid}')">✕ Reddet</button>
+                    </div>
+                `;
+            } else if (n.requestStatus === 'approved') {
+                actionHtml = `<div style="margin-top: 6px; font-size: 11px; color: #16a34a; font-weight: 600;">✓ Super Admin tarafından onaylandı</div>`;
+            } else if (n.requestStatus === 'rejected') {
+                actionHtml = `<div style="margin-top: 6px; font-size: 11px; color: #dc2626; font-weight: 600;">✕ Reddedildi</div>`;
+            }
         }
         return `
             <div class="notif-item${n.read ? '' : ' unread'}" onclick="clickNotification(event, '${n.id}', '${n.cardId}')">
@@ -1080,6 +1271,33 @@ function renderNotifications() {
     }).join('');
 }
 window.renderNotifications = renderNotifications;
+
+async function handleNotifApprove(event, userId) {
+    event.stopPropagation();
+    try {
+        const res = await API.approveUser(userId);
+        showToast(res.message || 'Kullanıcı onaylandı!');
+        await loadNotifications();
+        await loadAdminData();
+    } catch (e) {
+        showToast(e.message || 'Onaylanamadı', 'error');
+    }
+}
+window.handleNotifApprove = handleNotifApprove;
+
+async function handleNotifReject(event, userId) {
+    event.stopPropagation();
+    if (!confirm('Bu kullanıcının kaydını reddetmek istediğinize emin misiniz?')) return;
+    try {
+        const res = await API.rejectUser(userId);
+        showToast(res.message || 'Kullanıcı reddedildi', 'info');
+        await loadNotifications();
+        await loadAdminData();
+    } catch (e) {
+        showToast(e.message || 'İşlem başarısız', 'error');
+    }
+}
+window.handleNotifReject = handleNotifReject;
 
 async function approveDemoRequest(event, notificationId) {
     event.stopPropagation();

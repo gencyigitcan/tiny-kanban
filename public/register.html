@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanban – Kayıt Ol ve Erişim Talep Et</title>
+    <meta name="description" content="Kanban panosuna üye olun veya yeni çalışma alanı açın. Super Admin onaylı güvenli erişim.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .register-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 16px;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+        }
+        .register-container {
+            width: 100%;
+            max-width: 480px;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+            padding: 36px 32px;
+            position: relative;
+            overflow: hidden;
+        }
+        .register-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+        }
+        .register-brand {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .register-logo {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: #ffffff;
+            font-size: 26px;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);
+            margin-bottom: 12px;
+        }
+        .register-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 6px;
+            letter-spacing: -0.02em;
+        }
+        .register-subtitle {
+            font-size: 13px;
+            color: #64748b;
+            line-height: 1.5;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .form-input {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #0f172a;
+            background: #f8fafc;
+            transition: all 0.2s ease;
+        }
+        .form-input:focus {
+            background: #ffffff;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+        .btn-register-submit {
+            width: 100%;
+            padding: 13px;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: #ffffff;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+            margin-top: 8px;
+        }
+        .btn-register-submit:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
+        }
+        .btn-register-submit:active {
+            transform: translateY(0);
+        }
+        .register-notice {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #1e40af;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            line-height: 1.5;
+        }
+        .register-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .register-success {
+            display: none;
+            text-align: center;
+            padding: 16px 0;
+        }
+        .success-icon {
+            width: 64px;
+            height: 64px;
+            background: #dcfce7;
+            color: #15803d;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin-bottom: 16px;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .success-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+        .success-desc {
+            font-size: 14px;
+            color: #475569;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        .register-footer {
+            margin-top: 24px;
+            text-align: center;
+            font-size: 13px;
+            color: #64748b;
+        }
+        .register-footer a {
+            color: #6366f1;
+            font-weight: 600;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body class="register-page">
+
+    <div class="register-container">
+        <!-- Brand Header -->
+        <div class="register-brand">
+            <div class="register-logo">K</div>
+            <h1 class="register-title">Kanban Kayıt ve Talep</h1>
+            <p class="register-subtitle">Yeni bir hesap oluşturun ve Super Admin onayına gönderin</p>
+        </div>
+
+        <!-- Error Alert -->
+        <div class="register-error" id="registerError"></div>
+
+        <!-- Success Panel -->
+        <div class="register-success" id="registerSuccess">
+            <div class="success-icon">✓</div>
+            <h2 class="success-title">Kayıt Talebiniz Alındı!</h2>
+            <p class="success-desc">
+                Hesap bilgileriniz güvenle oluşturuldu ve <strong>Super Admin</strong> onayına iletildi.<br><br>
+                Sistem yöneticisi başvurunuzu onayladığı anda hesabınız aktifleşecek ve panonuza erişebileceksiniz.
+            </p>
+            <a href="/board.html" class="btn-register-submit" style="display: inline-block; text-decoration: none; text-align: center;">Giriş Sayfasına Dön ➔</a>
+        </div>
+
+        <!-- Form -->
+        <form id="standaloneRegisterForm">
+            <div class="form-group">
+                <label class="form-label" for="regFullName">Tam Adınız</label>
+                <input class="form-input" type="text" id="regFullName" required placeholder="ör. Selin Yılmaz" autocomplete="name">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="regUsername">Kullanıcı Adı veya E-posta</label>
+                <input class="form-input" type="text" id="regUsername" required placeholder="ör. selin@sirket.com veya selin" autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="regPassword">Şifre</label>
+                <input class="form-input" type="password" id="regPassword" required placeholder="En az 6 karakter" autocomplete="new-password">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="regCompany">Şirket / Takım Adı <span style="text-transform: none; color: #94a3b8; font-weight: normal;">(İsteğe bağlı)</span></label>
+                <input class="form-input" type="text" id="regCompany" placeholder="Bireysel kullanım için boş bırakabilirsiniz">
+            </div>
+
+            <button type="submit" class="btn-register-submit" id="btnSubmit">Kayıt Ol ve Onaya Gönder</button>
+
+            <div class="register-notice">
+                <span style="font-size: 16px;">🛡️</span>
+                <div>
+                    <strong>Güvenli Erişim Onayı:</strong> Sistem yöneticisi güvenliği için tüm yeni üyelikler Super Admin tarafından incelenip onaylandıktan sonra aktif hale getirilir.
+                </div>
+            </div>
+
+            <div class="register-footer">
+                Zaten bir hesabınız var mı? <a href="/board.html">Giriş Yap</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const form = document.getElementById('standaloneRegisterForm');
+        const errDiv = document.getElementById('registerError');
+        const successDiv = document.getElementById('registerSuccess');
+        const submitBtn = document.getElementById('btnSubmit');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errDiv.style.display = 'none';
+            errDiv.textContent = '';
+
+            const name = document.getElementById('regFullName').value.trim();
+            const username = document.getElementById('regUsername').value.trim();
+            const password = document.getElementById('regPassword').value;
+            const company = document.getElementById('regCompany').value.trim();
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Kaydediliyor...';
+
+            try {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, username, password, company: company || undefined })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || 'Kayıt işlemi başarısız');
+                }
+
+                if (data.pending) {
+                    form.style.display = 'none';
+                    successDiv.style.display = 'block';
+                } else if (data.token) {
+                    localStorage.setItem('tiny_kanban_token', data.token);
+                    window.location.href = '/board.html';
+                } else {
+                    form.style.display = 'none';
+                    successDiv.style.display = 'block';
+                }
+            } catch (err) {
+                errDiv.textContent = err.message;
+                errDiv.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Kayıt Ol ve Onaya Gönder';
+            }
+        });
+    </script>
+</body>
+</html>

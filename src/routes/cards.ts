@@ -2,7 +2,7 @@
 //  Card Routes
 // ============================================================
 import { Router } from 'express';
-import { readDb, writeDbSync, uid } from '../lib/db.js';
+import { readDb, writeDbSync, uid, logActivity, getEnvironment } from '../lib/db.js';
 import { validate } from '../middleware/validate.js';
 import { NotFoundError } from '../middleware/error.js';
 import { createCardSchema, updateCardSchema } from '../lib/schemas.js';
@@ -64,6 +64,20 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
     db.cards.push(card);
     notifyAssignee(db, card.id, card.title, card.assignee, req.user);
     writeDbSync(db, req);
+
+    logActivity({
+        userId: req.user?.id || 'unknown',
+        username: req.user?.username || 'unknown',
+        name: req.user?.name || 'Kullanıcı',
+        userRole: req.user?.role || 'user',
+        action: 'CARD_CREATE',
+        entityType: 'card',
+        entityId: card.id,
+        details: `'${card.title}' (${card.key}) kartı oluşturuldu. Kolon: ${card.col}, Öncelik: ${card.priority}`,
+        workspaceId: req.tenantId || 'personal',
+        environment: req.environment || getEnvironment(req)
+    }, req);
+
     res.status(201).json(card);
 });
 
@@ -74,6 +88,7 @@ cardRouter.put('/:id', validate(updateCardSchema), (req, res) => {
     if (idx === -1) throw new NotFoundError('Card not found');
 
     const oldAssignee = db.cards[idx].assignee;
+    const oldCol = db.cards[idx].col;
     const newAssignee = req.body.assignee;
     const title = req.body.title || db.cards[idx].title;
 
@@ -94,16 +109,48 @@ cardRouter.put('/:id', validate(updateCardSchema), (req, res) => {
     }
 
     writeDbSync(db, req);
+
+    const isMove = req.body.col && req.body.col !== oldCol;
+    logActivity({
+        userId: req.user?.id || 'unknown',
+        username: req.user?.username || 'unknown',
+        name: req.user?.name || 'Kullanıcı',
+        userRole: req.user?.role || 'user',
+        action: isMove ? 'CARD_MOVE' : 'CARD_UPDATE',
+        entityType: 'card',
+        entityId: db.cards[idx].id,
+        details: isMove
+            ? `'${db.cards[idx].title}' (${db.cards[idx].key}) kartı '${oldCol}' kolonundan '${db.cards[idx].col}' kolonuna taşındı.`
+            : `'${db.cards[idx].title}' (${db.cards[idx].key}) kartı güncellendi.`,
+        workspaceId: req.tenantId || 'personal',
+        environment: req.environment || getEnvironment(req)
+    }, req);
+
     res.json(db.cards[idx]);
 });
 
 /** DELETE /api/cards/:id */
 cardRouter.delete('/:id', (req, res) => {
     const db = readDb(req);
+    const cardToDelete = db.cards.find(c => c.id === req.params.id);
     const before = db.cards.length;
     db.cards = db.cards.filter(c => c.id !== req.params.id);
     if (db.cards.length === before) throw new NotFoundError('Card not found');
     writeDbSync(db, req);
+
+    logActivity({
+        userId: req.user?.id || 'unknown',
+        username: req.user?.username || 'unknown',
+        name: req.user?.name || 'Kullanıcı',
+        userRole: req.user?.role || 'user',
+        action: 'CARD_DELETE',
+        entityType: 'card',
+        entityId: req.params.id,
+        details: `'${cardToDelete?.title || req.params.id}' (${cardToDelete?.key || ''}) kartı silindi.`,
+        workspaceId: req.tenantId || 'personal',
+        environment: req.environment || getEnvironment(req)
+    }, req);
+
     res.json({ ok: true });
 });
 

@@ -426,8 +426,10 @@
                 <button class="modal-close" onclick="closeModal('userModal')">✕</button>
             </div>
             <div class="modal-body">
-                <div class="auth-tabs" style="margin-bottom: 16px;">
+                <div class="auth-tabs" style="margin-bottom: 16px; flex-wrap: wrap; gap: 6px;">
                     <button class="auth-tab active" id="tabUsersList">Kullanıcılar</button>
+                    <button class="auth-tab" id="tabPendingUsers">⏳ Onay Bekleyenler <span id="pendingUsersBadge" style="display:none; background:#ef4444; color:#fff; border-radius:10px; padding:1px 6px; font-size:10px; margin-left:4px;">0</span></button>
+                    <button class="auth-tab" id="tabLogs" style="display: none;">📜 Aktivite Günlüğü</button>
                     <button class="auth-tab" id="tabTeamsList">Takımlar / Panolar</button>
                     <button class="auth-tab" id="tabAddUser">✚ Yeni Kullanıcı Ekle</button>
                 </div>
@@ -437,7 +439,24 @@
                     <div class="manager-list" id="adminUsersList"></div>
                 </div>
 
-                <!-- Tab 2: Teams / Workspaces List -->
+                <!-- Tab 2: Pending Approvals List -->
+                <div class="user-panel" id="panelPendingUsers" style="display: none;">
+                    <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
+                        Aşağıdaki kullanıcılar sisteme kayıt talebinde bulunmuştur. Panoya giriş yapabilmeleri için Super Admin onayı gereklidir.
+                    </div>
+                    <div class="manager-list" id="adminPendingUsersList"></div>
+                </div>
+
+                <!-- Tab 3: Activity / Audit Logs (Super Admin Only) -->
+                <div class="user-panel" id="panelLogs" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <span style="font-size: 13px; color: var(--text-secondary);">Tüm kullanıcıların giriş, kart oluşturma, taşıma, güncelleme ve silme logları.</span>
+                        <button class="btn btn-secondary btn-sm" id="btnRefreshLogs" type="button">🔄 Yenile</button>
+                    </div>
+                    <div class="logs-container" id="adminLogsList" style="max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
+                </div>
+
+                <!-- Tab 4: Teams / Workspaces List -->
                 <div class="user-panel" id="panelTeamsList" style="display: none;">
                     <div style="margin-bottom: 14px; display: flex; gap: 8px;">
                         <input class="form-input" type="text" id="newTeamName" placeholder="Yeni Takım / Pano adı… (ör. Mobil Ekibi)">
@@ -446,7 +465,7 @@
                     <div class="manager-list" id="adminTeamsList"></div>
                 </div>
 
-                <!-- Tab 3: Add User Form -->
+                <!-- Tab 5: Add User Form -->
                 <div class="user-panel" id="panelAddUser" style="display: none;">
                     <form id="adminAddUserForm" style="display: flex; flex-direction: column; gap: 12px;">
                         <div class="form-row">
@@ -562,11 +581,13 @@
                     <input class="form-input" type="text" id="regCompany" placeholder="ör. Şirket adı veya bireysel için boş bırakın">
                 </div>
                 <div class="auth-error" id="registerError"></div>
-                <button type="submit" class="btn btn-primary auth-submit-btn">Hesap Oluştur</button>
+                <div class="register-success-box" id="regSuccessBox" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:12px; border-radius:8px; font-size:13px; margin-bottom:12px; line-height:1.5;"></div>
+                <button type="submit" class="btn btn-primary auth-submit-btn" id="btnRegisterSubmit">Hesap Oluştur</button>
             </form>
 
             <div class="auth-footer-note">
-                Varsayılan hesaplar: <code>gencyigitcan</code> (veya <code>yigitcangenc@gmail.com</code>), <code>admin</code>, <code>zeynep</code>
+                Varsayılan hesaplar: <code>gencyigitcan</code> (veya <code>yigitcangenc@gmail.com</code>), <code>admin</code>, <code>zeynep</code><br>
+                <a href="/register.html" style="color:var(--accent); font-weight:600; text-decoration:underline; display:inline-block; margin-top:6px;">Ayrı Kayıt ve Talep Sayfası ➔</a>
             </div>
         </div>
     </div>
