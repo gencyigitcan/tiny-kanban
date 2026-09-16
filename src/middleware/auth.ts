@@ -19,17 +19,43 @@ declare global {
 }
 
 export function requireAuth(req: Request, _res: Response, next: NextFunction): void {
+    const env = req.environment || getEnvironment(req);
+    req.environment = env;
+
+    const isDemoReq = (
+        req.headers['x-workspace'] === 'demo' ||
+        req.headers['x-tenant-id'] === 'demo' ||
+        req.query?.workspace === 'demo'
+    );
+
     const authHeader = req.headers.authorization;
+
+    // Public demo workspace access: automatically assign demo session without requiring login
+    if (isDemoReq && (!authHeader || !authHeader.startsWith('Bearer '))) {
+        const db = readDb({ tenantId: 'demo', environment: env });
+        const demoUser = db.users[0] || {
+            id: 'usr-1',
+            username: 'admin',
+            name: 'Ali Yılmaz',
+            avatarColor: '#4f46e5',
+            role: 'admin',
+            tenantId: 'demo',
+            workspaces: ['demo']
+        };
+        req.user = demoUser;
+        req.tenantId = 'demo';
+        req.dbScope = 'demo';
+        return next();
+    }
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         throw new AppError('Unauthorized: Token missing', 401);
     }
 
     const token = authHeader.split(' ')[1];
-    const env = req.environment || getEnvironment(req);
-    req.environment = env;
 
     // 1. Resolve tenant from token prefix (e.g. "team_123:abc..." or "user_ahmet:xyz...")
-    let tenantId = 'personal';
+    let tenantId = isDemoReq ? 'demo' : 'personal';
     if (token.includes(':')) {
         tenantId = token.split(':')[0];
     }
@@ -72,7 +98,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
     }
 
     req.user = user;
-    req.tenantId = sessionTenantId;
-    req.dbScope = sessionTenantId;
+    req.tenantId = isDemoReq ? 'demo' : sessionTenantId;
+    req.dbScope = req.tenantId;
     return next();
 }

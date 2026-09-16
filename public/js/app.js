@@ -20,18 +20,29 @@ let currentView = 'board';
 let syncIntervalId = null;
 
 // ── Boot ──────────────────────────────────────────────────
-// ── Boot ──────────────────────────────────────────────────
 async function boot() {
+    const isDemo = window.IS_DEMO_PAGE === true || window.location.pathname.includes('demo');
     const token = localStorage.getItem('tiny_kanban_token');
     
-    // Switch to local storage mode only if we are on demo page or explicitly offline
-    if (!token && !window.isLocalStorageMode) {
+    // Switch to auth screen only if NOT on demo page and no token
+    if (!isDemo && !token && !window.isLocalStorageMode) {
         showAuthScreen();
         return;
     }
 
     try {
-        if (token && !window.isLocalStorageMode) {
+        if (isDemo) {
+            currentUser = {
+                id: 'usr-1',
+                username: 'admin',
+                name: 'Ali Yılmaz',
+                avatarColor: '#4f46e5',
+                role: 'admin',
+                tenantId: 'demo'
+            };
+            window.currentUser = currentUser;
+            updateUserHeader();
+        } else if (token && !window.isLocalStorageMode) {
             try {
                 currentUser = await API.getMe();
                 window.currentUser = currentUser;
@@ -43,7 +54,7 @@ async function boot() {
             }
         }
 
-        // Fetch core data
+        // Fetch core data (on demo, this calls the live server with X-Workspace: demo)
         [cards, epics, sprints, users, labels, notifications] = await Promise.all([
             API.getCards(),
             API.getEpics(),
@@ -63,7 +74,6 @@ async function boot() {
         
         // If in localStorage mode, verify if demo needs seeding
         if (window.isLocalStorageMode) {
-            const isDemo = window.location.pathname.includes('demo.html');
             if (cards.length === 0 && epics.length === 0 && sprints.length === 0) {
                 seed2026Data(isDemo);
                 // Reload after seed
@@ -82,7 +92,7 @@ async function boot() {
         setupBackgroundSync();
     } catch (err) {
         console.error('Boot error:', err);
-        if (err.message === 'Unauthorized') {
+        if (err.message === 'Unauthorized' && !isDemo) {
             showAuthScreen();
             return;
         }

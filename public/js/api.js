@@ -3,11 +3,11 @@
 // ============================================================
 
 const API_ROOT = '';
-const IS_DEMO = window.location.pathname.includes('demo.html');
+const IS_DEMO = window.IS_DEMO_PAGE === true || window.location.pathname.includes('demo');
 const LS_KEY = IS_DEMO ? 'tiny_kanban_demo_db' : 'tiny_kanban_db';
 
-// Global state to track mode
-window.isLocalStorageMode = IS_DEMO || false;
+// Global state to track mode - NEVER force local storage mode on boot
+window.isLocalStorageMode = false;
 
 // Default empty structure
 const EMPTY_DB = { cards: [], epics: [], sprints: [] };
@@ -48,16 +48,22 @@ async function request(url, options = {}) {
     }
     try {
         const token = localStorage.getItem('tiny_kanban_token');
+        options.headers = {
+            ...(options.headers || {})
+        };
+        if (IS_DEMO) {
+            options.headers['X-Workspace'] = 'demo';
+            options.headers['X-Tenant-Id'] = 'demo';
+        }
         if (token) {
-            options.headers = {
-                ...options.headers,
-                'Authorization': `Bearer ${token}`
-            };
+            options.headers['Authorization'] = `Bearer ${token}`;
         }
         const r = await fetch(url, options);
         if (r.status === 401) {
-            localStorage.removeItem('tiny_kanban_token');
-            window.dispatchEvent(new Event('unauthorized'));
+            if (!IS_DEMO) {
+                localStorage.removeItem('tiny_kanban_token');
+                window.dispatchEvent(new Event('unauthorized'));
+            }
             throw new Error('Unauthorized');
         }
         if (!r.ok) {
@@ -70,7 +76,7 @@ async function request(url, options = {}) {
             throw e;
         }
         // Fall back to LocalStorage on connection error (except on clean exit / aborted fetches)
-        if (!IS_DEMO && !window.isLocalStorageMode) {
+        if (!window.isLocalStorageMode) {
             console.warn('API server is offline. Switching to client-side LocalStorage mode.', e);
             window.isLocalStorageMode = true;
             if (window.showToast) {

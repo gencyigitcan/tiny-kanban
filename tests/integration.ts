@@ -310,12 +310,40 @@ async function runTests() {
         if (checkLogin.status === 200) {
             throw new Error('User was still able to login after deletion!');
         }
-        console.log('   ✓ Confirmed: yigitcangenc@gmail.com is now clean and available for fresh registration by the user!\n');
+        // ========================================================
+        // Test Demo Public Workspace Access (No Bearer Token Needed)
+        // ========================================================
+        console.log('Test Demo: Access Demo API with X-Workspace: demo (No Token)');
+        const demoCardsRes = await api('/api/cards', {
+            headers: { 'X-Workspace': 'demo' }
+        });
+        if (demoCardsRes.status !== 200 || !Array.isArray(demoCardsRes.body) || demoCardsRes.body.length < 30) {
+            throw new Error(`Demo API cards failed: status ${demoCardsRes.status}, count: ${demoCardsRes.body?.length}`);
+        }
+        console.log(`   ✓ Demo API returned ${demoCardsRes.body.length} Nova Team cards without token`);
+
+        // Verify that personal tickets are present in personal DB
+        const finalPersonalDb = readDb({ tenantId: 'personal', environment: 'production' });
+        const expectedTitles = [
+            'Avukat ile Görüş',
+            "Kanban'ı düzelt",
+            "Kanban'a mail bağla",
+            'AUZEF Kayıt',
+            'Corepos yayınla'
+        ];
+        for (const title of expectedTitles) {
+            const hasCard = finalPersonalDb.cards.some(c => c.title.trim().toLowerCase() === title.trim().toLowerCase());
+            if (!hasCard) {
+                throw new Error(`CRITICAL: Yiğitcan Genç card missing from personal DB: ${title}`);
+            }
+        }
+        console.log('   ✓ Verified all 5 Yiğitcan Genç personal tickets are intact in personal DB\n');
 
         console.log('🎉 ALL INTEGRATION TESTS PASSED WITH 100% SUCCESS!');
 
     } finally {
         server.close();
+        process.exit(0);
     }
 }
 

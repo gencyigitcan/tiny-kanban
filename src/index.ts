@@ -19,8 +19,10 @@ import {
     saveTenantDbToD1,
     getTenantIndex,
     saveTenantIndex,
+    ensurePersonalDbIntegrity,
     RequestContext
 } from './lib/db.js';
+import { createDefaultDemoDb } from './lib/demo_data.js';
 import { cardRouter } from './routes/cards.js';
 import { epicRouter } from './routes/epics.js';
 import { sprintRouter } from './routes/sprints.js';
@@ -137,13 +139,21 @@ export default {
         // Resolve active tenant from token or header
         const authHeader = request.headers.get('authorization');
         let initialTenantId = 'personal';
-        if (authHeader && authHeader.startsWith('Bearer ')) {
+        const isDemoReq = request.headers.get('x-workspace') === 'demo' || 
+                          request.headers.get('x-tenant-id') === 'demo' || 
+                          url.searchParams.get('workspace') === 'demo';
+
+        if (isDemoReq) {
+            initialTenantId = 'demo';
+        } else if (authHeader && authHeader.startsWith('Bearer ')) {
             const token = authHeader.split(' ')[1];
             if (token.includes(':')) {
                 initialTenantId = token.split(':')[0];
             }
         } else if (request.headers.get('x-tenant-id')) {
             initialTenantId = request.headers.get('x-tenant-id')!;
+        } else if (request.headers.get('x-workspace')) {
+            initialTenantId = request.headers.get('x-workspace')!;
         }
 
         const tenantsMap = new Map<string, { db: any; dirty: boolean; key: string }>();
@@ -169,12 +179,18 @@ export default {
                         } else if (row.key === dbKey) {
                             try {
                                 const parsed = JSON.parse(row.value);
-                                tenantsMap.set('personal', { db: parsed, dirty: false, key: dbKey });
+                                const changed = (envName === 'production') ? ensurePersonalDbIntegrity(parsed) : false;
+                                tenantsMap.set('personal', { db: parsed, dirty: changed, key: dbKey });
                             } catch {}
                         } else if (row.key === demoKey) {
                             try {
-                                const parsed = JSON.parse(row.value);
-                                tenantsMap.set('demo', { db: parsed, dirty: false, key: demoKey });
+                                let parsed = JSON.parse(row.value);
+                                let changed = false;
+                                if (!parsed.users || parsed.users.length < 10 || !parsed.sprints || parsed.sprints.length < 52) {
+                                    parsed = createDefaultDemoDb();
+                                    changed = true;
+                                }
+                                tenantsMap.set('demo', { db: parsed, dirty: changed, key: demoKey });
                             } catch {}
                         } else if (row.key.startsWith(tenantPrefix)) {
                             const tId = row.key.slice(tenantPrefix.length);
@@ -207,6 +223,16 @@ export default {
                 db: personalDb,
                 dirty: false,
                 key: resolveStorageKey(envName, 'personal')
+            });
+        }
+
+        // Always ensure 'demo' is loaded
+        if (!tenantsMap.has('demo')) {
+            const demoDb = await loadTenantDbFromD1(env.DB, 'demo', envName);
+            tenantsMap.set('demo', {
+                db: demoDb,
+                dirty: false,
+                key: resolveStorageKey(envName, 'demo')
             });
         }
 

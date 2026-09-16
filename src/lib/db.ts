@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import writeFileAtomic from 'write-file-atomic';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { DbSchema, Workspace, TenantIndex, ActivityLog } from '../types/index.js';
-import { createDefaultDemoDb } from './demo_data.js';
+import { createDefaultDemoDb, YIGITCAN_USER_CARDS } from './demo_data.js';
 
 export type Environment = 'production' | 'test' | 'development';
 export type DbScope = 'personal' | 'demo' | string;
@@ -140,10 +140,11 @@ export function resolveTenantId(scopeOrReq?: any): string {
         if (scopeOrReq.dbScope) return scopeOrReq.dbScope;
         if (scopeOrReq.headers) {
             const h = typeof scopeOrReq.headers.get === 'function'
-                ? scopeOrReq.headers.get('x-tenant-id')
-                : scopeOrReq.headers['x-tenant-id'];
+                ? (scopeOrReq.headers.get('x-workspace') || scopeOrReq.headers.get('x-tenant-id'))
+                : (scopeOrReq.headers['x-workspace'] || scopeOrReq.headers['x-tenant-id']);
             if (h) return String(h).trim();
         }
+        if (scopeOrReq.query?.workspace) return String(scopeOrReq.query.workspace).trim();
         if (scopeOrReq.query?.tenantId) return String(scopeOrReq.query.tenantId).trim();
     } else if (typeof scopeOrReq === 'string' && scopeOrReq.trim()) {
         return scopeOrReq.trim();
@@ -162,6 +163,50 @@ export const DEFAULT_LABELS = [
     { id: 'docs', name: 'Belge', color: '#ca8a04', bg: '#fefce8', createdAt: Date.now() },
     { id: 'urgent', name: 'Acil', color: '#dc2626', bg: '#fff1f2', createdAt: Date.now() }
 ];
+
+// ── Ensure Personal DB Integrity (Yiğitcan Genç Cards Preservation) ──
+export function ensurePersonalDbIntegrity(db: DbSchema): boolean {
+    let changed = false;
+    if (!Array.isArray(db.cards)) {
+        db.cards = [];
+        changed = true;
+    }
+    if (!Array.isArray(db.labels)) {
+        db.labels = [...DEFAULT_LABELS];
+        changed = true;
+    }
+
+    // Ensure label 'lbl-websiteleri' exists
+    if (!db.labels.some(l => l.id === 'lbl-websiteleri')) {
+        db.labels.push({
+            id: 'lbl-websiteleri',
+            name: 'Web Siteleri',
+            color: '#6366f1',
+            bg: '#eef2ff',
+            createdAt: 1789555200000
+        });
+        changed = true;
+    }
+
+    // Ensure all 5 cards for Yiğitcan Genç exist
+    for (const uCard of YIGITCAN_USER_CARDS) {
+        const exists = db.cards.some(c =>
+            c.id === uCard.id ||
+            (c.title && c.title.trim().toLowerCase() === uCard.title.trim().toLowerCase())
+        );
+        if (!exists) {
+            db.cards.push(structuredClone(uCard));
+            changed = true;
+        }
+    }
+
+    if ((db.taskCounter ?? 0) < 15) {
+        db.taskCounter = 15;
+        changed = true;
+    }
+
+    return changed;
+}
 
 // ── Sample Test Environment Database ─────────────────────────
 export function createDefaultTestDb(): DbSchema {
@@ -277,6 +322,7 @@ export function initDb(): void {
                 { id: 'personal', name: 'Kişisel Çalışma Alanı', type: 'personal', ownerId: 'usr-superadmin', createdAt: Date.now() }
             ];
         }
+        ensurePersonalDbIntegrity(personalDb);
         writeTenantDbFileSync('personal', 'production', personalDb);
 
         // ── 2. DEMO DATABASE (demo_db.json) ──────────────────────
@@ -593,26 +639,36 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                 logs: Array.isArray(parsed.logs) ? parsed.logs : []
             };
 
-            // In production personal DB, if superUser exists, ensure email & workspaces
+            // In production personal DB, if superUser exists, ensure email & workspaces and card integrity
             if (env === 'production' && tenantId === 'personal') {
+                let changed = ensurePersonalDbIntegrity(db);
                 let superUser = db.users.find(u =>
                     u.username.toLowerCase() === 'gencyigitcan' ||
                     (u.email && u.email.toLowerCase() === 'yigitcangenc@gmail.com') ||
                     u.id === 'usr-superadmin'
                 );
                 if (superUser) {
-                    superUser.email = 'yigitcangenc@gmail.com';
-                    superUser.status = 'approved';
+                    if (superUser.email !== 'yigitcangenc@gmail.com' || superUser.status !== 'approved') {
+                        superUser.email = 'yigitcangenc@gmail.com';
+                        superUser.status = 'approved';
+                        changed = true;
+                    }
                     if (!superUser.workspaces || !superUser.workspaces.includes('personal')) {
                         superUser.workspaces = ['personal', ...(superUser.workspaces || [])];
+                        changed = true;
                     }
+                }
+                if (changed && dbBinding) {
+                    await saveTenantDbToD1(dbBinding, key, db);
                 }
             }
 
             // In demo DB, ensure all 10 users and 2026-2027 data exist
             if (tenantId === 'demo' && (db.users.length < 10 || db.sprints.length < 52)) {
                 db = createDefaultDemoDb();
-                await saveTenantDbToD1(dbBinding, key, db);
+                if (dbBinding) {
+                    await saveTenantDbToD1(dbBinding, key, db);
+                }
             }
 
             return db;
@@ -629,9 +685,14 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
         initialDb = isNodeRuntime() ? readTenantDbFileSync('demo', 'production') : createDefaultDemoDb();
     } else {
         initialDb = readTenantDbFileSync(tenantId, env);
+        if (tenantId === 'personal' && env === 'production') {
+            ensurePersonalDbIntegrity(initialDb);
+        }
     }
 
-    await saveTenantDbToD1(dbBinding, key, initialDb);
+    if (dbBinding) {
+        await saveTenantDbToD1(dbBinding, key, initialDb);
+    }
     return initialDb;
 }
 

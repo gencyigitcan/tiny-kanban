@@ -2087,7 +2087,7 @@ const DEMO_LABELS = [
 ];
 
 function seed2026Data(force = false) {
-    const IS_DEMO = window.location.pathname.includes('demo.html');
+    const IS_DEMO = window.IS_DEMO_PAGE === true || window.location.pathname.includes('demo');
     const LS_KEY = IS_DEMO ? 'tiny_kanban_demo_db' : 'tiny_kanban_db';
 
     // Only seed if localStorage is empty or version mismatch or force is true
@@ -2120,7 +2120,7 @@ function seed2026Data(force = false) {
     console.log('Database successfully seeded for 2026-2027 with 10-person Nova Team!');
 }
 
-// Auto seed demo if we're on demo.html
-if (window.location.pathname.includes('demo.html')) {
+// Auto seed demo if we're on demo page
+if (window.IS_DEMO_PAGE === true || window.location.pathname.includes('demo')) {
     seed2026Data(false);
 }
