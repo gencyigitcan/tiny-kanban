@@ -14,39 +14,114 @@
      ============================================================ -->
     <header>
         <div class="container nav-wrapper">
-            <a href="#" class="logo-container">
-                <div class="logo-icon">K</div>
-                <span class="logo-text">Kanban Project</span>
+            <a href="/" class="logo-container">
+                <div class="logo-icon" style="background: linear-gradient(135deg, #4f46e5, #0ea5e9); color:#fff; font-weight:800; border-radius:10px; width:36px; height:36px; display:flex; align-items:center; justify-content:center;">K</div>
+                <span class="logo-text" style="font-family:var(--font-heading); font-weight:800; font-size:18px; letter-spacing:-0.5px;">Tiny Kanban <span style="font-size:11px; background:rgba(99,102,241,0.2); color:#818cf8; padding:2px 6px; border-radius:4px; font-weight:600; margin-left:4px;">v1.3</span></span>
             </a>
             <nav class="nav-links">
-                <a href="#about" class="nav-link">Hakkında</a>
+                <a href="/demo" class="nav-link" style="color:#38bdf8; font-weight:600;">⚡ Canlı Demo (/demo)</a>
                 <a href="#board-view" class="nav-link">Kanban</a>
-                <a href="#gantt-view" class="nav-link">Gantt Görünümü</a>
+                <a href="#gantt-view" class="nav-link">Gantt</a>
                 <a href="#dashboard-view" class="nav-link">İstatistikler</a>
-                <a href="#backlog-view" class="nav-link">Sprint Planlama</a>
+                <a href="#backlog-view" class="nav-link">104 Hafta Sprint</a>
                 <a href="#architecture" class="nav-link">Mimari</a>
             </nav>
-            <div>
-                <a href="#demo-request" class="btn btn-primary">Demo Talep Et ➔</a>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <a href="/demo" class="btn btn-secondary" style="background:rgba(99,102,241,0.12); border-color:#6366f1; color:#a5b4fc; font-size:13px; padding:8px 14px;">⚡ Demo (/demo)</a>
+                <a href="/board.html" class="btn btn-primary" style="font-size:13px; padding:8px 16px;">🔐 Giriş Yap</a>
+                <a href="/register.html" class="btn btn-secondary" style="font-size:13px; padding:8px 14px; border-color:var(--border-color); color:var(--text-secondary);">Kayıt Ol</a>
             </div>
         </div>
     </header>
 
     <!-- ============================================================
-     HERO SECTION
+     HERO SECTION (SaaS App Gateway & Direct Demo Access)
      ============================================================ -->
     <section class="hero container" id="about">
-        <div class="badge-private">
-            <span>🛡️</span> Kişisel & Bireysel Geliştirici Projesi
-        </div>
-        <h1 class="hero-title">
-            Bulut Bağımlılığı Olmayan<br><span>Kişisel Kanban Panosu</span>
-        </h1>
-        <p class="hero-subtitle">
-            Karmaşık SaaS araçları yerine; kendi sunucumda kolayca barındırabildiğim, verilerin tamamen benim kontrolümde olduğu ve diske güvenle saklandığı TypeScript tabanlı minimalist bir Kanban panosu geliştirdim.
-        </p>
-        <div class="hero-actions">
-            <a href="#demo-request" class="btn btn-primary">Demo Hesabı Talep Et ➔</a>
+        <div class="hero-grid">
+            
+            <!-- Left Column: Value Prop & CTAs -->
+            <div class="hero-left">
+                <div class="badge-private">
+                    <span>🛡️</span> 2026 Kurumsal Çok Kiracılı Mimari
+                </div>
+                <h1 class="hero-title">
+                    Çevik Takımlar İçin<br><span>Özgür, Hızlı ve Güvenli</span>
+                </h1>
+                <p class="hero-subtitle">
+                    2026 ve 2027 yıllarını kapsayan 104 haftalık sprint döngüsü (31 Aralık 2027 sonuna kadar), 1.040 görev, tam izole kiracı veritabanları ve sıfır SaaS bağımlılığı.
+                </p>
+                
+                <div class="hero-actions">
+                    <a href="/demo" class="btn btn-primary" style="padding: 13px 24px; font-size: 15px; font-weight:700; box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4);">
+                        🚀 Canlı Demo Panosunu Aç (/demo) ➔
+                    </a>
+                    <a href="#quick-login" class="btn btn-secondary" style="padding: 13px 20px; font-size: 14px;">
+                        🔐 Çalışma Alanına Bağlan
+                    </a>
+                </div>
+
+                <div class="hero-metrics">
+                    <div class="hero-metric-item">
+                        <span class="check">✓</span> 104 Hafta (1.040 Görev)
+                    </div>
+                    <div class="hero-metric-item">
+                        <span class="check">✓</span> İzole Kiracı Veritabanı
+                    </div>
+                    <div class="hero-metric-item">
+                        <span class="check">✓</span> 100/100 Güvenlik Sertifikalı
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Interactive Quick Login & Live Gateway Card -->
+            <div class="gateway-card" id="quick-login">
+                <div class="gateway-header">
+                    <div class="gateway-title-row">
+                        <span style="font-size:20px;">🔐</span>
+                        <div class="gateway-title">Çalışma Alanına Giriş</div>
+                    </div>
+                    <p class="gateway-desc">Kişisel çalışma alanınıza veya demo hesabınıza anında bağlanın.</p>
+                </div>
+
+                <div class="gateway-msg" id="heroLoginMsg"></div>
+
+                <form class="gateway-form" id="heroLoginForm" autocomplete="on">
+                    <div class="gateway-input-wrap">
+                        <label class="gateway-label" for="heroUsername">Kullanıcı Adı veya E-posta</label>
+                        <input class="gateway-input" type="text" id="heroUsername" placeholder="ör. admin veya e-posta" required autocomplete="username">
+                    </div>
+                    <div class="gateway-input-wrap">
+                        <label class="gateway-label" for="heroPassword">Şifre</label>
+                        <input class="gateway-input" type="password" id="heroPassword" placeholder="••••••••" required autocomplete="current-password">
+                    </div>
+
+                    <button type="submit" class="gateway-submit-btn" id="heroLoginBtn">
+                        <span>Giriş Yap ve Panoyu Aç</span> ➔
+                    </button>
+                </form>
+
+                <div class="gateway-divider">
+                    <span>VEYA ŞİFRESİZ KEŞFEDİN</span>
+                </div>
+
+                <a href="/demo" class="gateway-demo-btn">
+                    <span>⚡ Doğrudan Canlı Demo Panosuna Git (/demo)</span> ➔
+                </a>
+
+                <div class="gateway-quick-fill">
+                    <span>Hızlı Doldur:</span>
+                    <div style="display:flex; gap:6px;">
+                        <button type="button" class="pill-credential" onclick="fillHeroCredentials('admin', 'password')">admin</button>
+                        <button type="button" class="pill-credential" onclick="fillHeroCredentials('zeynep', 'password')">zeynep</button>
+                    </div>
+                </div>
+
+                <div class="gateway-register-link">
+                    Hesabınız yok mu? <a href="/register.html">Yeni Kayıt Talebi Oluşturun ➔</a>
+                </div>
+            </div>
+
         </div>
     </section>
 

@@ -643,6 +643,65 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ── Hero Quick Login Form Handler ────────────────────────
+    window.fillHeroCredentials = function(username, password) {
+        const u = document.getElementById('heroUsername');
+        const p = document.getElementById('heroPassword');
+        if (u) u.value = username;
+        if (p) p.value = password;
+        if (u) u.focus();
+    };
+
+    const heroLoginForm = document.getElementById('heroLoginForm');
+    const heroLoginMsg = document.getElementById('heroLoginMsg');
+    const heroLoginBtn = document.getElementById('heroLoginBtn');
+
+    if (heroLoginForm) {
+        heroLoginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('heroUsername')?.value.trim();
+            const password = document.getElementById('heroPassword')?.value;
+            if (!username || !password) return;
+
+            heroLoginMsg.className = 'gateway-msg';
+            heroLoginMsg.style.display = 'none';
+            heroLoginBtn.disabled = true;
+            heroLoginBtn.innerHTML = '<span>Giriş Yapılıyor…</span> ⏳';
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || 'Giriş yapılamadı');
+                }
+
+                // Store token & user info in localStorage for board.html
+                localStorage.setItem('kanban_token', data.token);
+                if (data.user) {
+                    localStorage.setItem('kanban_user', JSON.stringify(data.user));
+                }
+
+                heroLoginMsg.className = 'gateway-msg success';
+                heroLoginMsg.textContent = '✓ Giriş başarılı! Çalışma alanınıza yönlendiriliyorsunuz...';
+                heroLoginMsg.style.display = 'block';
+
+                setTimeout(() => {
+                    window.location.href = '/board.html';
+                }, 400);
+            } catch (err) {
+                heroLoginMsg.className = 'gateway-msg error';
+                heroLoginMsg.textContent = err.message || 'Kullanıcı adı veya şifre hatalı';
+                heroLoginMsg.style.display = 'block';
+                heroLoginBtn.disabled = false;
+                heroLoginBtn.innerHTML = '<span>Giriş Yap ve Panoyu Aç</span> ➔';
+            }
+        });
+    }
+
     // Boot
     loadSprint(currentSprintIndex);
     startSimulationTimer();

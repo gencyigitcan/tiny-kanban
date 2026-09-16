@@ -102,9 +102,21 @@ app.use('/api/cards', requireAuth, cardRouter);
 app.use('/api/epics', requireAuth, epicRouter);
 app.use('/api/sprints', requireAuth, sprintRouter);
 
-// ── Serve Landing Page at Root ────────────────────────────
+// ── Serve HTML Pages ──────────────────────────────────────
 app.get('/', (_req, res) => {
     res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+});
+app.get('/demo', (_req, res) => {
+    res.sendFile(path.join(process.cwd(), 'public', 'demo.html'));
+});
+app.get('/board', (_req, res) => {
+    res.sendFile(path.join(process.cwd(), 'public', 'board.html'));
+});
+app.get('/login', (_req, res) => {
+    res.sendFile(path.join(process.cwd(), 'public', 'board.html'));
+});
+app.get('/register', (_req, res) => {
+    res.sendFile(path.join(process.cwd(), 'public', 'register.html'));
 });
 
 // ── 404 catch-all (API) ───────────────────────────────────
@@ -131,6 +143,15 @@ export default {
         const url = new URL(request.url);
         // Serve static assets directly from Cloudflare Pages CDN
         if (!url.pathname.startsWith('/api/')) {
+            if (url.pathname === '/demo') {
+                return env.ASSETS.fetch(new Request(new URL('/demo.html', request.url), request));
+            }
+            if (url.pathname === '/board' || url.pathname === '/login') {
+                return env.ASSETS.fetch(new Request(new URL('/board.html', request.url), request));
+            }
+            if (url.pathname === '/register') {
+                return env.ASSETS.fetch(new Request(new URL('/register.html', request.url), request));
+            }
             return env.ASSETS.fetch(request);
         }
 
