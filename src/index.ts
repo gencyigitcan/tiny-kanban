@@ -186,7 +186,7 @@ export default {
                             try {
                                 let parsed = JSON.parse(row.value);
                                 let changed = false;
-                                if (!parsed.users || parsed.users.length < 10 || !parsed.sprints || parsed.sprints.length < 52) {
+                                if (!parsed.users || parsed.users.length < 10 || !parsed.sprints || parsed.sprints.length < 52 || !parsed.cards || parsed.cards.length < 500) {
                                     parsed = createDefaultDemoDb();
                                     changed = true;
                                 }

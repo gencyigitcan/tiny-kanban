@@ -63,11 +63,13 @@ async function boot() {
             API.getLabels(),
             API.getNotifications()
         ]);
+        window.sprints = sprints;
         window.LABELS = labels;
         window.LABEL_MAP = Object.fromEntries(labels.map(l => [l.id, l]));
         
-        // Setup dropdown elements with registered users list
+        // Setup dropdown elements with registered users and sprints list
         populateAssigneeSelects();
+        populateSprintFilter();
 
         // Render notifications in header
         renderNotifications();
@@ -101,7 +103,14 @@ function renderAll() {
 function updateSprintBadge() {
     const active = sprints.find(s => s.active);
     const el = document.getElementById('sprintBadge');
-    if (el) el.textContent = active ? `🟢 ${active.name}` : 'Sprint yok';
+    if (el) {
+        if (active) {
+            const dateStr = active.startDate && active.endDate ? ` · ${active.startDate} → ${active.endDate}` : '';
+            el.textContent = `🟢 ${active.name}${dateStr}`;
+        } else {
+            el.textContent = 'Sprint yok';
+        }
+    }
 }
 
 // ── View switcher ─────────────────────────────────────────
@@ -350,6 +359,7 @@ document.querySelectorAll('.quick-add-input').forEach(input => {
 
 // ── Search & Filter ───────────────────────────────────────
 safeAddListener('searchInput', 'input', () => renderAll());
+safeAddListener('filterSprint', 'change', () => renderAll());
 safeAddListener('filterAssignee', 'change', () => renderAll());
 safeAddListener('filterPriority', 'change', () => renderAll());
 
@@ -569,6 +579,23 @@ function populateAssigneeSelects() {
     }
 }
 
+function populateSprintFilter() {
+    const sel = document.getElementById('filterSprint');
+    if (!sel) return;
+    const currentVal = sel.value || 'active';
+    const active = sprints.find(s => s.active);
+    
+    let html = `<option value="active" ${currentVal === 'active' ? 'selected' : ''}>⚡ Aktif Sprint ${active ? `(${active.name})` : ''}</option>`;
+    html += `<option value="all" ${currentVal === 'all' ? 'selected' : ''}>🌐 Tüm Sprintler (52 Hafta)</option>`;
+    
+    sprints.forEach(s => {
+        const isSelected = currentVal === s.id;
+        const dates = s.startDate && s.endDate ? ` (${s.startDate} ~ ${s.endDate})` : '';
+        html += `<option value="${s.id}" ${isSelected ? 'selected' : ''}>${escHtml(s.name)}${dates}${s.active ? ' ⚡' : ''}</option>`;
+    });
+    sel.innerHTML = html;
+}
+
 function setupBackgroundSync() {
     if (syncIntervalId) return;
     
@@ -608,11 +635,13 @@ function setupBackgroundSync() {
                     cards = newCards;
                     epics = newEpics;
                     sprints = newSprints;
+                    window.sprints = sprints;
                     labels = newLabels;
                     notifications = newNotifications;
                     window.LABELS = labels;
                     window.LABEL_MAP = Object.fromEntries(labels.map(l => [l.id, l]));
                     
+                    populateSprintFilter();
                     renderNotifications();
                     renderAll();
                 }

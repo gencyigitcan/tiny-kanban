@@ -348,6 +348,10 @@ export function initDb(): void {
             }
         }
 
+        if (!demoDb.cards || demoDb.cards.length < 500 || !demoDb.sprints || demoDb.sprints.length < 52) {
+            demoDb = createDefaultDemoDb();
+        }
+
         if (demoDb.users.length < 10) {
             demoDb.users = [
                 { id: 'usr-1', username: 'admin', name: 'Ali Yılmaz', passwordHash: hashPassword('password'), avatarColor: '#4f46e5', role: 'admin', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
@@ -676,8 +680,8 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                 }
             }
 
-            // In demo DB, ensure all 10 users and 2026-2027 data exist
-            if (tenantId === 'demo' && (db.users.length < 10 || db.sprints.length < 52)) {
+            // In demo DB, ensure all 10 users and 2026-2027 weekly data exist (at least 520 cards)
+            if (tenantId === 'demo' && (db.users.length < 10 || db.sprints.length < 52 || db.cards.length < 500)) {
                 db = createDefaultDemoDb();
                 if (dbBinding) {
                     await saveTenantDbToD1(dbBinding, key, db);

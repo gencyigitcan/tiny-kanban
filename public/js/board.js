@@ -131,13 +131,27 @@ function renderBoard(cards, epics = [], readonly = false) {
   const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
   const fa = (document.getElementById('filterAssignee')?.value || '').toLowerCase();
   const fp = document.getElementById('filterPriority')?.value || '';
+  const fs = document.getElementById('filterSprint')?.value || 'active';
+  const allSprints = window.sprints || [];
+  const activeSprint = allSprints.find(s => s.active);
 
   ['todo', 'doing', 'done'].forEach(col => {
     const body = document.getElementById('col-' + col);
     if (!body) return;
     body.querySelectorAll('.card').forEach(el => el.remove());
     const emptyState = body.querySelector('.empty-state');
-    const colCards = cards.filter(c => c.col === col);
+    
+    // Sütuna ve seçili sprinte göre kartları filtrele
+    const colCards = cards.filter(c => {
+      if (c.col !== col) return false;
+      if (!fs || fs === 'all') return true;
+      if (fs === 'active') {
+        if (activeSprint) return c.sprintId === activeSprint.id;
+        return true;
+      }
+      return c.sprintId === fs;
+    });
+
     const frag = document.createDocumentFragment();
     const tmp = document.createElement('div');
     colCards.forEach(card => {
