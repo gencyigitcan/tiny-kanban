@@ -25,7 +25,7 @@ async function boot() {
     const token = localStorage.getItem('tiny_kanban_token');
     
     // Switch to auth screen only if NOT on demo page and no token
-    if (!isDemo && !token && !window.isLocalStorageMode) {
+    if (!isDemo && !token) {
         showAuthScreen();
         return;
     }
@@ -42,7 +42,7 @@ async function boot() {
             };
             window.currentUser = currentUser;
             updateUserHeader();
-        } else if (token && !window.isLocalStorageMode) {
+        } else if (token) {
             try {
                 currentUser = await API.getMe();
                 window.currentUser = currentUser;
@@ -54,7 +54,7 @@ async function boot() {
             }
         }
 
-        // Fetch core data (on demo, this calls the live server with X-Workspace: demo)
+        // Fetch core data directly from Server DB
         [cards, epics, sprints, users, labels, notifications] = await Promise.all([
             API.getCards(),
             API.getEpics(),
@@ -72,19 +72,6 @@ async function boot() {
         // Render notifications in header
         renderNotifications();
         
-        // If in localStorage mode, verify if demo needs seeding
-        if (window.isLocalStorageMode) {
-            if (cards.length === 0 && epics.length === 0 && sprints.length === 0) {
-                seed2026Data(isDemo);
-                // Reload after seed
-                [cards, epics, sprints] = await Promise.all([
-                    API.getCards(),
-                    API.getEpics(),
-                    API.getSprints()
-                ]);
-            }
-        }
-        
         hideAuthScreen();
         renderAll();
         
@@ -92,20 +79,11 @@ async function boot() {
         setupBackgroundSync();
     } catch (err) {
         console.error('Boot error:', err);
-        if (err.message === 'Unauthorized' && !isDemo) {
-            showAuthScreen();
+        if (err.message?.includes('yetkisiz') || err.message === 'Unauthorized') {
+            if (!isDemo) showAuthScreen();
             return;
         }
-        showToast('Sunucuya bağlanılamadı. Çevrimdışı moda geçiliyor...', 'warn');
-        // Fallback load
-        try {
-            cards = window.getLocalData().cards;
-            epics = window.getLocalData().epics;
-            sprints = window.getLocalData().sprints;
-            renderAll();
-        } catch {
-            showToast('Hafıza yükleme hatası.', 'error');
-        }
+        showToast('Veriler sunucudan alınamadı: ' + (err.message || 'Bilinmeyen hata'), 'error');
     }
 }
 
@@ -585,7 +563,6 @@ function populateAssigneeSelects() {
 }
 
 function setupBackgroundSync() {
-    if (window.isLocalStorageMode) return;
     if (syncIntervalId) return;
     
     syncIntervalId = setInterval(async () => {

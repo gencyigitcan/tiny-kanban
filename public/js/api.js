@@ -1,312 +1,121 @@
 // ============================================================
-//  api.js – REST client with Automatic LocalStorage Fallback
+//  api.js – Pure REST Client for Kanban Web Application
+//  Direct server database communication with token management.
+//  No client-side database emulation (localStorage DB eliminated).
 // ============================================================
 
 const API_ROOT = '';
 const IS_DEMO = window.IS_DEMO_PAGE === true || window.location.pathname.includes('demo');
-const LS_KEY = IS_DEMO ? 'tiny_kanban_demo_db' : 'tiny_kanban_db';
 
-// Global state to track mode - NEVER force local storage mode on boot
-window.isLocalStorageMode = false;
-
-// Default empty structure
-const EMPTY_DB = { cards: [], epics: [], sprints: [] };
-
-function getLocalData() {
-    try {
-        const raw = localStorage.getItem(LS_KEY);
-        if (!raw) {
-            localStorage.setItem(LS_KEY, JSON.stringify(EMPTY_DB));
-            return structuredClone(EMPTY_DB);
-        }
-        const parsed = JSON.parse(raw);
-        return {
-            cards: Array.isArray(parsed.cards) ? parsed.cards : [],
-            epics: Array.isArray(parsed.epics) ? parsed.epics : [],
-            sprints: Array.isArray(parsed.sprints) ? parsed.sprints : [],
-            users: Array.isArray(parsed.users) ? parsed.users : [],
-            labels: Array.isArray(parsed.labels) ? parsed.labels : []
-        };
-    } catch {
-        return structuredClone(EMPTY_DB);
-    }
-}
-
-function saveLocalData(data) {
-    localStorage.setItem(LS_KEY, JSON.stringify(data));
-}
-
-// Generate client-side short collision-resistant ID
-function localUid() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-}
-
-// REST wrapper helper that falls back on network errors
+// REST wrapper helper that sends requests directly to the server API
 async function request(url, options = {}) {
-    if (window.isLocalStorageMode) {
-        throw new Error('Local storage mode active');
+    const token = localStorage.getItem('tiny_kanban_token');
+    options.headers = {
+        ...(options.headers || {})
+    };
+    
+    // In demo mode, automatically scope requests to demo tenant
+    if (IS_DEMO) {
+        options.headers['X-Workspace'] = 'demo';
+        options.headers['X-Tenant-Id'] = 'demo';
     }
+    
+    if (token) {
+        options.headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    let r;
     try {
-        const token = localStorage.getItem('tiny_kanban_token');
-        options.headers = {
-            ...(options.headers || {})
-        };
-        if (IS_DEMO) {
-            options.headers['X-Workspace'] = 'demo';
-            options.headers['X-Tenant-Id'] = 'demo';
-        }
-        if (token) {
-            options.headers['Authorization'] = `Bearer ${token}`;
-        }
-        const r = await fetch(url, options);
-        if (r.status === 401) {
-            if (!IS_DEMO) {
-                localStorage.removeItem('tiny_kanban_token');
-                window.dispatchEvent(new Event('unauthorized'));
-            }
-            throw new Error('Unauthorized');
-        }
-        if (!r.ok) {
-            const errBody = await r.json().catch(() => ({}));
-            throw new Error(errBody.error || `Server returned status ${r.status}`);
-        }
-        return await r.json();
-    } catch (e) {
-        if (e.message === 'Unauthorized') {
-            throw e;
-        }
-        // Fall back to LocalStorage on connection error (except on clean exit / aborted fetches)
-        if (!window.isLocalStorageMode) {
-            console.warn('API server is offline. Switching to client-side LocalStorage mode.', e);
-            window.isLocalStorageMode = true;
-            if (window.showToast) {
-                window.showToast('Sunucu çevrimdışı. Tarayıcı hafızası moduna geçildi.', 'warn');
-            }
-        }
-        throw e;
+        r = await fetch(url, options);
+    } catch (networkErr) {
+        console.error('Network request failed:', networkErr);
+        throw new Error('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.');
     }
+
+    if (r.status === 401) {
+        if (!IS_DEMO) {
+            localStorage.removeItem('tiny_kanban_token');
+            window.dispatchEvent(new Event('unauthorized'));
+        }
+        throw new Error('Oturum süresi doldu veya yetkisiz erişim');
+    }
+
+    if (!r.ok) {
+        const errBody = await r.json().catch(() => ({}));
+        throw new Error(errBody.error || `Sunucu hatası (${r.status})`);
+    }
+
+    return await r.json();
 }
 
 const API = {
     // ── Cards ────────────────────────────────────────────────
     async getCards() {
-        try {
-            return await request('/api/cards');
-        } catch {
-            return getLocalData().cards;
-        }
+        return await request('/api/cards');
     },
     async addCard(payload) {
-        try {
-            return await request('/api/cards', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-        } catch {
-            const db = getLocalData();
-            const newCard = {
-                id: localUid(),
-                title: payload.title?.trim() || 'Yeni Görev',
-                desc: payload.desc || '',
-                assignee: payload.assignee || '',
-                priority: payload.priority || 'medium',
-                col: payload.col || 'todo',
-                startDate: payload.startDate || null,
-                dueDate: payload.dueDate || null,
-                labels: Array.isArray(payload.labels) ? payload.labels : [],
-                storyPoints: payload.storyPoints != null ? Number(payload.storyPoints) : null,
-                estimatedEffort: payload.estimatedEffort != null ? Number(payload.estimatedEffort) : null,
-                spentEffort: payload.spentEffort != null ? Number(payload.spentEffort) : null,
-                subtasks: Array.isArray(payload.subtasks) ? payload.subtasks : [],
-                comments: Array.isArray(payload.comments) ? payload.comments : [],
-                epicId: payload.epicId || null,
-                sprintId: payload.sprintId || null,
-                createdAt: Date.now()
-            };
-            db.cards.push(newCard);
-            saveLocalData(db);
-            return newCard;
-        }
+        return await request('/api/cards', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
     },
     async updateCard(id, payload) {
-        try {
-            return await request(`/api/cards/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-        } catch {
-            const db = getLocalData();
-            const idx = db.cards.findIndex(c => c.id === id);
-            if (idx === -1) throw new Error('Card not found');
-            
-            const card = db.cards[idx];
-            // Merging fields
-            if (payload.title !== undefined) card.title = payload.title.trim();
-            if (payload.desc !== undefined) card.desc = payload.desc;
-            if (payload.assignee !== undefined) card.assignee = payload.assignee;
-            if (payload.priority !== undefined) card.priority = payload.priority;
-            if (payload.col !== undefined) card.col = payload.col;
-            if (payload.startDate !== undefined) card.startDate = payload.startDate;
-            if (payload.dueDate !== undefined) card.dueDate = payload.dueDate;
-            if (payload.labels !== undefined) card.labels = payload.labels;
-            if (payload.storyPoints !== undefined) card.storyPoints = payload.storyPoints != null ? Number(payload.storyPoints) : null;
-            if (payload.estimatedEffort !== undefined) card.estimatedEffort = payload.estimatedEffort != null ? Number(payload.estimatedEffort) : null;
-            if (payload.spentEffort !== undefined) card.spentEffort = payload.spentEffort != null ? Number(payload.spentEffort) : null;
-            if (payload.subtasks !== undefined) card.subtasks = payload.subtasks;
-            if (payload.comments !== undefined) card.comments = payload.comments;
-            if (payload.epicId !== undefined) card.epicId = payload.epicId;
-            if (payload.sprintId !== undefined) card.sprintId = payload.sprintId;
-
-            saveLocalData(db);
-            return card;
-        }
+        return await request(`/api/cards/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
     },
     async deleteCard(id) {
-        try {
-            return await request(`/api/cards/${id}`, { method: 'DELETE' });
-        } catch {
-            const db = getLocalData();
-            db.cards = db.cards.filter(c => c.id !== id);
-            saveLocalData(db);
-            return { success: true };
-        }
+        return await request(`/api/cards/${id}`, { method: 'DELETE' });
     },
 
     // ── Epics ────────────────────────────────────────────────
     async getEpics() {
-        try {
-            return await request('/api/epics');
-        } catch {
-            return getLocalData().epics;
-        }
+        return await request('/api/epics');
     },
     async addEpic(payload) {
-        try {
-            return await request('/api/epics', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-        } catch {
-            const db = getLocalData();
-            const newEpic = {
-                id: localUid(),
-                name: payload.name?.trim() || 'Yeni Epic',
-                color: payload.color || '#6366f1',
-                createdAt: Date.now()
-            };
-            db.epics.push(newEpic);
-            saveLocalData(db);
-            return newEpic;
-        }
+        return await request('/api/epics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
     },
     async updateEpic(id, payload) {
-        try {
-            return await request(`/api/epics/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-        } catch {
-            const db = getLocalData();
-            const idx = db.epics.findIndex(e => e.id === id);
-            if (idx === -1) throw new Error('Epic not found');
-            if (payload.name !== undefined) db.epics[idx].name = payload.name.trim();
-            if (payload.color !== undefined) db.epics[idx].color = payload.color;
-            saveLocalData(db);
-            return db.epics[idx];
-        }
+        return await request(`/api/epics/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
     },
     async deleteEpic(id) {
-        try {
-            return await request(`/api/epics/${id}`, { method: 'DELETE' });
-        } catch {
-            const db = getLocalData();
-            db.epics = db.epics.filter(e => e.id !== id);
-            // Unlink cards with this epicId
-            db.cards.forEach(c => {
-                if (c.epicId === id) c.epicId = null;
-            });
-            saveLocalData(db);
-            return { success: true };
-        }
+        return await request(`/api/epics/${id}`, { method: 'DELETE' });
     },
 
     // ── Sprints ──────────────────────────────────────────────
     async getSprints() {
-        try {
-            return await request('/api/sprints');
-        } catch {
-            return getLocalData().sprints;
-        }
+        return await request('/api/sprints');
     },
     async addSprint(payload) {
-        try {
-            return await request('/api/sprints', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-        } catch {
-            const db = getLocalData();
-            const newSprint = {
-                id: localUid(),
-                name: payload.name?.trim() || 'Yeni Sprint',
-                startDate: payload.startDate || null,
-                endDate: payload.endDate || null,
-                active: false,
-                createdAt: Date.now()
-            };
-            db.sprints.push(newSprint);
-            saveLocalData(db);
-            return newSprint;
-        }
+        return await request('/api/sprints', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
     },
     async updateSprint(id, payload) {
-        try {
-            return await request(`/api/sprints/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-        } catch {
-            const db = getLocalData();
-            const idx = db.sprints.findIndex(s => s.id === id);
-            if (idx === -1) throw new Error('Sprint not found');
-            const sprint = db.sprints[idx];
-            if (payload.name !== undefined) sprint.name = payload.name.trim();
-            if (payload.startDate !== undefined) sprint.startDate = payload.startDate;
-            if (payload.endDate !== undefined) sprint.endDate = payload.endDate;
-            if (payload.active !== undefined) {
-                sprint.active = payload.active;
-                if (payload.active) {
-                    // Deactivate all other sprints
-                    db.sprints.forEach(s => {
-                        if (s.id !== id) s.active = false;
-                    });
-                }
-            }
-            saveLocalData(db);
-            return sprint;
-        }
+        return await request(`/api/sprints/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
     },
     async deleteSprint(id) {
-        try {
-            return await request(`/api/sprints/${id}`, { method: 'DELETE' });
-        } catch {
-            const db = getLocalData();
-            db.sprints = db.sprints.filter(s => s.id !== id);
-            // Unlink cards with this sprintId
-            db.cards.forEach(c => {
-                if (c.sprintId === id) c.sprintId = null;
-            });
-            saveLocalData(db);
-            return { success: true };
-        }
+        return await request(`/api/sprints/${id}`, { method: 'DELETE' });
     },
-    // ── Authentication ──────────────────────────────────────
+
+    // ── Authentication & Session ────────────────────────────
     async login(username, password, company) {
         const res = await request('/api/auth/login', {
             method: 'POST',
@@ -344,7 +153,7 @@ const API = {
         try {
             await request('/api/auth/logout', { method: 'POST' });
         } catch (e) {
-            console.warn('Logout server request failed:', e);
+            console.warn('Logout request failed:', e);
         } finally {
             localStorage.removeItem('tiny_kanban_token');
         }
@@ -352,13 +161,10 @@ const API = {
     async getMe() {
         return await request('/api/auth/me');
     },
+
     // ── Workspaces & Team Administration ────────────────────
     async getWorkspaces() {
-        try {
-            return await request('/api/admin/workspaces');
-        } catch (e) {
-            return { workspaces: [{ id: 'personal', name: 'Kişisel Pano' }], activeWorkspaceId: 'personal' };
-        }
+        return await request('/api/admin/workspaces');
     },
     async createWorkspace(name, description) {
         return await request('/api/admin/workspaces', {
@@ -403,96 +209,32 @@ const API = {
         return await request('/api/admin/logs');
     },
     async getUsers() {
-        try {
-            return await request('/api/users');
-        } catch (e) {
-            // Local fallback users: check if seeded in localStorage, else return 10-person Nova team
-            const local = getLocalData();
-            if (local.users && local.users.length >= 10) {
-                return local.users;
-            }
-            return [
-                { id: 'usr-1', username: 'admin', name: 'Ali Yılmaz', avatarColor: '#4f46e5', role: 'admin' },
-                { id: 'usr-2', username: 'zeynep', name: 'Zeynep Kaya', avatarColor: '#0ea5e9', role: 'user' },
-                { id: 'usr-3', username: 'mehmet', name: 'Mehmet Demir', avatarColor: '#10b981', role: 'user' },
-                { id: 'usr-4', username: 'selin', name: 'Selin Yıldız', avatarColor: '#f59e0b', role: 'user' },
-                { id: 'usr-5', username: 'caner', name: 'Caner Öztürk', avatarColor: '#8b5cf6', role: 'user' },
-                { id: 'usr-6', username: 'burcu', name: 'Burcu Çelik', avatarColor: '#ec4899', role: 'user' },
-                { id: 'usr-7', username: 'emre', name: 'Emre Aydın', avatarColor: '#06b6d4', role: 'user' },
-                { id: 'usr-8', username: 'gamze', name: 'Gamze Şahin', avatarColor: '#14b8a6', role: 'user' },
-                { id: 'usr-9', username: 'tolga', name: 'Tolga Kurt', avatarColor: '#f97316', role: 'user' },
-                { id: 'usr-10', username: 'derya', name: 'Derya Arslan', avatarColor: '#64748b', role: 'user' }
-            ];
-        }
+        return await request('/api/users');
     },
+
     // ── Custom Labels ────────────────────────────────────────
     async getLabels() {
-        try {
-            return await request('/api/labels');
-        } catch {
-            return getLocalData().labels || [];
-        }
+        return await request('/api/labels');
     },
     async addLabel(payload) {
-        try {
-            return await request('/api/labels', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-        } catch {
-            const db = getLocalData();
-            db.labels = db.labels || [];
-            const hex = payload.color || '#6366f1';
-            const newLabel = {
-                id: localUid(),
-                name: payload.name.trim(),
-                color: hex,
-                bg: `${hex}1a`,
-                createdAt: Date.now()
-            };
-            db.labels.push(newLabel);
-            saveLocalData(db);
-            return newLabel;
-        }
+        return await request('/api/labels', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
     },
     async deleteLabel(id) {
-        try {
-            return await request(`/api/labels/${id}`, { method: 'DELETE' });
-        } catch {
-            const db = getLocalData();
-            db.labels = (db.labels || []).filter(l => l.id !== id);
-            db.cards.forEach(c => {
-                if (c.labels) c.labels = c.labels.filter(lid => lid !== id);
-            });
-            saveLocalData(db);
-            return { success: true };
-        }
+        return await request(`/api/labels/${id}`, { method: 'DELETE' });
     },
+
     // ── Notifications ────────────────────────────────────────
     async getNotifications() {
-        try {
-            return await request('/api/notifications');
-        } catch {
-            return [];
-        }
+        return await request('/api/notifications');
     },
     async readNotification(id) {
-        try {
-            return await request(`/api/notifications/${id}/read`, { method: 'POST' });
-        } catch {
-            return { success: true };
-        }
+        return await request(`/api/notifications/${id}/read`, { method: 'POST' });
     },
     async readAllNotifications() {
-        try {
-            return await request('/api/notifications/read-all', { method: 'POST' });
-        } catch {
-            return { success: true };
-        }
+        return await request('/api/notifications/read-all', { method: 'POST' });
     }
 };
-
-// Expose state methods for seeder integration
-window.getLocalData = getLocalData;
-window.saveLocalData = saveLocalData;

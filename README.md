@@ -1,10 +1,25 @@
-# Kanban
+# Kanban — Enterprise Agile Work Management System
 
-Personal Jira-like project management board. Single-user, self-hosted, zero-cloud.
+Multi-tenant, edge-native, real-time Jira-alternative project management platform running on Cloudflare Pages, Workers, and D1 Serverless SQL.
 
-[![Version](https://img.shields.io/badge/version-1.2.0-6366f1?style=flat-square)](https://github.com/gencyigitcan/tiny-kanban/releases)
+[![Version](https://img.shields.io/badge/version-1.3.0-6366f1?style=flat-square)](https://github.com/gencyigitcan/tiny-kanban/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![Cloudflare D1](https://img.shields.io/badge/Cloudflare-D1%20SQL-f38020?style=flat-square&logo=cloudflare)](https://developers.cloudflare.com/d1/)
 [![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
+
+## 📚 AI & Enterprise Engineering Handover Suite
+
+For deep technical specifications, architecture blueprints, and operations manuals, consult the role-based handover documentation:
+
+| Role / Specification | Document | Scope & Focus |
+| :--- | :--- | :--- |
+| **Software Engineer** | [`Software Dev.md`](./Software%20Dev.md) | Full technical architecture, types, REST contracts, and frontend state engine |
+| **DevOps & Cloud Architect** | [`devops engineer.md`](./devops%20engineer.md) | Cloudflare Pages, Workers, D1 SQL, multi-env isolation, and CI/CD pipelines |
+| **Product Manager / BA** | [`business analyst.md`](./business%20analyst.md) | PRD, user personas, approval gates, agile metrics, and acceptance criteria |
+| **Chief Technology Officer** | [`intent.md`](./intent.md) | High-level philosophy, Architecture Decision Records (ADRs), and roadmap |
+| **Security Engineer** | [`security engineer.md`](./security%20engineer.md) | STRIDE threat model, PBKDF2 cryptography, RBAC, and audit trail controls |
+
+---
 
 ## Features
 

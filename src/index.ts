@@ -179,7 +179,7 @@ export default {
                         } else if (row.key === dbKey) {
                             try {
                                 const parsed = JSON.parse(row.value);
-                                const changed = (envName === 'production') ? ensurePersonalDbIntegrity(parsed) : false;
+                                const changed = (envName === 'production' && (!parsed.cards || parsed.cards.length === 0)) ? ensurePersonalDbIntegrity(parsed) : false;
                                 tenantsMap.set('personal', { db: parsed, dirty: changed, key: dbKey });
                             } catch {}
                         } else if (row.key === demoKey) {

@@ -322,7 +322,9 @@ export function initDb(): void {
                 { id: 'personal', name: 'Kişisel Çalışma Alanı', type: 'personal', ownerId: 'usr-superadmin', createdAt: Date.now() }
             ];
         }
-        ensurePersonalDbIntegrity(personalDb);
+        if (personalDb.cards.length === 0) {
+            ensurePersonalDbIntegrity(personalDb);
+        }
         writeTenantDbFileSync('personal', 'production', personalDb);
 
         // ── 2. DEMO DATABASE (demo_db.json) ──────────────────────
@@ -639,9 +641,12 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                 logs: Array.isArray(parsed.logs) ? parsed.logs : []
             };
 
-            // In production personal DB, if superUser exists, ensure email & workspaces and card integrity
+            // In production personal DB, if superUser exists, ensure email & workspaces
             if (env === 'production' && tenantId === 'personal') {
-                let changed = ensurePersonalDbIntegrity(db);
+                let changed = false;
+                if (db.cards.length === 0) {
+                    changed = ensurePersonalDbIntegrity(db) || changed;
+                }
                 let superUser = db.users.find(u =>
                     u.username.toLowerCase() === 'gencyigitcan' ||
                     (u.email && u.email.toLowerCase() === 'yigitcangenc@gmail.com') ||
