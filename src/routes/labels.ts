@@ -10,13 +10,13 @@ import { createLabelSchema } from '../lib/schemas.js';
 export const labelsRouter = Router();
 
 /** GET /api/labels */
-labelsRouter.get('/', (_req, res) => {
-    res.json(readDb().labels || []);
+labelsRouter.get('/', (req, res) => {
+    res.json(readDb(req).labels || []);
 });
 
 /** POST /api/labels */
 labelsRouter.post('/', validate(createLabelSchema), (req, res) => {
-    const db = readDb();
+    const db = readDb(req);
     
     const name = (req.body.name as string).trim();
     const color = (req.body.color as string) || '#6366f1';
@@ -40,13 +40,13 @@ labelsRouter.post('/', validate(createLabelSchema), (req, res) => {
     };
 
     db.labels.push(label);
-    writeDbSync(db);
+    writeDbSync(db, req);
     res.status(201).json(label);
 });
 
 /** DELETE /api/labels/:id — also unlinks from cards */
 labelsRouter.delete('/:id', (req, res) => {
-    const db = readDb();
+    const db = readDb(req);
     db.labels = db.labels || [];
     
     const labelToDelete = db.labels.find(l => l.id === req.params.id);
@@ -64,6 +64,6 @@ labelsRouter.delete('/:id', (req, res) => {
         }
     });
 
-    writeDbSync(db);
+    writeDbSync(db, req);
     res.json({ ok: true });
 });

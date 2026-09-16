@@ -1,4 +1,4 @@
-# Tiny Kanban
+# Kanban
 
 Personal Jira-like project management board. Single-user, self-hosted, zero-cloud.
 

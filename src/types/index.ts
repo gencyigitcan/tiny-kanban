@@ -56,20 +56,41 @@ export interface Sprint {
     createdAt: number;
 }
 
+export interface WorkspaceMember {
+    userId: string;
+    username: string;
+    role: 'admin' | 'member';
+}
+
+export interface Workspace {
+    id: string;
+    name: string;
+    type: 'personal' | 'team' | 'user';
+    description?: string;
+    ownerId?: string;
+    members?: WorkspaceMember[];
+    createdAt: number;
+}
+
 export interface User {
     id: string;
     username: string;
     name: string;
     passwordHash: string;
     avatarColor: string;
+    role?: 'superadmin' | 'admin' | 'user';
     createdAt: number;
     expiresAt?: number;
+    tenantId?: string;
+    workspaces?: string[];
+    company?: string;
 }
 
 export interface Session {
     token: string;
     userId: string;
     expiresAt: number;
+    tenantId?: string;
 }
 
 export interface Label {
@@ -105,5 +126,19 @@ export interface DbSchema {
     labels: Label[];
     notifications: Notification[];
     taskCounter: number;
+    workspaces?: Workspace[];
+}
+
+export interface TenantMeta {
+    id: string;
+    name: string;
+    type: 'personal' | 'team' | 'user';
+    ownerId?: string;
+    createdAt: number;
+}
+
+export interface TenantIndex {
+    workspaces: Workspace[];
+    userToTenants: Record<string, string[]>; // username -> workspaceIds
 }
 

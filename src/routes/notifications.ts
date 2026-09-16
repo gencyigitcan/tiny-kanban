@@ -13,7 +13,7 @@ notificationsRouter.use(requireAuth);
 
 /** GET /api/notifications */
 notificationsRouter.get('/', (req, res) => {
-    const db = readDb();
+    const db = readDb(req);
     const myNotifications = (db.notifications || [])
         .filter(n => n.userId === req.user!.id)
         .sort((a, b) => b.createdAt - a.createdAt); // Newest first
@@ -22,7 +22,7 @@ notificationsRouter.get('/', (req, res) => {
 
 /** POST /api/notifications/:id/read */
 notificationsRouter.post('/:id/read', (req, res) => {
-    const db = readDb();
+    const db = readDb(req);
     db.notifications = db.notifications || [];
     
     const notification = db.notifications.find(n => n.id === req.params.id && n.userId === req.user!.id);
@@ -31,13 +31,13 @@ notificationsRouter.post('/:id/read', (req, res) => {
     }
     
     notification.read = true;
-    writeDbSync(db);
+    writeDbSync(db, req);
     res.json({ ok: true, notification });
 });
 
 /** POST /api/notifications/read-all */
 notificationsRouter.post('/read-all', (req, res) => {
-    const db = readDb();
+    const db = readDb(req);
     db.notifications = db.notifications || [];
     
     let updatedCount = 0;
@@ -49,7 +49,7 @@ notificationsRouter.post('/read-all', (req, res) => {
     });
     
     if (updatedCount > 0) {
-        writeDbSync(db);
+        writeDbSync(db, req);
     }
     res.json({ ok: true, markedCount: updatedCount });
 });

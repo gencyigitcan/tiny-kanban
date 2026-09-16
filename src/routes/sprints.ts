@@ -10,13 +10,13 @@ import { createSprintSchema, updateSprintSchema } from '../lib/schemas.js';
 export const sprintRouter = Router();
 
 /** GET /api/sprints */
-sprintRouter.get('/', (_req, res) => {
-    res.json(readDb().sprints);
+sprintRouter.get('/', (req, res) => {
+    res.json(readDb(req).sprints);
 });
 
 /** POST /api/sprints */
 sprintRouter.post('/', validate(createSprintSchema), (req, res) => {
-    const db = readDb();
+    const db = readDb(req);
     const sprint = {
         id: uid(),
         name: req.body.name as string,
@@ -26,13 +26,13 @@ sprintRouter.post('/', validate(createSprintSchema), (req, res) => {
         createdAt: Date.now(),
     };
     db.sprints.push(sprint);
-    writeDbSync(db);
+    writeDbSync(db, req);
     res.status(201).json(sprint);
 });
 
 /** PUT /api/sprints/:id  — activating a sprint deactivates all others */
 sprintRouter.put('/:id', validate(updateSprintSchema), (req, res) => {
-    const db = readDb();
+    const db = readDb(req);
     const idx = db.sprints.findIndex(s => s.id === req.params.id);
     if (idx === -1) throw new NotFoundError('Sprint not found');
 
@@ -46,15 +46,15 @@ sprintRouter.put('/:id', validate(updateSprintSchema), (req, res) => {
             (db.sprints[idx] as unknown as Record<string, unknown>)[key] = req.body[key];
         }
     }
-    writeDbSync(db);
+    writeDbSync(db, req);
     res.json(db.sprints[idx]);
 });
 
 /** DELETE /api/sprints/:id  — also unlinks cards */
 sprintRouter.delete('/:id', (req, res) => {
-    const db = readDb();
+    const db = readDb(req);
     db.sprints = db.sprints.filter(s => s.id !== req.params.id);
     db.cards.forEach(c => { if (c.sprintId === req.params.id) c.sprintId = null; });
-    writeDbSync(db);
+    writeDbSync(db, req);
     res.json({ ok: true });
 });

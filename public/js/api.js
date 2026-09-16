@@ -299,22 +299,33 @@ const API = {
         }
     },
     // ── Authentication ──────────────────────────────────────
-    async login(username, password) {
+    async login(username, password, company) {
         const res = await request('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, password, company: company || undefined })
         });
         if (res.token) {
             localStorage.setItem('tiny_kanban_token', res.token);
         }
         return res;
     },
-    async register(username, password, name) {
+    async register(username, password, name, company) {
         const res = await request('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password, name })
+            body: JSON.stringify({ username, password, name, company: company || undefined })
+        });
+        if (res.token) {
+            localStorage.setItem('tiny_kanban_token', res.token);
+        }
+        return res;
+    },
+    async switchWorkspace(workspaceId) {
+        const res = await request('/api/auth/switch-workspace', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ workspaceId })
         });
         if (res.token) {
             localStorage.setItem('tiny_kanban_token', res.token);
@@ -332,6 +343,41 @@ const API = {
     },
     async getMe() {
         return await request('/api/auth/me');
+    },
+    // ── Workspaces & Team Administration ────────────────────
+    async getWorkspaces() {
+        try {
+            return await request('/api/admin/workspaces');
+        } catch (e) {
+            return { workspaces: [{ id: 'personal', name: 'Kişisel Pano' }], activeWorkspaceId: 'personal' };
+        }
+    },
+    async createWorkspace(name, description) {
+        return await request('/api/admin/workspaces', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description })
+        });
+    },
+    async getAdminUsers() {
+        return await request('/api/admin/users');
+    },
+    async createAdminUser(payload) {
+        return await request('/api/admin/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    },
+    async updateUserWorkspaces(userId, workspaces) {
+        return await request(`/api/admin/users/${userId}/workspaces`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ workspaces })
+        });
+    },
+    async deleteAdminUser(userId) {
+        return await request(`/api/admin/users/${userId}`, { method: 'DELETE' });
     },
     async getUsers() {
         try {

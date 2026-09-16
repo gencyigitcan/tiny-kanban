@@ -1,5 +1,5 @@
 // ============================================================
-//  Tiny Kanban – Express Server (Jira-extended)
+//  Kanban – Express Server (Jira-extended)
 // ============================================================
 const express = require('express');
 const fs = require('fs');
@@ -156,7 +156,7 @@ app.get('/', (req, res) => res.redirect('/board.html'));
 
 // ── Start ────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`\n  🟣 Tiny Kanban running at http://localhost:${PORT}\n`);
+  console.log(`\n  🟣 Kanban running at http://localhost:${PORT}\n`);
   console.log(`     My Board  → http://localhost:${PORT}/board.html`);
   console.log(`     Demo      → http://localhost:${PORT}/demo.html\n`);
 });

@@ -1,5 +1,5 @@
 /* ============================================================
-   TINY KANBAN – LANDING PAGE INTERACTIVE SIMULATION
+   KANBAN – LANDING PAGE INTERACTIVE SIMULATION
    ============================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {

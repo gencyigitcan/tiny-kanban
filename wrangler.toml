@@ -7,3 +7,22 @@ compatibility_flags = [ "nodejs_compat" ]
 binding = "DB"
 database_name = "tiny-kanban-db"
 database_id = "9f9ccd66-716a-4f56-a591-9495bb3992d0"
+
+[vars]
+APP_ENV = "production"
+
+[env.test]
+name = "tiny-kanban-test"
+vars = { APP_ENV = "test" }
+[[env.test.d1_databases]]
+binding = "DB"
+database_name = "tiny-kanban-db"
+database_id = "9f9ccd66-716a-4f56-a591-9495bb3992d0"
+
+[env.production]
+name = "tiny-kanban"
+vars = { APP_ENV = "production" }
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "tiny-kanban-db"
+database_id = "9f9ccd66-716a-4f56-a591-9495bb3992d0"

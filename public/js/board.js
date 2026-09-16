@@ -528,7 +528,7 @@ function renderReports(cards, epics = [], sprints = []) {
 
       <!-- Printable Only Header -->
       <div class="print-only-header">
-        <h1>Tiny Kanban Proje Raporu</h1>
+        <h1>Kanban Proje Raporu</h1>
         <p>Tarih: ${new Date().toLocaleDateString('tr-TR')} · Çalışma Dönemi: 2026 Takvim Yılı</p>
         <hr style="margin:16px 0; border:0; border-top:1px solid #ddd">
       </div>
@@ -627,7 +627,7 @@ function exportToCSV(cardsList, epicsList, sprintsList) {
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `tiny-kanban-rapor-${new Date().toISOString().slice(0, 10)}.csv`);
+  link.setAttribute("download", `kanban-rapor-${new Date().toISOString().slice(0, 10)}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -652,13 +652,10 @@ let dragId = null;
 function onDragStart(e) {
   dragId = e.currentTarget.dataset.id;
   e.currentTarget.classList.add('dragging');
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', dragId);
-  const ghost = e.currentTarget.cloneNode(true);
-  ghost.style.cssText = `position:fixed;top:-1000px;left:-1000px;width:${e.currentTarget.offsetWidth}px;opacity:1;box-shadow:0 10px 30px rgba(0,0,0,.2);transform:rotate(1.5deg)`;
-  document.body.appendChild(ghost);
-  e.dataTransfer.setDragImage(ghost, e.offsetX, e.offsetY);
-  setTimeout(() => ghost.remove(), 0);
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragId);
+  }
 }
 window.onDragStart = onDragStart;
 
@@ -671,17 +668,37 @@ window.onDragEnd = onDragEnd;
 
 function onDragOver(e) {
   e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  e.currentTarget.classList.add('drag-over');
-  removePlaceholders();
-  const ph = document.createElement('div');
-  ph.className = 'drop-placeholder';
-  const target = getCardBelow(e.currentTarget, e.clientY);
-  target ? e.currentTarget.insertBefore(ph, target) : e.currentTarget.appendChild(ph);
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = 'move';
+  }
+  const container = e.currentTarget;
+  container.classList.add('drag-over');
+
+  const afterElement = getCardBelow(container, e.clientY);
+  let ph = container.querySelector('.drop-placeholder');
+
+  if (!ph) {
+    ph = document.createElement('div');
+    ph.className = 'drop-placeholder';
+    if (afterElement) {
+      container.insertBefore(ph, afterElement);
+    } else {
+      container.appendChild(ph);
+    }
+  } else {
+    if (afterElement && ph.nextElementSibling !== afterElement) {
+      container.insertBefore(ph, afterElement);
+    } else if (!afterElement && container.lastElementChild !== ph) {
+      container.appendChild(ph);
+    }
+  }
 }
 window.onDragOver = onDragOver;
 
 function onDragLeave(e) {
+  if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) {
+    return;
+  }
   e.currentTarget.classList.remove('drag-over');
   removePlaceholders();
 }

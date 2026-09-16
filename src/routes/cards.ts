@@ -31,14 +31,14 @@ function notifyAssignee(db: any, cardId: string, cardTitle: string, assigneeName
 }
 
 /** GET /api/cards */
-cardRouter.get('/', (_req, res) => {
-    res.json(readDb().cards);
+cardRouter.get('/', (req, res) => {
+    res.json(readDb(req).cards);
 });
 
 /** POST /api/cards */
 cardRouter.post('/', validate(createCardSchema), (req, res) => {
     const body = req.body as Omit<Card, 'id' | 'key' | 'comments' | 'createdAt'>;
-    const db = readDb();
+    const db = readDb(req);
     db.taskCounter = (db.taskCounter ?? 0) + 1;
     const key = `TK-${db.taskCounter}`;
     const card: Card = {
@@ -63,13 +63,13 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
     };
     db.cards.push(card);
     notifyAssignee(db, card.id, card.title, card.assignee, req.user);
-    writeDbSync(db);
+    writeDbSync(db, req);
     res.status(201).json(card);
 });
 
 /** PUT /api/cards/:id */
 cardRouter.put('/:id', validate(updateCardSchema), (req, res) => {
-    const db = readDb();
+    const db = readDb(req);
     const idx = db.cards.findIndex(c => c.id === req.params.id);
     if (idx === -1) throw new NotFoundError('Card not found');
 
@@ -93,17 +93,17 @@ cardRouter.put('/:id', validate(updateCardSchema), (req, res) => {
         notifyAssignee(db, db.cards[idx].id, title, newAssignee, req.user);
     }
 
-    writeDbSync(db);
+    writeDbSync(db, req);
     res.json(db.cards[idx]);
 });
 
 /** DELETE /api/cards/:id */
 cardRouter.delete('/:id', (req, res) => {
-    const db = readDb();
+    const db = readDb(req);
     const before = db.cards.length;
     db.cards = db.cards.filter(c => c.id !== req.params.id);
     if (db.cards.length === before) throw new NotFoundError('Card not found');
-    writeDbSync(db);
+    writeDbSync(db, req);
     res.json({ ok: true });
 });
 

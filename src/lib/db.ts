@@ -1,130 +1,499 @@
 // ============================================================
-//  Atomic JSON Database Service
+//  Atomic JSON Database Service (Multi-Environment & Multi-Tenant)
 // ============================================================
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import writeFileAtomic from 'write-file-atomic';
-import type { DbSchema, User } from '../types/index.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import type { DbSchema, Workspace, TenantIndex } from '../types/index.js';
+
+export type Environment = 'production' | 'test' | 'development';
+export type DbScope = 'personal' | 'demo' | string;
 
 const DATA_DIR = path.join(process.cwd(), 'data');
-const DATA_FILE = path.join(DATA_DIR, 'db.json');
+const TENANTS_DIR = path.join(DATA_DIR, 'tenants');
+const PERSONAL_DATA_FILE = path.join(DATA_DIR, 'db.json');
+const DEMO_DATA_FILE = path.join(DATA_DIR, 'demo_db.json');
 
-const EMPTY_DB: DbSchema = { cards: [], epics: [], sprints: [], users: [], sessions: [], labels: [], notifications: [], taskCounter: 0 };
+export const EMPTY_DB: DbSchema = {
+    cards: [],
+    epics: [],
+    sprints: [],
+    users: [],
+    sessions: [],
+    labels: [],
+    notifications: [],
+    taskCounter: 0,
+    workspaces: []
+};
 
-function hashPassword(password: string): string {
+// ── Password Hashing Helpers ─────────────────────────────────
+export function hashPassword(password: string): string {
     const salt = crypto.randomBytes(16).toString('hex');
     const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
     return `${salt}:${hash}`;
 }
 
-/** Ensure data directory and db.json exist on startup */
-export function initDb(): void {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    
-    let db: DbSchema;
-    if (!fs.existsSync(DATA_FILE)) {
-        db = structuredClone(EMPTY_DB);
-    } else {
-        try {
-            const raw = fs.readFileSync(DATA_FILE, 'utf8');
-            const parsed = JSON.parse(raw) as Partial<DbSchema>;
-            db = {
-                cards: Array.isArray(parsed.cards) ? parsed.cards : [],
-                epics: Array.isArray(parsed.epics) ? parsed.epics : [],
-                sprints: Array.isArray(parsed.sprints) ? parsed.sprints : [],
-                users: Array.isArray(parsed.users) ? parsed.users : [],
-                sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
-                labels: Array.isArray(parsed.labels) ? parsed.labels : [],
-                notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
-                taskCounter: typeof parsed.taskCounter === 'number' ? parsed.taskCounter : 0
-            };
-        } catch {
-            db = structuredClone(EMPTY_DB);
-        }
-    }
-
-    // Seed mock team users if empty
-    if (db.users.length === 0) {
-        const seededUsers: User[] = [
-            {
-                id: 'usr-1',
-                username: 'admin',
-                name: 'Ali Yılmaz',
-                passwordHash: hashPassword('password'),
-                avatarColor: '#4f46e5',
-                createdAt: Date.now()
-            },
-            {
-                id: 'usr-2',
-                username: 'zeynep',
-                name: 'Zeynep Kaya',
-                passwordHash: hashPassword('password'),
-                avatarColor: '#0ea5e9',
-                createdAt: Date.now()
-            },
-            {
-                id: 'usr-3',
-                username: 'mehmet',
-                name: 'Mehmet Demir',
-                passwordHash: hashPassword('password'),
-                avatarColor: '#10b981',
-                createdAt: Date.now()
-            }
-        ];
-        db.users = seededUsers;
-    }
-
-    // Seed standard labels if empty
-    if (!db.labels || db.labels.length === 0) {
-        db.labels = [
-            { id: 'bug', name: 'Bug', color: '#ef4444', bg: '#fef2f2', createdAt: Date.now() },
-            { id: 'feature', name: 'Özellik', color: '#6366f1', bg: '#eef2ff', createdAt: Date.now() },
-            { id: 'task', name: 'Görev', color: '#3b82f6', bg: '#eff6ff', createdAt: Date.now() },
-            { id: 'design', name: 'Tasarım', color: '#8b5cf6', bg: '#f5f3ff', createdAt: Date.now() },
-            { id: 'devops', name: 'DevOps', color: '#0891b2', bg: '#ecfeff', createdAt: Date.now() },
-            { id: 'test', name: 'Test', color: '#16a34a', bg: '#f0fdf4', createdAt: Date.now() },
-            { id: 'docs', name: 'Belge', color: '#ca8a04', bg: '#fefce8', createdAt: Date.now() },
-            { id: 'urgent', name: 'Acil', color: '#dc2626', bg: '#fff1f2', createdAt: Date.now() }
-        ];
-    }
-
-    // Retroactively assign keys if missing, and sync taskCounter
-    let maxNum = db.taskCounter || 0;
-    db.cards.forEach(c => {
-        if (c.key) {
-            const num = parseInt(c.key.replace('TK-', ''), 10);
-            if (!isNaN(num) && num > maxNum) maxNum = num;
-        }
-    });
-    db.cards.forEach(c => {
-        if (!c.key) {
-            maxNum++;
-            c.key = `TK-${maxNum}`;
-        }
-    });
-    db.taskCounter = maxNum;
-
-    writeDbSync(db);
+export function verifyPassword(password: string, stored: string): boolean {
+    const [salt, hash] = stored.split(':');
+    if (!salt || !hash) return false;
+    const testHash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+    return hash === testHash;
 }
 
-// ── Cloudflare Workers & AsyncLocalStorage Context ────────
-import { AsyncLocalStorage } from 'node:async_hooks';
+// ── Environment Detection ────────────────────────────────────
+export function getEnvironment(reqOrScope?: any, envBinding?: any): Environment {
+    // 1. Cloudflare Workers env variable
+    if (envBinding?.APP_ENV) {
+        const val = String(envBinding.APP_ENV).toLowerCase();
+        if (val === 'test') return 'test';
+        if (val === 'production') return 'production';
+        if (val === 'development') return 'development';
+    }
 
-export const dbContext = new AsyncLocalStorage<DbSchema & { _dirty?: boolean }>();
+    // 2. Node.js process environment
+    if (typeof process !== 'undefined' && process.env?.APP_ENV) {
+        const val = String(process.env.APP_ENV).toLowerCase();
+        if (val === 'test') return 'test';
+        if (val === 'production') return 'production';
+        if (val === 'development') return 'development';
+    }
 
-/** Read entire DB synchronously, always returns a valid shape */
-export function readDb(): DbSchema {
-    const store = dbContext.getStore();
-    if (store) {
-        return store;
+    // 3. Check request headers / host / query
+    if (reqOrScope && typeof reqOrScope === 'object') {
+        let host = '';
+        let xEnv = '';
+
+        if (typeof reqOrScope.headers?.get === 'function') {
+            host = reqOrScope.headers.get('host') || '';
+            xEnv = reqOrScope.headers.get('x-environment') || '';
+        } else if (reqOrScope.headers) {
+            host = reqOrScope.headers['host'] || '';
+            xEnv = reqOrScope.headers['x-environment'] || '';
+        }
+
+        if (xEnv.toLowerCase() === 'test') return 'test';
+        if (xEnv.toLowerCase() === 'production') return 'production';
+
+        if (host.includes('test') || host.includes('preview') || host.includes('staging') || host.startsWith('test.')) {
+            return 'test';
+        }
+
+        if ('environment' in reqOrScope && reqOrScope.environment) {
+            return reqOrScope.environment;
+        }
+    }
+
+    return (process.env.NODE_ENV === 'development') ? 'development' : 'production';
+}
+
+// ── Storage Key & File Path Resolution ───────────────────────
+export function resolveStorageKey(env: Environment, tenantId: string = 'personal'): string {
+    const tId = tenantId || 'personal';
+    if (env === 'production' || env === 'development') {
+        if (tId === 'personal') return 'db'; // Preserves existing Cloudflare D1 key
+        if (tId === 'demo') return 'demo';
+        return `tenant:${tId}`;
+    } else {
+        // Test environment is strictly isolated
+        if (tId === 'personal' || tId === 'default') return 'test:db';
+        if (tId === 'demo') return 'test:demo';
+        return `test:tenant:${tId}`;
+    }
+}
+
+export function resolveFilePath(scopeOrReq?: DbScope | { dbScope?: DbScope; tenantId?: string } | string, env: Environment = 'production'): string {
+    let tId = 'personal';
+    if (typeof scopeOrReq === 'object' && scopeOrReq !== null) {
+        if ('tenantId' in scopeOrReq && scopeOrReq.tenantId) {
+            tId = scopeOrReq.tenantId;
+        } else if ('dbScope' in scopeOrReq && scopeOrReq.dbScope) {
+            tId = scopeOrReq.dbScope;
+        }
+    } else if (typeof scopeOrReq === 'string' && scopeOrReq.trim()) {
+        tId = scopeOrReq.trim();
+    }
+
+    if (env === 'production' || env === 'development') {
+        if (tId === 'personal') return PERSONAL_DATA_FILE; // Preserves data/db.json
+        if (tId === 'demo') return DEMO_DATA_FILE;         // Preserves data/demo_db.json
+        return path.join(TENANTS_DIR, `${tId}.json`);
+    } else {
+        // Test environment
+        if (tId === 'personal' || tId === 'default') return path.join(DATA_DIR, 'test_db.json');
+        if (tId === 'demo') return path.join(DATA_DIR, 'test_demo_db.json');
+        return path.join(TENANTS_DIR, `test_${tId}.json`);
+    }
+}
+
+export function resolveTenantId(scopeOrReq?: any): string {
+    if (typeof scopeOrReq === 'object' && scopeOrReq !== null) {
+        if (scopeOrReq.tenantId) return scopeOrReq.tenantId;
+        if (scopeOrReq.dbScope) return scopeOrReq.dbScope;
+        if (scopeOrReq.headers) {
+            const h = typeof scopeOrReq.headers.get === 'function'
+                ? scopeOrReq.headers.get('x-tenant-id')
+                : scopeOrReq.headers['x-tenant-id'];
+            if (h) return String(h).trim();
+        }
+        if (scopeOrReq.query?.tenantId) return String(scopeOrReq.query.tenantId).trim();
+    } else if (typeof scopeOrReq === 'string' && scopeOrReq.trim()) {
+        return scopeOrReq.trim();
+    }
+    return 'personal';
+}
+
+// ── Default Labels ───────────────────────────────────────────
+export const DEFAULT_LABELS = [
+    { id: 'bug', name: 'Bug', color: '#ef4444', bg: '#fef2f2', createdAt: Date.now() },
+    { id: 'feature', name: 'Özellik', color: '#6366f1', bg: '#eef2ff', createdAt: Date.now() },
+    { id: 'task', name: 'Görev', color: '#3b82f6', bg: '#eff6ff', createdAt: Date.now() },
+    { id: 'design', name: 'Tasarım', color: '#8b5cf6', bg: '#f5f3ff', createdAt: Date.now() },
+    { id: 'devops', name: 'DevOps', color: '#0891b2', bg: '#ecfeff', createdAt: Date.now() },
+    { id: 'test', name: 'Test', color: '#16a34a', bg: '#f0fdf4', createdAt: Date.now() },
+    { id: 'docs', name: 'Belge', color: '#ca8a04', bg: '#fefce8', createdAt: Date.now() },
+    { id: 'urgent', name: 'Acil', color: '#dc2626', bg: '#fff1f2', createdAt: Date.now() }
+];
+
+// ── Sample Test Environment Database ─────────────────────────
+export function createDefaultTestDb(): DbSchema {
+    return {
+        cards: [
+            {
+                id: 'test-card-1',
+                key: 'TK-1',
+                title: 'Test Ortamı Doğrulaması',
+                desc: 'Bu kart sadece TEST ortamında görüntülenir. Kişisel kartlardan tamamen izoledir.',
+                assignee: 'Test Kullanıcısı',
+                priority: 'high',
+                col: 'doing',
+                startDate: '2026-03-10',
+                dueDate: '2026-03-25',
+                labels: ['test', 'devops'],
+                storyPoints: 3,
+                estimatedEffort: 4,
+                spentEffort: 2,
+                subtasks: [{ id: 'sub-1', text: 'İzolasyon kontrolü', done: true }],
+                comments: [{ id: 'comm-1', text: 'Test ortamı başarıyla ayrıştırıldı.', createdAt: Date.now(), author: 'Test Yöneticisi' }],
+                epicId: null,
+                sprintId: 'sprint-test-1',
+                createdAt: Date.now() - 3600000
+            },
+            {
+                id: 'test-card-2',
+                key: 'TK-2',
+                title: 'Kullanıcı İzinleri Testi',
+                desc: 'Farklı rollerin ve takım yetkilendirmelerinin doğrulanması.',
+                assignee: 'Test Kullanıcısı',
+                priority: 'medium',
+                col: 'todo',
+                startDate: '2026-03-15',
+                dueDate: '2026-03-30',
+                labels: ['feature'],
+                storyPoints: 5,
+                estimatedEffort: 8,
+                spentEffort: 0,
+                subtasks: [],
+                comments: [],
+                epicId: null,
+                sprintId: 'sprint-test-1',
+                createdAt: Date.now() - 1800000
+            }
+        ],
+        epics: [
+            { id: 'epic-test-1', name: 'Ortam İzolasyonu', color: '#6366f1', createdAt: Date.now() }
+        ],
+        sprints: [
+            { id: 'sprint-test-1', name: 'Test Sprint 1', startDate: '2026-03-01', endDate: '2026-03-31', active: true, createdAt: Date.now() }
+        ],
+        users: [
+            {
+                id: 'usr-testadmin',
+                username: 'testadmin',
+                name: 'Test Yöneticisi',
+                passwordHash: hashPassword('password'),
+                avatarColor: '#4f46e5',
+                role: 'admin',
+                tenantId: 'personal',
+                workspaces: ['personal'],
+                createdAt: Date.now()
+            },
+            {
+                id: 'usr-tester',
+                username: 'tester',
+                name: 'Test Kullanıcısı',
+                passwordHash: hashPassword('password'),
+                avatarColor: '#10b981',
+                role: 'user',
+                tenantId: 'personal',
+                workspaces: ['personal'],
+                createdAt: Date.now()
+            }
+        ],
+        sessions: [],
+        labels: DEFAULT_LABELS,
+        notifications: [],
+        taskCounter: 2,
+        workspaces: [
+            { id: 'personal', name: 'Test Ortamı Panosu', type: 'team', ownerId: 'usr-testadmin', createdAt: Date.now() }
+        ]
+    };
+}
+
+// ── Startup Initialization (Local Node.js) ───────────────────
+export function initDb(): void {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (!fs.existsSync(TENANTS_DIR)) fs.mkdirSync(TENANTS_DIR, { recursive: true });
+
+    // ── 1. PERSONAL DATABASE (db.json) - MUST PRESERVE EXISTING DATA ──
+    let personalDb: DbSchema;
+    if (!fs.existsSync(PERSONAL_DATA_FILE)) {
+        personalDb = structuredClone(EMPTY_DB);
+    } else {
+        try {
+            const raw = fs.readFileSync(PERSONAL_DATA_FILE, 'utf8');
+            personalDb = JSON.parse(raw);
+        } catch {
+            personalDb = structuredClone(EMPTY_DB);
+        }
+    }
+
+    // Ensure Super Admin gencyigitcan exists in personal DB
+    let superUser = personalDb.users.find(u => u.username.toLowerCase() === 'gencyigitcan');
+    if (!superUser) {
+        superUser = {
+            id: 'usr-superadmin',
+            username: 'gencyigitcan',
+            name: 'Yiğitcan Genç',
+            passwordHash: hashPassword('Ygt150294'),
+            avatarColor: '#6366f1',
+            role: 'superadmin',
+            tenantId: 'personal',
+            workspaces: ['personal'],
+            createdAt: Date.now()
+        };
+        personalDb.users.unshift(superUser);
+    } else {
+        superUser.role = 'superadmin';
+        superUser.tenantId = 'personal';
+        if (!superUser.workspaces) superUser.workspaces = ['personal'];
+    }
+
+    if (!personalDb.labels || personalDb.labels.length === 0) {
+        personalDb.labels = DEFAULT_LABELS;
+    }
+
+    if (!personalDb.workspaces || personalDb.workspaces.length === 0) {
+        personalDb.workspaces = [
+            { id: 'personal', name: 'Kişisel Çalışma Alanı', type: 'personal', ownerId: 'usr-superadmin', createdAt: Date.now() }
+        ];
+    }
+    writeTenantDbFileSync('personal', 'production', personalDb);
+
+    // ── 2. DEMO DATABASE (demo_db.json) ──────────────────────
+    let demoDb: DbSchema;
+    if (!fs.existsSync(DEMO_DATA_FILE)) {
+        demoDb = structuredClone(EMPTY_DB);
+    } else {
+        try {
+            const raw = fs.readFileSync(DEMO_DATA_FILE, 'utf8');
+            demoDb = JSON.parse(raw);
+        } catch {
+            demoDb = structuredClone(EMPTY_DB);
+        }
+    }
+
+    if (demoDb.users.length === 0) {
+        demoDb.users = [
+            { id: 'usr-1', username: 'admin', name: 'Ali Yılmaz', passwordHash: hashPassword('password'), avatarColor: '#4f46e5', role: 'admin', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
+            { id: 'usr-2', username: 'zeynep', name: 'Zeynep Kaya', passwordHash: hashPassword('password'), avatarColor: '#0ea5e9', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
+            { id: 'usr-3', username: 'mehmet', name: 'Mehmet Demir', passwordHash: hashPassword('password'), avatarColor: '#10b981', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() }
+        ];
+    }
+    if (!demoDb.labels || demoDb.labels.length === 0) {
+        demoDb.labels = DEFAULT_LABELS.slice(0, 3);
+    }
+    if (!demoDb.workspaces || demoDb.workspaces.length === 0) {
+        demoDb.workspaces = [
+            { id: 'demo', name: 'Demo Panosu', type: 'team', ownerId: 'usr-1', createdAt: Date.now() }
+        ];
+    }
+    writeTenantDbFileSync('demo', 'production', demoDb);
+
+    // ── 3. TEST DATABASE (test_db.json) ──────────────────────
+    const testDbPath = path.join(DATA_DIR, 'test_db.json');
+    if (!fs.existsSync(testDbPath)) {
+        writeTenantDbFileSync('personal', 'test', createDefaultTestDb());
+    }
+
+    // Initialize Tenant Index files
+    initTenantIndexFiles();
+}
+
+// ── Tenant Index Helpers ─────────────────────────────────────
+function initTenantIndexFiles(): void {
+    const prodIndexPath = path.join(DATA_DIR, 'tenants_index.json');
+    if (!fs.existsSync(prodIndexPath)) {
+        const prodIndex: TenantIndex = {
+            workspaces: [
+                { id: 'personal', name: 'Kişisel Çalışma Alanı', type: 'personal', ownerId: 'usr-superadmin', createdAt: Date.now() },
+                { id: 'demo', name: 'Demo Panosu', type: 'team', ownerId: 'usr-1', createdAt: Date.now() }
+            ],
+            userToTenants: {
+                'gencyigitcan': ['personal'],
+                'admin': ['demo'],
+                'zeynep': ['demo'],
+                'mehmet': ['demo']
+            }
+        };
+        writeFileAtomic.sync(prodIndexPath, JSON.stringify(prodIndex, null, 2));
+    }
+
+    const testIndexPath = path.join(DATA_DIR, 'test_tenants_index.json');
+    if (!fs.existsSync(testIndexPath)) {
+        const testIndex: TenantIndex = {
+            workspaces: [
+                { id: 'personal', name: 'Test Ortamı Panosu', type: 'team', ownerId: 'usr-testadmin', createdAt: Date.now() }
+            ],
+            userToTenants: {
+                'testadmin': ['personal'],
+                'tester': ['personal']
+            }
+        };
+        writeFileAtomic.sync(testIndexPath, JSON.stringify(testIndex, null, 2));
+    }
+}
+
+export async function getTenantIndex(env: Environment, d1Binding?: any): Promise<TenantIndex> {
+    const indexKey = env === 'test' ? 'test:tenants_index' : 'tenants_index';
+    const filePath = path.join(DATA_DIR, `${env === 'test' ? 'test_' : ''}tenants_index.json`);
+
+    if (d1Binding) {
+        try {
+            const row = await d1Binding.prepare("SELECT value FROM json_store WHERE key = ?").bind(indexKey).first();
+            if (row && typeof row.value === 'string') {
+                return JSON.parse(row.value);
+            }
+        } catch (e) {
+            console.error("D1 getTenantIndex failed:", e);
+        }
+    }
+
+    // Local file fallback
+    try {
+        if (fs.existsSync(filePath)) {
+            return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        }
+    } catch { }
+
+    const fallback: TenantIndex = env === 'test' ? {
+        workspaces: [{ id: 'personal', name: 'Test Ortamı Panosu', type: 'team', ownerId: 'usr-testadmin', createdAt: Date.now() }],
+        userToTenants: { 'testadmin': ['personal'], 'tester': ['personal'] }
+    } : {
+        workspaces: [
+            { id: 'personal', name: 'Kişisel Çalışma Alanı', type: 'personal', ownerId: 'usr-superadmin', createdAt: Date.now() },
+            { id: 'demo', name: 'Demo Panosu', type: 'team', ownerId: 'usr-1', createdAt: Date.now() }
+        ],
+        userToTenants: { 'gencyigitcan': ['personal'], 'admin': ['demo'], 'zeynep': ['demo'], 'mehmet': ['demo'] }
+    };
+
+    if (d1Binding) {
+        await saveTenantIndex(fallback, env, d1Binding);
+    }
+    return fallback;
+}
+
+export async function saveTenantIndex(index: TenantIndex, env: Environment, d1Binding?: any): Promise<void> {
+    const indexKey = env === 'test' ? 'test:tenants_index' : 'tenants_index';
+    const filePath = path.join(DATA_DIR, `${env === 'test' ? 'test_' : ''}tenants_index.json`);
+
+    if (d1Binding) {
+        try {
+            const val = JSON.stringify(index);
+            await d1Binding.prepare(
+                "INSERT INTO json_store (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+            ).bind(indexKey, val).run();
+        } catch (e) {
+            console.error("D1 saveTenantIndex failed:", e);
+        }
     }
 
     try {
-        if (!fs.existsSync(DATA_FILE)) {
+        if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+        await writeFileAtomic(filePath, JSON.stringify(index, null, 2));
+    } catch { }
+}
+
+// ── AsyncLocalStorage Request Context ────────────────────────
+export interface RequestContext {
+    envName: Environment;
+    d1Binding?: any;
+    activeTenantId: string;
+    tenants: Map<string, { db: DbSchema; dirty: boolean; key: string }>;
+}
+
+export const dbContext = new AsyncLocalStorage<RequestContext>();
+
+// ── Read & Write Functions (Used by all routes) ───────────────
+export function readDb(scopeOrReq?: DbScope | { dbScope?: DbScope; tenantId?: string; environment?: Environment } | string): DbSchema {
+    const store = dbContext.getStore();
+    const tId = resolveTenantId(scopeOrReq);
+    const env = store?.envName || getEnvironment(scopeOrReq);
+
+    if (store) {
+        // Check if tenant is cached in this request
+        const cached = store.tenants.get(tId);
+        if (cached) {
+            return cached.db;
+        }
+        // If not cached, load sync from disk fallback
+        const diskDb = readTenantDbFileSync(tId, env);
+        store.tenants.set(tId, { db: diskDb, dirty: false, key: resolveStorageKey(env, tId) });
+        return diskDb;
+    }
+
+    return readTenantDbFileSync(tId, env);
+}
+
+export function writeDbSync(data: DbSchema, scopeOrReq?: DbScope | { dbScope?: DbScope; tenantId?: string; environment?: Environment } | string): void {
+    const store = dbContext.getStore();
+    const tId = resolveTenantId(scopeOrReq);
+    const env = store?.envName || getEnvironment(scopeOrReq);
+
+    if (store) {
+        const key = resolveStorageKey(env, tId);
+        const existing = store.tenants.get(tId);
+        if (existing) {
+            Object.assign(existing.db, data);
+            existing.dirty = true;
+        } else {
+            store.tenants.set(tId, { db: data, dirty: true, key });
+        }
+
+        // If not running on Cloudflare (native node), also write to disk
+        if (!store.d1Binding) {
+            writeTenantDbFileSync(tId, env, data);
+        }
+        return;
+    }
+
+    writeTenantDbFileSync(tId, env, data);
+}
+
+export async function writeDb(data: DbSchema, scopeOrReq?: DbScope | { dbScope?: DbScope; tenantId?: string; environment?: Environment } | string): Promise<void> {
+    writeDbSync(data, scopeOrReq);
+}
+
+// ── File System Helpers ──────────────────────────────────────
+export function readTenantDbFileSync(tenantId: string, env: Environment): DbSchema {
+    const filePath = resolveFilePath(tenantId, env);
+    try {
+        if (!fs.existsSync(filePath)) {
+            if (env === 'test') return createDefaultTestDb();
             return structuredClone(EMPTY_DB);
         }
-        const raw = fs.readFileSync(DATA_FILE, 'utf8');
+        const raw = fs.readFileSync(filePath, 'utf8');
         const parsed = JSON.parse(raw) as Partial<DbSchema>;
         return {
             cards: Array.isArray(parsed.cards) ? parsed.cards : [],
@@ -132,118 +501,165 @@ export function readDb(): DbSchema {
             sprints: Array.isArray(parsed.sprints) ? parsed.sprints : [],
             users: Array.isArray(parsed.users) ? parsed.users : [],
             sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
-            labels: Array.isArray(parsed.labels) ? parsed.labels : [],
+            labels: Array.isArray(parsed.labels) ? parsed.labels : DEFAULT_LABELS,
             notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
-            taskCounter: typeof parsed.taskCounter === 'number' ? parsed.taskCounter : 0
+            taskCounter: typeof parsed.taskCounter === 'number' ? parsed.taskCounter : 0,
+            workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : []
         };
     } catch {
+        if (env === 'test') return createDefaultTestDb();
         return structuredClone(EMPTY_DB);
     }
 }
 
-/** Write DB atomically — prevents partial writes on crash */
-export async function writeDb(data: DbSchema): Promise<void> {
-    const store = dbContext.getStore();
-    if (store) {
-        Object.assign(store, data);
-        store._dirty = true;
-        return;
-    }
-
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    await writeFileAtomic(DATA_FILE, JSON.stringify(data, null, 2), { encoding: 'utf8' });
+export function writeTenantDbFileSync(tenantId: string, env: Environment, data: DbSchema): void {
+    const filePath = resolveFilePath(tenantId, env);
+    const parentDir = path.dirname(filePath);
+    if (!fs.existsSync(parentDir)) fs.mkdirSync(parentDir, { recursive: true });
+    writeFileAtomic.sync(filePath, JSON.stringify(data, null, 2));
 }
 
-/** Synchronous write (for route handlers returning sync responses) */
-export function writeDbSync(data: DbSchema): void {
-    const store = dbContext.getStore();
-    if (store) {
-        Object.assign(store, data);
-        store._dirty = true;
-        return;
+// ── Cloudflare D1 Load & Save Helpers ────────────────────────
+export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: Environment): Promise<DbSchema> {
+    const key = resolveStorageKey(env, tenantId);
+    if (!dbBinding) {
+        return readTenantDbFileSync(tenantId, env);
     }
 
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    writeFileAtomic.sync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
-/** Load database state from Cloudflare D1 */
-export async function loadDbFromD1(dbBinding: any): Promise<DbSchema> {
     try {
-        const row = await dbBinding.prepare("SELECT value FROM json_store WHERE key = 'db'").first();
+        const row = await dbBinding.prepare("SELECT value FROM json_store WHERE key = ?").bind(key).first();
         if (row && typeof row.value === 'string') {
             const parsed = JSON.parse(row.value) as Partial<DbSchema>;
-            return {
+            const db: DbSchema = {
                 cards: Array.isArray(parsed.cards) ? parsed.cards : [],
                 epics: Array.isArray(parsed.epics) ? parsed.epics : [],
                 sprints: Array.isArray(parsed.sprints) ? parsed.sprints : [],
                 users: Array.isArray(parsed.users) ? parsed.users : [],
                 sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
-                labels: Array.isArray(parsed.labels) ? parsed.labels : [],
+                labels: Array.isArray(parsed.labels) ? parsed.labels : DEFAULT_LABELS,
                 notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
-                taskCounter: typeof parsed.taskCounter === 'number' ? parsed.taskCounter : 0
+                taskCounter: typeof parsed.taskCounter === 'number' ? parsed.taskCounter : 0,
+                workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : []
             };
+
+            // In production personal DB, ensure gencyigitcan Super Admin is present
+            if (env === 'production' && tenantId === 'personal') {
+                let superUser = db.users.find(u => u.username.toLowerCase() === 'gencyigitcan');
+                if (!superUser) {
+                    superUser = {
+                        id: 'usr-superadmin',
+                        username: 'gencyigitcan',
+                        name: 'Yiğitcan Genç',
+                        passwordHash: hashPassword('Ygt150294'),
+                        avatarColor: '#6366f1',
+                        role: 'superadmin',
+                        tenantId: 'personal',
+                        workspaces: ['personal'],
+                        createdAt: Date.now()
+                    };
+                    db.users.unshift(superUser);
+                }
+            }
+
+            return db;
         }
     } catch (e) {
-        console.error("D1 database load failed, fallback to seeding initial data:", e);
+        console.error(`D1 load failed for key '${key}':`, e);
     }
 
-    // Seed default data if empty or query failed
-    const db = structuredClone(EMPTY_DB);
-    db.users = [
-        {
-            id: 'usr-1',
-            username: 'admin',
-            name: 'Ali Yılmaz',
-            passwordHash: hashPassword('password'),
-            avatarColor: '#4f46e5',
-            createdAt: Date.now()
-        },
-        {
-            id: 'usr-2',
-            username: 'zeynep',
-            name: 'Zeynep Kaya',
-            passwordHash: hashPassword('password'),
-            avatarColor: '#0ea5e9',
-            createdAt: Date.now()
-        },
-        {
-            id: 'usr-3',
-            username: 'mehmet',
-            name: 'Mehmet Demir',
-            passwordHash: hashPassword('password'),
-            avatarColor: '#10b981',
-            createdAt: Date.now()
-        }
-    ];
-    db.labels = [
-        { id: 'bug', name: 'Bug', color: '#ef4444', bg: '#fef2f2', createdAt: Date.now() },
-        { id: 'feature', name: 'Özellik', color: '#6366f1', bg: '#eef2ff', createdAt: Date.now() },
-        { id: 'task', name: 'Görev', color: '#3b82f6', bg: '#eff6ff', createdAt: Date.now() },
-        { id: 'design', name: 'Tasarım', color: '#8b5cf6', bg: '#f5f3ff', createdAt: Date.now() },
-        { id: 'devops', name: 'DevOps', color: '#0891b2', bg: '#ecfeff', createdAt: Date.now() },
-        { id: 'test', name: 'Test', color: '#16a34a', bg: '#f0fdf4', createdAt: Date.now() },
-        { id: 'docs', name: 'Belge', color: '#ca8a04', bg: '#fefce8', createdAt: Date.now() },
-        { id: 'urgent', name: 'Acil', color: '#dc2626', bg: '#fff1f2', createdAt: Date.now() }
-    ];
+    // Seed if empty or not found
+    let initialDb: DbSchema;
+    if (env === 'test') {
+        initialDb = createDefaultTestDb();
+    } else if (tenantId === 'demo') {
+        initialDb = readTenantDbFileSync('demo', 'production');
+    } else {
+        initialDb = readTenantDbFileSync(tenantId, env);
+    }
 
-    await saveDbToD1(dbBinding, db);
-    return db;
+    await saveTenantDbToD1(dbBinding, key, initialDb);
+    return initialDb;
 }
 
-/** Save database state to Cloudflare D1 */
+export async function saveTenantDbToD1(dbBinding: any, key: string, data: DbSchema): Promise<void> {
+    if (!dbBinding) return;
+    try {
+        const dataToSave = { ...data };
+        delete (dataToSave as any)._dirty;
+        const value = JSON.stringify(dataToSave);
+        await dbBinding.prepare(
+            "INSERT INTO json_store (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+        ).bind(key, value).run();
+    } catch (e) {
+        console.error(`D1 save failed for key '${key}':`, e);
+    }
+}
+
+// ── Backward-compatible exports for loadDbFromD1 / saveDbToD1 ──
+export async function loadDbFromD1(dbBinding: any): Promise<DbSchema> {
+    return loadTenantDbFromD1(dbBinding, 'personal', 'production');
+}
+
 export async function saveDbToD1(dbBinding: any, data: DbSchema): Promise<void> {
-    const dataToSave = { ...data };
-    delete (dataToSave as any)._dirty;
-    const value = JSON.stringify(dataToSave);
-    await dbBinding.prepare(
-        "INSERT INTO json_store (key, value) VALUES ('db', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
-    ).bind(value).run();
+    return saveTenantDbToD1(dbBinding, 'db', data);
 }
 
-/** Generate a short collision-resistant ID */
+// ── Workspace Creation Helper ────────────────────────────────
+export async function createWorkspace(
+    name: string,
+    type: 'personal' | 'team' | 'user',
+    owner: { id: string; username: string },
+    env: Environment,
+    d1Binding?: any,
+    customId?: string
+): Promise<Workspace> {
+    const wsId = customId || (type === 'user' ? `user_${owner.username}` : `team_${uid()}`);
+    const workspace: Workspace = {
+        id: wsId,
+        name: name.trim(),
+        type,
+        ownerId: owner.id,
+        members: [{ userId: owner.id, username: owner.username, role: 'admin' }],
+        createdAt: Date.now()
+    };
+
+    // Initialize new DB for this workspace
+    const newDb: DbSchema = {
+        cards: [],
+        epics: [],
+        sprints: [],
+        users: [],
+        sessions: [],
+        labels: DEFAULT_LABELS,
+        notifications: [],
+        taskCounter: 0,
+        workspaces: [workspace]
+    };
+
+    // Save workspace DB
+    const key = resolveStorageKey(env, wsId);
+    if (d1Binding) {
+        await saveTenantDbToD1(d1Binding, key, newDb);
+    }
+    writeTenantDbFileSync(wsId, env, newDb);
+
+    // Update Tenant Index
+    const index = await getTenantIndex(env, d1Binding);
+    if (!index.workspaces.some(w => w.id === wsId)) {
+        index.workspaces.push(workspace);
+    }
+    if (!index.userToTenants[owner.username]) {
+        index.userToTenants[owner.username] = [];
+    }
+    if (!index.userToTenants[owner.username].includes(wsId)) {
+        index.userToTenants[owner.username].push(wsId);
+    }
+    await saveTenantIndex(index, env, d1Binding);
+
+    return workspace;
+}
+
+// ── Short ID Generator ───────────────────────────────────────
 export function uid(): string {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
-
-

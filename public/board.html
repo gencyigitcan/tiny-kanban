@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tiny Kanban – My Board</title>
+    <title>Kanban – My Board</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
@@ -23,7 +23,20 @@
     <header class="header">
         <div class="header-brand">
             <div class="header-logo">K</div>
-            <span class="header-title">My Board</span>
+            <div class="workspace-switcher-container">
+                <button class="workspace-switcher-btn" id="workspaceSwitcherBtn" type="button" title="Çalışma Alanı Değiştir">
+                    <span class="ws-icon" id="wsIcon">🛡️</span>
+                    <span class="ws-name" id="wsName">Kişisel Pano</span>
+                    <span class="ws-arrow">▾</span>
+                </button>
+                <div class="workspace-dropdown" id="workspaceDropdown" style="display: none;">
+                    <div class="ws-dropdown-header">Çalışma Alanlarım</div>
+                    <div class="ws-list" id="wsList"></div>
+                    <div class="ws-dropdown-footer">
+                        <button class="btn-link" id="createWorkspacePromptBtn" type="button">✚ Yeni Takım Oluştur</button>
+                    </div>
+                </div>
+            </div>
             <span class="header-subtitle" id="sprintBadge">—</span>
         </div>
         <div class="header-search">
@@ -43,6 +56,7 @@
         </div>
         <div class="header-actions">
             <button class="btn btn-primary" id="addTaskBtn">✚ <span class="label">Yeni Görev</span></button>
+            <button class="btn btn-secondary" id="manageUsersBtn" style="display: none;">👥 <span class="label">Takım & Yetkiler</span></button>
             <button class="btn btn-secondary" id="manageLabelsBtn">🏷 <span class="label">Etiketler</span></button>
             <button class="btn btn-secondary" id="manageEpicsBtn">🎨 <span class="label">Epics</span></button>
             <button class="btn btn-secondary" id="manageSprintsBtn">⚡ <span class="label">Sprints</span></button>
@@ -402,6 +416,96 @@
         </div>
     </div>
 
+    <!-- ============================================================
+     USER & TEAM MANAGEMENT MODAL
+     ============================================================ -->
+    <div class="modal-overlay" id="userModal">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h2 class="modal-title">👥 Takım & Kullanıcı Yönetimi</h2>
+                <button class="modal-close" onclick="closeModal('userModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="auth-tabs" style="margin-bottom: 16px;">
+                    <button class="auth-tab active" id="tabUsersList">Kullanıcılar</button>
+                    <button class="auth-tab" id="tabTeamsList">Takımlar / Panolar</button>
+                    <button class="auth-tab" id="tabAddUser">✚ Yeni Kullanıcı Ekle</button>
+                </div>
+
+                <!-- Tab 1: Users List -->
+                <div class="user-panel" id="panelUsersList">
+                    <div class="manager-list" id="adminUsersList"></div>
+                </div>
+
+                <!-- Tab 2: Teams / Workspaces List -->
+                <div class="user-panel" id="panelTeamsList" style="display: none;">
+                    <div style="margin-bottom: 14px; display: flex; gap: 8px;">
+                        <input class="form-input" type="text" id="newTeamName" placeholder="Yeni Takım / Pano adı… (ör. Mobil Ekibi)">
+                        <button class="btn btn-primary btn-sm" id="btnCreateTeamSubmit" style="white-space: nowrap;">Takım Oluştur</button>
+                    </div>
+                    <div class="manager-list" id="adminTeamsList"></div>
+                </div>
+
+                <!-- Tab 3: Add User Form -->
+                <div class="user-panel" id="panelAddUser" style="display: none;">
+                    <form id="adminAddUserForm" style="display: flex; flex-direction: column; gap: 12px;">
+                        <div class="form-row">
+                            <div class="form-group" style="margin: 0;">
+                                <label class="form-label" for="newUserName">Tam Ad</label>
+                                <input class="form-input" type="text" id="newUserName" required placeholder="ör. Selin Yılmaz">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label class="form-label" for="newUserUsername">Kullanıcı Adı</label>
+                                <input class="form-input" type="text" id="newUserUsername" required placeholder="ör. selin">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="margin: 0;">
+                                <label class="form-label" for="newUserPassword">Şifre</label>
+                                <input class="form-input" type="password" id="newUserPassword" required placeholder="En az 6 karakter">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label class="form-label" for="newUserRole">Rol</label>
+                                <select class="form-select" id="newUserRole">
+                                    <option value="user">Kullanıcı (Standart Üye)</option>
+                                    <option value="admin">Yönetici (Admin)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Veritabanı / Pano Erişim Yetkisi</label>
+                            <div class="ws-mode-card">
+                                <label class="ws-radio-option">
+                                    <input type="radio" name="newUserWorkspaceMode" value="team" checked>
+                                    <div>
+                                        <div class="ws-radio-title">🏢 Mevcut Takım / Çalışma Alanına Yetkilendir</div>
+                                        <div class="ws-radio-desc">Kullanıcı seçilen takımın DB kayıtlarını (görevler, epikler, sprintler) görür ve birlikte çalışır.</div>
+                                    </div>
+                                </label>
+                                <div id="targetWorkspaceGroup" style="margin-left: 24px; margin-top: 6px;">
+                                    <select class="form-select" id="newUserTargetWorkspace">
+                                    </select>
+                                </div>
+
+                                <label class="ws-radio-option" style="margin-top: 10px;">
+                                    <input type="radio" name="newUserWorkspaceMode" value="personal">
+                                    <div>
+                                        <div class="ws-radio-title">👤 Kullanıcıya Özel Bağımsız DB Oluştur</div>
+                                        <div class="ws-radio-desc">Kullanıcıya sadece kendine ait, sıfırdan izole bir DB açılır. Diğer takımların görevlerini asla göremez.</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="auth-error" id="addUserError" style="display: none;"></div>
+                        <button type="submit" class="btn btn-primary" style="align-self: flex-start;">Kullanıcıyı Kaydet</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="toast-container" id="toastContainer"></div>
     <div class="kbd-hint"><kbd>N</kbd> Yeni görev &nbsp;·&nbsp; <kbd>Esc</kbd> Kapat</div>
 
@@ -412,7 +516,7 @@
         <div class="auth-card">
             <div class="auth-brand">
                 <div class="auth-logo">K</div>
-                <h1 class="auth-title">Tiny Kanban</h1>
+                <h1 class="auth-title">Kanban</h1>
                 <p class="auth-subtitle">Küçük ekipler için Jira-like iş takip tahtası</p>
             </div>
             
@@ -431,6 +535,10 @@
                     <label class="form-label" for="loginPassword">Şifre</label>
                     <input class="form-input" type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password">
                 </div>
+                <div class="form-group">
+                    <label class="form-label" for="loginCompany">Şirket / Çalışma Alanı (İsteğe bağlı)</label>
+                    <input class="form-input" type="text" id="loginCompany" placeholder="Boş bırakılabilir (Otomatik bulunur)">
+                </div>
                 <div class="auth-error" id="loginError"></div>
                 <button type="submit" class="btn btn-primary auth-submit-btn">Giriş Yap</button>
             </form>
@@ -448,6 +556,10 @@
                 <div class="form-group">
                     <label class="form-label" for="regPassword">Şifre</label>
                     <input class="form-input" type="password" id="regPassword" required placeholder="En az 6 karakter" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="regCompany">Şirket / Takım Adı (İsteğe bağlı)</label>
+                    <input class="form-input" type="text" id="regCompany" placeholder="ör. Acme Teknoloji veya boş bırakın">
                 </div>
                 <div class="auth-error" id="registerError"></div>
                 <button type="submit" class="btn btn-primary auth-submit-btn">Hesap Oluştur</button>

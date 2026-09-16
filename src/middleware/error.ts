@@ -18,6 +18,11 @@ export class AppError extends Error {
 export class NotFoundError extends AppError { constructor(m = 'Not found') { super(m, 404); } }
 export class ValidationError extends AppError { constructor(m = 'Validation failed') { super(m, 400); } }
 
+export const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) =>
+    (req: Request, res: Response, next: NextFunction) => {
+        Promise.resolve(fn(req, res, next)).catch(next);
+    };
+
 /**
  * Express 4-argument error handler — must be registered last.
  */
