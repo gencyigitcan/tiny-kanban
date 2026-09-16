@@ -63,7 +63,7 @@ Sistem istek geldiğinde ortamı otomatik olarak tespit eder. Test ortamında ve
 | Metot & Endpoint | Açıklama | Örnek Parametreler / Gövde |
 |---|---|---|
 | `GET /api/cards` | Aktif panodaki tüm görev kartlarını getirir. | — |
-| `POST /api/cards` | Aktif panoya yeni bir görev kartı ekler. | `{"title": "Görev Başlığı", "assignee": "Yiğitcan", "priority": "high", "col": "todo", "storyPoints": 3}` |
+| `POST /api/cards` | Aktif panoya yeni bir görev kartı ekler. | `{"title": "Görev Başlığı", "assignee": "Selin", "priority": "high", "col": "todo", "storyPoints": 3}` |
 | `PUT /api/cards/:id` | Görevi günceller (Sütun taşıma, durum, efor, etiket, kişi atama vb.). | `{"col": "doing", "priority": "medium", "spentEffort": 2}` |
 | `DELETE /api/cards/:id` | Görev kartını siler. | — |
 
@@ -102,7 +102,7 @@ Sistem istek geldiğinde ortamı otomatik olarak tespit eder. Test ortamında ve
 
 | Dosya / Anahtar | Ortam / Kapsam | Açıklama |
 |---|---|---|
-| `data/db.json` *(D1 key: `db`)* | Production / Personal | **Kişisel Çalışma Alanı:** Yiğitcan Genç'in tüm kişisel biletleri burada saklanır. |
+| `data/db.json` *(D1 key: `db`)* | Production / Personal | **Kişisel Çalışma Alanı:** Süper Admin'in tüm kişisel biletleri burada saklanır. |
 | `data/test_db.json` *(D1 key: `test:db`)* | Test Ortamı | **Test Panosu:** Test ortamında çalışan tertemiz test biletleri. |
 | `data/demo_db.json` *(D1 key: `demo`)* | Production / Demo | **Demo Panosu:** Halka açık demo verisi. |
 | `data/tenants_index.json` | Tümü | Çalışma alanları ve kullanıcı yetki haritası indeksi. |
