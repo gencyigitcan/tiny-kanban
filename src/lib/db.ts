@@ -47,7 +47,7 @@ export function getEnvironment(reqOrScope?: any, envBinding?: any): Environment 
     // 1. Cloudflare Workers env variable
     if (envBinding?.APP_ENV) {
         const val = String(envBinding.APP_ENV).toLowerCase();
-        if (val === 'test') return 'test';
+        if (val === 'test' || val === 'preview') return 'test';
         if (val === 'production') return 'production';
         if (val === 'development') return 'development';
     }
@@ -55,7 +55,7 @@ export function getEnvironment(reqOrScope?: any, envBinding?: any): Environment 
     // 2. Node.js process environment
     if (typeof process !== 'undefined' && process.env?.APP_ENV) {
         const val = String(process.env.APP_ENV).toLowerCase();
-        if (val === 'test') return 'test';
+        if (val === 'test' || val === 'preview') return 'test';
         if (val === 'production') return 'production';
         if (val === 'development') return 'development';
     }
@@ -73,7 +73,7 @@ export function getEnvironment(reqOrScope?: any, envBinding?: any): Environment 
             xEnv = reqOrScope.headers['x-environment'] || '';
         }
 
-        if (xEnv.toLowerCase() === 'test') return 'test';
+        if (xEnv.toLowerCase() === 'test' || xEnv.toLowerCase() === 'preview') return 'test';
         if (xEnv.toLowerCase() === 'production') return 'production';
 
         if (host.includes('test') || host.includes('preview') || host.includes('staging') || host.startsWith('test.')) {
