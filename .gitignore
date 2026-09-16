@@ -4,3 +4,4 @@ data/
 *.log
 .wrangler/
 public/_worker.js
+worker-configuration.d.ts
