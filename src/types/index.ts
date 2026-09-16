@@ -75,6 +75,7 @@ export interface Workspace {
 export interface User {
     id: string;
     username: string;
+    email?: string;
     name: string;
     passwordHash: string;
     avatarColor: string;

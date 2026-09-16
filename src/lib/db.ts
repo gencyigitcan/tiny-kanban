@@ -366,14 +366,23 @@ function initTenantIndexFiles(): void {
 }
 
 export async function getTenantIndex(env: Environment, d1Binding?: any): Promise<TenantIndex> {
+    const store = dbContext.getStore();
+    const binding = d1Binding || store?.d1Binding;
+
+    if (store && store.index) {
+        return store.index;
+    }
+
     const indexKey = env === 'test' ? 'test:tenants_index' : 'tenants_index';
     const filePath = path.join(DATA_DIR, `${env === 'test' ? 'test_' : ''}tenants_index.json`);
 
-    if (d1Binding) {
+    if (binding) {
         try {
-            const row = await d1Binding.prepare("SELECT value FROM json_store WHERE key = ?").bind(indexKey).first();
+            const row = await binding.prepare("SELECT value FROM json_store WHERE key = ?").bind(indexKey).first();
             if (row && typeof row.value === 'string') {
-                return JSON.parse(row.value);
+                const parsed = JSON.parse(row.value);
+                if (store) store.index = parsed;
+                return parsed;
             }
         } catch (e) {
             console.error("D1 getTenantIndex failed:", e);
@@ -383,7 +392,9 @@ export async function getTenantIndex(env: Environment, d1Binding?: any): Promise
     // Local file fallback
     try {
         if (fs.existsSync(filePath)) {
-            return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            if (store) store.index = parsed;
+            return parsed;
         }
     } catch { }
 
@@ -395,23 +406,39 @@ export async function getTenantIndex(env: Environment, d1Binding?: any): Promise
             { id: 'personal', name: 'Kişisel Çalışma Alanı', type: 'personal', ownerId: 'usr-superadmin', createdAt: Date.now() },
             { id: 'demo', name: 'Demo Panosu', type: 'team', ownerId: 'usr-1', createdAt: Date.now() }
         ],
-        userToTenants: { 'gencyigitcan': ['personal'], 'admin': ['demo'], 'zeynep': ['demo'], 'mehmet': ['demo'] }
+        userToTenants: {
+            'gencyigitcan': ['personal'],
+            'yigitcangenc@gmail.com': ['personal'],
+            'admin': ['demo'],
+            'zeynep': ['demo'],
+            'mehmet': ['demo']
+        }
     };
 
-    if (d1Binding) {
-        await saveTenantIndex(fallback, env, d1Binding);
+    if (store) {
+        store.index = fallback;
+    }
+    if (binding) {
+        await saveTenantIndex(fallback, env, binding);
     }
     return fallback;
 }
 
 export async function saveTenantIndex(index: TenantIndex, env: Environment, d1Binding?: any): Promise<void> {
+    const store = dbContext.getStore();
+    const binding = d1Binding || store?.d1Binding;
+    if (store) {
+        store.index = index;
+        store.indexDirty = true;
+    }
+
     const indexKey = env === 'test' ? 'test:tenants_index' : 'tenants_index';
     const filePath = path.join(DATA_DIR, `${env === 'test' ? 'test_' : ''}tenants_index.json`);
 
-    if (d1Binding) {
+    if (binding) {
         try {
             const val = JSON.stringify(index);
-            await d1Binding.prepare(
+            await binding.prepare(
                 "INSERT INTO json_store (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
             ).bind(indexKey, val).run();
         } catch (e) {
@@ -431,6 +458,8 @@ export interface RequestContext {
     d1Binding?: any;
     activeTenantId: string;
     tenants: Map<string, { db: DbSchema; dirty: boolean; key: string }>;
+    index?: TenantIndex;
+    indexDirty?: boolean;
 }
 
 export const dbContext = new AsyncLocalStorage<RequestContext>();
@@ -542,13 +571,18 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                 workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : []
             };
 
-            // In production personal DB, ensure gencyigitcan Super Admin is present
+            // In production personal DB, ensure gencyigitcan / yigitcangenc@gmail.com Super Admin is present
             if (env === 'production' && tenantId === 'personal') {
-                let superUser = db.users.find(u => u.username.toLowerCase() === 'gencyigitcan');
+                let superUser = db.users.find(u =>
+                    u.username.toLowerCase() === 'gencyigitcan' ||
+                    (u.email && u.email.toLowerCase() === 'yigitcangenc@gmail.com') ||
+                    u.id === 'usr-superadmin'
+                );
                 if (!superUser) {
                     superUser = {
                         id: 'usr-superadmin',
                         username: 'gencyigitcan',
+                        email: 'yigitcangenc@gmail.com',
                         name: 'Yiğitcan Genç',
                         passwordHash: hashPassword('Ygt150294'),
                         avatarColor: '#6366f1',
@@ -558,6 +592,11 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                         createdAt: Date.now()
                     };
                     db.users.unshift(superUser);
+                } else {
+                    superUser.email = 'yigitcangenc@gmail.com';
+                    if (!superUser.workspaces || !superUser.workspaces.includes('personal')) {
+                        superUser.workspaces = ['personal', ...(superUser.workspaces || [])];
+                    }
                 }
             }
 
@@ -613,7 +652,10 @@ export async function createWorkspace(
     d1Binding?: any,
     customId?: string
 ): Promise<Workspace> {
-    const wsId = customId || (type === 'user' ? `user_${owner.username}` : `team_${uid()}`);
+    const store = dbContext.getStore();
+    const binding = d1Binding || store?.d1Binding;
+    const cleanUsername = owner.username.toLowerCase().replace(/[^a-zA-Z0-9_]/g, '_');
+    const wsId = customId || (type === 'user' ? `user_${cleanUsername}` : `team_${uid()}`);
     const workspace: Workspace = {
         id: wsId,
         name: name.trim(),
@@ -638,23 +680,27 @@ export async function createWorkspace(
 
     // Save workspace DB
     const key = resolveStorageKey(env, wsId);
-    if (d1Binding) {
-        await saveTenantDbToD1(d1Binding, key, newDb);
+    if (store) {
+        store.tenants.set(wsId, { db: newDb, dirty: true, key });
+    }
+    if (binding) {
+        await saveTenantDbToD1(binding, key, newDb);
     }
     writeTenantDbFileSync(wsId, env, newDb);
 
     // Update Tenant Index
-    const index = await getTenantIndex(env, d1Binding);
+    const index = await getTenantIndex(env, binding);
     if (!index.workspaces.some(w => w.id === wsId)) {
         index.workspaces.push(workspace);
     }
-    if (!index.userToTenants[owner.username]) {
-        index.userToTenants[owner.username] = [];
+    const normOwner = owner.username.toLowerCase();
+    if (!index.userToTenants[normOwner]) {
+        index.userToTenants[normOwner] = [];
     }
-    if (!index.userToTenants[owner.username].includes(wsId)) {
-        index.userToTenants[owner.username].push(wsId);
+    if (!index.userToTenants[normOwner].includes(wsId)) {
+        index.userToTenants[normOwner].push(wsId);
     }
-    await saveTenantIndex(index, env, d1Binding);
+    await saveTenantIndex(index, env, binding);
 
     return workspace;
 }

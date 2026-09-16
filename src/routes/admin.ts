@@ -108,7 +108,7 @@ adminRouter.get('/users', asyncHandler(async (req, res) => {
 // ── POST /api/admin/users ────────────────────────────────────
 const createUserSchema = z.object({
     name: z.string().min(2, 'İsim en az 2 karakter olmalıdır').max(100).trim(),
-    username: z.string().min(3, 'Kullanıcı adı en az 3 karakter olmalıdır').max(30).regex(/^[a-zA-Z0-9_]+$/, 'Geçersiz kullanıcı adı'),
+    username: z.string().min(3, 'Kullanıcı adı veya e-posta en az 3 karakter olmalıdır').max(100).regex(/^[a-zA-Z0-9_.@+-]+$/, 'Geçersiz kullanıcı adı veya e-posta'),
     password: z.string().min(6, 'Şifre en az 6 karakter olmalıdır').max(100),
     role: z.enum(['admin', 'user']).default('user'),
     workspaceMode: z.enum(['personal', 'team']),
@@ -136,6 +136,7 @@ adminRouter.post('/users', validate(createUserSchema), asyncHandler(async (req, 
     const newUser: User = {
         id: userId,
         username: normalizedUser,
+        email: normalizedUser.includes('@') ? normalizedUser : undefined,
         name: name.trim(),
         passwordHash: hashPassword(password),
         avatarColor: '#4f46e5',

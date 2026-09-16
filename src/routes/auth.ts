@@ -11,6 +11,7 @@ import {
     verifyPassword,
     getEnvironment,
     getTenantIndex,
+    saveTenantIndex,
     createWorkspace
 } from '../lib/db.js';
 import { validate } from '../middleware/validate.js';
@@ -41,13 +42,15 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
     const env = req.environment || getEnvironment(req);
     const index = await getTenantIndex(env);
 
-    // Check if user already exists
-    if (index.userToTenants[normalizedUsername]) {
-        throw new AppError('Kullanıcı adı zaten kullanımda', 400);
+    const isOwnerUser = normalizedUsername === 'yigitcangenc@gmail.com' || normalizedUsername === 'gencyigitcan';
+
+    // Check if user already exists in index (if not owner resetting/registering)
+    if (index.userToTenants[normalizedUsername] && !isOwnerUser) {
+        throw new AppError('Kullanıcı adı veya e-posta zaten kullanımda', 400);
     }
 
     const randomColor = PASTEL_COLORS[Math.floor(Math.random() * PASTEL_COLORS.length)];
-    const userId = 'usr-' + uid();
+    const userId = isOwnerUser ? 'usr-superadmin' : ('usr-' + uid());
 
     let tenantId: string;
     let workspaceName: string;
@@ -58,26 +61,51 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
         tenantId = ws.id;
     } else {
         workspaceName = `${name.trim()} (Bireysel)`;
-        tenantId = `user_${normalizedUsername}`;
+        tenantId = `user_${normalizedUsername.replace(/[^a-zA-Z0-9_]/g, '_')}`;
         await createWorkspace(workspaceName, 'user', { id: userId, username: normalizedUsername }, env, undefined, tenantId);
     }
 
     const newUser: User = {
         id: userId,
         username: normalizedUsername,
+        email: normalizedUsername.includes('@') ? normalizedUsername : (isOwnerUser ? 'yigitcangenc@gmail.com' : undefined),
         name: name.trim(),
         passwordHash: hashPassword(password),
         avatarColor: randomColor,
-        role: 'admin',
+        role: isOwnerUser ? 'superadmin' : 'admin',
         tenantId,
-        workspaces: [tenantId],
+        workspaces: isOwnerUser ? ['personal', tenantId] : [tenantId],
         company: company ? company.trim() : undefined,
         createdAt: Date.now()
     };
 
     // Add user to their newly created workspace DB
     const db = readDb({ tenantId, environment: env });
-    db.users.push(newUser);
+    const existingIdx = db.users.findIndex(u => u.username.toLowerCase() === normalizedUsername || u.id === userId);
+    if (existingIdx >= 0) {
+        db.users[existingIdx] = newUser;
+    } else {
+        db.users.push(newUser);
+    }
+    writeDbSync(db, { tenantId, environment: env });
+
+    // If owner user, also update usr-superadmin in personal DB and link workspaces
+    if (isOwnerUser) {
+        const personalDb = readDb({ tenantId: 'personal', environment: env });
+        const superIdx = personalDb.users.findIndex(u => u.id === 'usr-superadmin' || u.username.toLowerCase() === 'gencyigitcan');
+        if (superIdx >= 0) {
+            personalDb.users[superIdx].passwordHash = newUser.passwordHash;
+            personalDb.users[superIdx].email = 'yigitcangenc@gmail.com';
+            personalDb.users[superIdx].workspaces = Array.from(new Set([...(personalDb.users[superIdx].workspaces || []), 'personal', tenantId]));
+        } else {
+            personalDb.users.unshift(newUser);
+        }
+        writeDbSync(personalDb, { tenantId: 'personal', environment: env });
+
+        index.userToTenants['yigitcangenc@gmail.com'] = Array.from(new Set([...(index.userToTenants['yigitcangenc@gmail.com'] || []), 'personal', tenantId]));
+        index.userToTenants['gencyigitcan'] = Array.from(new Set([...(index.userToTenants['gencyigitcan'] || []), 'personal', tenantId]));
+        await saveTenantIndex(index, env);
+    }
 
     // Create session token scoped to this workspace
     const randomBytes = crypto.randomBytes(24).toString('hex');
@@ -91,18 +119,25 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
     db.sessions.push(newSession);
     writeDbSync(db, { tenantId, environment: env });
 
+    const wsNameMap = Object.fromEntries(index.workspaces.map(w => [w.id, w.name]));
+    const accessibleWorkspaces = (newUser.workspaces || [tenantId]).map(id => ({
+        id,
+        name: wsNameMap[id] || (id === 'personal' ? 'Kişisel Çalışma Alanı' : id)
+    }));
+
     res.status(201).json({
         token,
         user: {
             id: newUser.id,
             username: newUser.username,
+            email: newUser.email,
             name: newUser.name,
             avatarColor: newUser.avatarColor,
             role: newUser.role,
             tenantId,
-            workspaces: [{ id: tenantId, name: workspaceName }]
+            workspaces: accessibleWorkspaces
         },
-        workspaces: [{ id: tenantId, name: workspaceName }],
+        workspaces: accessibleWorkspaces,
         activeWorkspaceId: tenantId
     });
 }));
@@ -114,9 +149,18 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
     const env = req.environment || getEnvironment(req);
     const index = await getTenantIndex(env);
 
+    const userMatches = (u: User) => {
+        const uName = (u.username || '').toLowerCase();
+        const uEmail = (u.email || '').toLowerCase();
+        return uName === normalizedUsername ||
+               uEmail === normalizedUsername ||
+               (normalizedUsername === 'yigitcangenc@gmail.com' && uName === 'gencyigitcan') ||
+               (normalizedUsername === 'gencyigitcan' && uEmail === 'yigitcangenc@gmail.com');
+    };
+
     let activeTenantId = 'personal';
     let db = readDb({ tenantId: 'personal', environment: env });
-    let user = db.users.find(u => u.username.toLowerCase() === normalizedUsername);
+    let user = db.users.find(userMatches);
 
     if (user && verifyPassword(password, user.passwordHash)) {
         activeTenantId = 'personal';
@@ -127,17 +171,19 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
             if (companyWs) {
                 activeTenantId = companyWs.id;
                 db = readDb({ tenantId: activeTenantId, environment: env });
-                user = db.users.find(u => u.username.toLowerCase() === normalizedUsername);
+                user = db.users.find(userMatches);
             }
         }
 
         // Check index for user's assigned workspaces
         if (!user || !verifyPassword(password, user.passwordHash)) {
-            const userWsIds = index.userToTenants[normalizedUsername];
+            const userWsIds = index.userToTenants[normalizedUsername] ||
+                             (normalizedUsername === 'yigitcangenc@gmail.com' ? index.userToTenants['gencyigitcan'] : undefined) ||
+                             (normalizedUsername === 'gencyigitcan' ? index.userToTenants['yigitcangenc@gmail.com'] : undefined);
             if (userWsIds && userWsIds.length > 0) {
                 for (const wsId of userWsIds) {
                     const testDb = readDb({ tenantId: wsId, environment: env });
-                    const candidate = testDb.users.find(u => u.username.toLowerCase() === normalizedUsername);
+                    const candidate = testDb.users.find(userMatches);
                     if (candidate && verifyPassword(password, candidate.passwordHash)) {
                         user = candidate;
                         activeTenantId = wsId;
@@ -151,7 +197,7 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
         // Fallback: check Demo DB
         if (!user || !verifyPassword(password, user.passwordHash)) {
             const demoDb = readDb({ tenantId: 'demo', environment: env });
-            const candidate = demoDb.users.find(u => u.username.toLowerCase() === normalizedUsername);
+            const candidate = demoDb.users.find(userMatches);
             if (candidate && verifyPassword(password, candidate.passwordHash)) {
                 user = candidate;
                 activeTenantId = 'demo';
@@ -169,10 +215,17 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
     }
 
     // Get all workspaces accessible by this user
-    const userWorkspaceIds = index.userToTenants[normalizedUsername] || [activeTenantId];
-    if (!userWorkspaceIds.includes(activeTenantId)) {
-        userWorkspaceIds.unshift(activeTenantId);
+    const directWsIds = index.userToTenants[normalizedUsername] || [];
+    const aliasWsIds = (normalizedUsername === 'yigitcangenc@gmail.com' ? index.userToTenants['gencyigitcan'] : 
+                       (normalizedUsername === 'gencyigitcan' ? index.userToTenants['yigitcangenc@gmail.com'] : [])) || [];
+    const allWsSet = new Set<string>([...directWsIds, ...aliasWsIds, activeTenantId, ...(user.workspaces || [])]);
+
+    // Superadmin or Yiğitcan always has access to 'personal'
+    if (user.role === 'superadmin' || normalizedUsername === 'yigitcangenc@gmail.com' || normalizedUsername === 'gencyigitcan') {
+        allWsSet.add('personal');
     }
+    const userWorkspaceIds = Array.from(allWsSet);
+
     const wsNameMap = Object.fromEntries(index.workspaces.map(w => [w.id, w.name]));
     const accessibleWorkspaces = userWorkspaceIds.map(id => ({
         id,
@@ -196,6 +249,7 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
         user: {
             id: user.id,
             username: user.username,
+            email: user.email,
             name: user.name,
             avatarColor: user.avatarColor,
             role: user.role || 'user',
@@ -219,9 +273,15 @@ authRouter.post('/switch-workspace', requireAuth, asyncHandler(async (req, res) 
     const index = await getTenantIndex(env);
     const username = req.user!.username.toLowerCase();
     const isSuperAdmin = req.user!.role === 'superadmin';
+    const isOwner = username === 'yigitcangenc@gmail.com' || username === 'gencyigitcan' || isSuperAdmin;
 
-    const userWsIds = index.userToTenants[username] || [req.tenantId || 'personal'];
-    if (!isSuperAdmin && !userWsIds.includes(workspaceId)) {
+    const directWsIds = index.userToTenants[username] || [];
+    const aliasWsIds = (username === 'yigitcangenc@gmail.com' ? index.userToTenants['gencyigitcan'] : 
+                       (username === 'gencyigitcan' ? index.userToTenants['yigitcangenc@gmail.com'] : [])) || [];
+    const userWsSet = new Set([...directWsIds, ...aliasWsIds, ...(req.user!.workspaces || [])]);
+    if (isOwner) userWsSet.add('personal');
+
+    if (!isOwner && !userWsSet.has(workspaceId)) {
         throw new AppError('Bu çalışma alanına erişim yetkiniz bulunmamaktadır', 403);
     }
 
@@ -268,15 +328,24 @@ authRouter.get('/me', requireAuth, asyncHandler(async (req, res) => {
     const index = await getTenantIndex(env);
     const username = user.username.toLowerCase();
     const isSuperAdmin = user.role === 'superadmin';
+    const isOwner = username === 'yigitcangenc@gmail.com' || username === 'gencyigitcan' || isSuperAdmin;
 
-    const userWsIds = index.userToTenants[username] || [req.tenantId || 'personal'];
+    const directWsIds = index.userToTenants[username] || [];
+    const aliasWsIds = (username === 'yigitcangenc@gmail.com' ? index.userToTenants['gencyigitcan'] : 
+                       (username === 'gencyigitcan' ? index.userToTenants['yigitcangenc@gmail.com'] : [])) || [];
+    const userWsSet = new Set([...directWsIds, ...aliasWsIds, ...(user.workspaces || []), req.tenantId || 'personal']);
+    if (isOwner) {
+        userWsSet.add('personal');
+    }
+
     const accessible = index.workspaces.filter(w =>
-        isSuperAdmin || userWsIds.includes(w.id) || w.ownerId === user.id
+        isSuperAdmin || userWsSet.has(w.id) || w.ownerId === user.id
     );
 
     res.json({
         id: user.id,
         username: user.username,
+        email: user.email,
         name: user.name,
         avatarColor: user.avatarColor,
         role: user.role || 'user',

@@ -65,14 +65,14 @@ export const updateSprintSchema = createSprintSchema.partial().extend({
 
 // ── Auth ─────────────────────────────────────────────────────
 export const registerSchema = z.object({
-    username: z.string().min(3, 'Kullanıcı adı en az 3 karakter olmalıdır').max(30).regex(/^[a-zA-Z0-9_]+$/, 'Geçersiz kullanıcı adı (sadece harf, sayı ve alt çizgi)'),
+    username: z.string().min(3, 'Kullanıcı adı veya e-posta en az 3 karakter olmalıdır').max(100).regex(/^[a-zA-Z0-9_.@+-]+$/, 'Geçersiz kullanıcı adı veya e-posta'),
     password: z.string().min(6, 'Şifre en az 6 karakter olmalıdır').max(100),
     name: z.string().min(1, 'İsim boş olamaz').max(100).trim(),
     company: z.string().max(100).optional(),
 });
 
 export const loginSchema = z.object({
-    username: z.string().min(1, 'Kullanıcı adı gerekli'),
+    username: z.string().min(1, 'Kullanıcı adı veya e-posta gerekli').max(100),
     password: z.string().min(1, 'Şifre gerekli'),
     company: z.string().max(100).optional(),
 });

@@ -17,6 +17,8 @@ import {
     resolveStorageKey,
     loadTenantDbFromD1,
     saveTenantDbToD1,
+    getTenantIndex,
+    saveTenantIndex,
     RequestContext
 } from './lib/db.js';
 import { cardRouter } from './routes/cards.js';
@@ -144,20 +146,82 @@ export default {
             initialTenantId = request.headers.get('x-tenant-id')!;
         }
 
-        // Preload the tenant DB from Cloudflare D1
-        const tenantDb = await loadTenantDbFromD1(env.DB, initialTenantId, envName);
         const tenantsMap = new Map<string, { db: any; dirty: boolean; key: string }>();
-        tenantsMap.set(initialTenantId, {
-            db: tenantDb,
-            dirty: false,
-            key: resolveStorageKey(envName, initialTenantId)
-        });
+        let tenantIndex: any = undefined;
+
+        if (env.DB) {
+            try {
+                // Ensure json_store table exists
+                await env.DB.prepare("CREATE TABLE IF NOT EXISTS json_store (key TEXT PRIMARY KEY, value TEXT)").run();
+
+                // Batch preload all keys from D1 in a single query
+                const rows = await env.DB.prepare("SELECT key, value FROM json_store").all();
+                if (rows && rows.results) {
+                    const indexKey = envName === 'test' ? 'test:tenants_index' : 'tenants_index';
+                    const dbKey = envName === 'test' ? 'test:db' : 'db';
+                    const demoKey = envName === 'test' ? 'test:demo' : 'demo';
+                    const tenantPrefix = envName === 'test' ? 'test:tenant:' : 'tenant:';
+
+                    for (const row of rows.results as any[]) {
+                        if (!row.key || typeof row.value !== 'string') continue;
+                        if (row.key === indexKey) {
+                            try { tenantIndex = JSON.parse(row.value); } catch {}
+                        } else if (row.key === dbKey) {
+                            try {
+                                const parsed = JSON.parse(row.value);
+                                tenantsMap.set('personal', { db: parsed, dirty: false, key: dbKey });
+                            } catch {}
+                        } else if (row.key === demoKey) {
+                            try {
+                                const parsed = JSON.parse(row.value);
+                                tenantsMap.set('demo', { db: parsed, dirty: false, key: demoKey });
+                            } catch {}
+                        } else if (row.key.startsWith(tenantPrefix)) {
+                            const tId = row.key.slice(tenantPrefix.length);
+                            try {
+                                const parsed = JSON.parse(row.value);
+                                tenantsMap.set(tId, { db: parsed, dirty: false, key: row.key });
+                            } catch {}
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("D1 batch preload failed:", err);
+            }
+        }
+
+        // Ensure activeTenantId is loaded
+        if (!tenantsMap.has(initialTenantId)) {
+            const tenantDb = await loadTenantDbFromD1(env.DB, initialTenantId, envName);
+            tenantsMap.set(initialTenantId, {
+                db: tenantDb,
+                dirty: false,
+                key: resolveStorageKey(envName, initialTenantId)
+            });
+        }
+
+        // Always ensure 'personal' is loaded (for auth and personal tickets)
+        if (!tenantsMap.has('personal')) {
+            const personalDb = await loadTenantDbFromD1(env.DB, 'personal', envName);
+            tenantsMap.set('personal', {
+                db: personalDb,
+                dirty: false,
+                key: resolveStorageKey(envName, 'personal')
+            });
+        }
+
+        // Ensure tenant index is loaded
+        if (!tenantIndex) {
+            tenantIndex = await getTenantIndex(envName, env.DB);
+        }
 
         const contextStore: RequestContext = {
             envName,
             d1Binding: env.DB,
             activeTenantId: initialTenantId,
-            tenants: tenantsMap
+            tenants: tenantsMap,
+            index: tenantIndex,
+            indexDirty: false
         };
 
         return dbContext.run(contextStore, async () => {
@@ -168,6 +232,9 @@ export default {
                     if (item.dirty) {
                         await saveTenantDbToD1(store.d1Binding, item.key, item.db);
                     }
+                }
+                if (store.index && store.indexDirty) {
+                    await saveTenantIndex(store.index, store.envName, store.d1Binding);
                 }
             }
             return response;
