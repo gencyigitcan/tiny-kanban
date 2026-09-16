@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && node build.js",
     "lint": "tsc --noEmit",
     "test": "tsx tests/integration.ts",
-    "test:security": "tsx tests/security_100_checks.ts"
+    "test:security": "tsx tests/security_100_checks.ts",
+    "test:isolation": "tsx tests/test_tenant_isolation.ts"
   },
   "dependencies": {
     "cors": "^2.8.6",

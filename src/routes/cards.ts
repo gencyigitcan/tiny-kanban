@@ -4,7 +4,7 @@
 import { Router } from 'express';
 import { readDb, writeDbSync, uid, logActivity, getEnvironment } from '../lib/db.js';
 import { validate } from '../middleware/validate.js';
-import { NotFoundError } from '../middleware/error.js';
+import { NotFoundError, AppError } from '../middleware/error.js';
 import { createCardSchema, updateCardSchema } from '../lib/schemas.js';
 import type { Card } from '../types/index.js';
 
@@ -46,6 +46,20 @@ cardRouter.get('/:id', (req, res) => {
 cardRouter.post('/', validate(createCardSchema), (req, res) => {
     const body = req.body as Omit<Card, 'id' | 'key' | 'comments' | 'createdAt'>;
     const db = readDb(req);
+
+    // Validate that assignee belongs to the active workspace / team
+    if (body.assignee && body.assignee.trim()) {
+        const trimmed = body.assignee.trim().toLowerCase();
+        const availableUsers = (db.users && db.users.length > 0) ? db.users : (req.user ? [req.user] : []);
+        const exists = availableUsers.some((u: any) => 
+            (u.name && u.name.toLowerCase() === trimmed) ||
+            (u.username && u.username.toLowerCase() === trimmed)
+        );
+        if (!exists) {
+            throw new AppError('Atanan kullanıcı bu çalışma alanında veya takımda bulunmuyor', 400);
+        }
+    }
+
     db.taskCounter = (db.taskCounter ?? 0) + 1;
     const key = `TK-${db.taskCounter}`;
     const card: Card = {
@@ -93,6 +107,19 @@ cardRouter.put('/:id', validate(updateCardSchema), (req, res) => {
     const db = readDb(req);
     const idx = db.cards.findIndex(c => c.id === req.params.id);
     if (idx === -1) throw new NotFoundError('Card not found');
+
+    // Validate that new assignee belongs to the active workspace / team
+    if (req.body.assignee !== undefined && req.body.assignee && String(req.body.assignee).trim()) {
+        const trimmed = String(req.body.assignee).trim().toLowerCase();
+        const availableUsers = (db.users && db.users.length > 0) ? db.users : (req.user ? [req.user] : []);
+        const exists = availableUsers.some((u: any) => 
+            (u.name && u.name.toLowerCase() === trimmed) ||
+            (u.username && u.username.toLowerCase() === trimmed)
+        );
+        if (!exists) {
+            throw new AppError('Atanan kullanıcı bu çalışma alanında veya takımda bulunmuyor', 400);
+        }
+    }
 
     const oldAssignee = db.cards[idx].assignee;
     const oldCol = db.cards[idx].col;

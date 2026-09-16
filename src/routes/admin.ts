@@ -31,7 +31,7 @@ function checkAdminPermission(req: any) {
     }
 }
 
-// Helper to gather all users across all workspace DBs and personal DB
+// Helper to gather all users across all workspace DBs, personal DB, and isolated user DBs
 function getAllUsersAcrossTenants(env: Environment, index: any): User[] {
     const userMap = new Map<string, User>();
 
@@ -43,10 +43,22 @@ function getAllUsersAcrossTenants(env: Environment, index: any): User[] {
         }
     } catch {}
 
-    // 2. All Workspaces
+    // Collect all tenant IDs from workspaces and userToTenants
+    const allTenantIds = new Set<string>();
     for (const ws of index.workspaces || []) {
+        allTenantIds.add(ws.id);
+    }
+    for (const wsList of Object.values(index.userToTenants || {})) {
+        if (Array.isArray(wsList)) {
+            for (const wsId of wsList) allTenantIds.add(wsId);
+        }
+    }
+
+    // 2. All Workspaces & User DBs
+    for (const tId of allTenantIds) {
+        if (tId === 'personal') continue;
         try {
-            const wsDb = readDb({ tenantId: ws.id, environment: env });
+            const wsDb = readDb({ tenantId: tId, environment: env });
             for (const u of wsDb.users || []) {
                 if (!userMap.has(u.id)) {
                     userMap.set(u.id, { ...u });
@@ -77,15 +89,27 @@ function updateUserAcrossTenants(userId: string, updater: (u: User) => void, env
         }
     } catch {}
 
-    // 2. All Workspaces
+    // Collect all tenant IDs
+    const allTenantIds = new Set<string>();
     for (const ws of index.workspaces || []) {
+        allTenantIds.add(ws.id);
+    }
+    for (const wsList of Object.values(index.userToTenants || {})) {
+        if (Array.isArray(wsList)) {
+            for (const wsId of wsList) allTenantIds.add(wsId);
+        }
+    }
+
+    // 2. All Workspaces & User DBs
+    for (const tId of allTenantIds) {
+        if (tId === 'personal') continue;
         try {
-            const wsDb = readDb({ tenantId: ws.id, environment: env });
+            const wsDb = readDb({ tenantId: tId, environment: env });
             const u = wsDb.users?.find(u => u.id === userId);
             if (u) {
                 updater(u);
                 if (!targetUser) targetUser = { ...u };
-                writeDbSync(wsDb, { tenantId: ws.id, environment: env });
+                writeDbSync(wsDb, { tenantId: tId, environment: env });
             }
         } catch {}
     }

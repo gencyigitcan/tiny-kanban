@@ -181,6 +181,23 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
     });
     writeDbSync(personalDb, { tenantId: 'personal', environment: env });
 
+    if (!index.userToTenants[normalizedUsername]) {
+        index.userToTenants[normalizedUsername] = [];
+    }
+    if (!index.userToTenants[normalizedUsername].includes(tenantId)) {
+        index.userToTenants[normalizedUsername].push(tenantId);
+    }
+    if (!index.workspaces.some(w => w.id === tenantId)) {
+        index.workspaces.push({
+            id: tenantId,
+            name: `${newUser.name} Çalışma Alanı`,
+            type: 'personal',
+            ownerId: newUser.id,
+            createdAt: Date.now()
+        });
+    }
+    await saveTenantIndex(index, env);
+
     logActivity({
         userId: newUser.id,
         username: newUser.username,
@@ -214,6 +231,7 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
     const normalizedUsername = username.toLowerCase().trim();
     const env = req.environment || getEnvironment(req);
     const index = await getTenantIndex(env);
+    const isSuperAdminUser = normalizedUsername === 'yigitcangenc@gmail.com' || normalizedUsername === 'gencyigitcan';
 
     const userMatches = (u: User) => {
         const uName = (u.username || '').toLowerCase();
@@ -224,51 +242,62 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
                (normalizedUsername === 'gencyigitcan' && uEmail === 'yigitcangenc@gmail.com');
     };
 
-    let activeTenantId = 'personal';
-    let db = readDb({ tenantId: 'personal', environment: env });
-    let user = db.users.find(userMatches);
+    let activeTenantId = '';
+    let db: any = null;
+    let user: User | undefined;
 
-    if (user && verifyPassword(password, user.passwordHash)) {
-        activeTenantId = 'personal';
-    } else {
-        // Check company if explicitly provided
-        if (company && company.trim()) {
-            const companyWs = index.workspaces.find(w => w.name.toLowerCase() === company.toLowerCase().trim() || w.id === company.trim());
-            if (companyWs) {
-                activeTenantId = companyWs.id;
-                db = readDb({ tenantId: activeTenantId, environment: env });
-                user = db.users.find(userMatches);
-            }
+    // 1. Only Superadmin / Yiğitcan Genç checks the master personal DB
+    if (isSuperAdminUser) {
+        const personalDb = readDb({ tenantId: 'personal', environment: env });
+        const candidate = personalDb.users.find(userMatches);
+        if (candidate && verifyPassword(password, candidate.passwordHash)) {
+            user = candidate;
+            activeTenantId = 'personal';
+            db = personalDb;
         }
+    }
 
-        // Check index for user's assigned workspaces
-        if (!user || !verifyPassword(password, user.passwordHash)) {
-            const userWsIds = index.userToTenants[normalizedUsername] ||
-                             (normalizedUsername === 'yigitcangenc@gmail.com' ? index.userToTenants['gencyigitcan'] : undefined) ||
-                             (normalizedUsername === 'gencyigitcan' ? index.userToTenants['yigitcangenc@gmail.com'] : undefined);
-            if (userWsIds && userWsIds.length > 0) {
-                for (const wsId of userWsIds) {
-                    const testDb = readDb({ tenantId: wsId, environment: env });
-                    const candidate = testDb.users.find(userMatches);
-                    if (candidate && verifyPassword(password, candidate.passwordHash)) {
-                        user = candidate;
-                        activeTenantId = wsId;
-                        db = testDb;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Fallback: check Demo DB
-        if (!user || !verifyPassword(password, user.passwordHash)) {
-            const demoDb = readDb({ tenantId: 'demo', environment: env });
-            const candidate = demoDb.users.find(userMatches);
+    // 2. Check company / shared team workspace if explicitly provided
+    if (!user && company && company.trim()) {
+        const companyWs = index.workspaces.find(w => w.name.toLowerCase() === company.toLowerCase().trim() || w.id === company.trim());
+        if (companyWs) {
+            const companyDb = readDb({ tenantId: companyWs.id, environment: env });
+            const candidate = companyDb.users.find(userMatches);
             if (candidate && verifyPassword(password, candidate.passwordHash)) {
                 user = candidate;
-                activeTenantId = 'demo';
-                db = demoDb;
+                activeTenantId = companyWs.id;
+                db = companyDb;
             }
+        }
+    }
+
+    // 3. Check user's assigned workspaces from index (isolated user DB or assigned teams)
+    if (!user) {
+        const userWsIds = index.userToTenants[normalizedUsername] ||
+                         (normalizedUsername === 'yigitcangenc@gmail.com' ? index.userToTenants['gencyigitcan'] : undefined) ||
+                         (normalizedUsername === 'gencyigitcan' ? index.userToTenants['yigitcangenc@gmail.com'] : undefined) || [];
+        for (const wsId of userWsIds) {
+            // Non-superadmin users can NEVER access 'personal'
+            if (!isSuperAdminUser && wsId === 'personal') continue;
+            const wsDb = readDb({ tenantId: wsId, environment: env });
+            const candidate = wsDb.users.find(userMatches);
+            if (candidate && verifyPassword(password, candidate.passwordHash)) {
+                user = candidate;
+                activeTenantId = wsId;
+                db = wsDb;
+                break;
+            }
+        }
+    }
+
+    // 4. Fallback: check Demo DB if user belongs to Nova Demo team
+    if (!user) {
+        const demoDb = readDb({ tenantId: 'demo', environment: env });
+        const candidate = demoDb.users.find(userMatches);
+        if (candidate && verifyPassword(password, candidate.passwordHash)) {
+            user = candidate;
+            activeTenantId = 'demo';
+            db = demoDb;
         }
     }
 

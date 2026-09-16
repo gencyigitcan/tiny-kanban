@@ -895,6 +895,519 @@ async function onBacklogDrop(e) {
 }
 window.onBacklogDrop = onBacklogDrop;
 
+// ── Epics View Render (Menu-driven) ────────────────────────
+function renderEpicsView(cards = [], epics = []) {
+  const container = document.getElementById('epicsView');
+  if (!container) return;
+
+  const totalEpics = epics.length;
+  const cardsWithEpic = cards.filter(c => c.epicId);
+  const doneWithEpic = cardsWithEpic.filter(c => c.col === 'done');
+  const overallEpicPct = cardsWithEpic.length ? Math.round((doneWithEpic.length / cardsWithEpic.length) * 100) : 0;
+
+  const epicsHtml = epics.map(epic => {
+    const epicCards = cards.filter(c => c.epicId === epic.id);
+    const todoCards = epicCards.filter(c => c.col === 'todo');
+    const doingCards = epicCards.filter(c => c.col === 'doing');
+    const doneCards = epicCards.filter(c => c.col === 'done');
+    const pct = epicCards.length ? Math.round((doneCards.length / epicCards.length) * 100) : 0;
+    const totalSP = epicCards.reduce((acc, c) => acc + (Number(c.storyPoints) || 0), 0);
+    const totalEst = epicCards.reduce((acc, c) => acc + (Number(c.estimatedEffort) || 0), 0);
+    const totalSpt = epicCards.reduce((acc, c) => acc + (Number(c.spentEffort) || 0), 0);
+
+    const taskCardsList = epicCards.map(c => `
+      <div class="epic-task-row" onclick="openCardDetail('${c.id}')">
+        <span class="epic-task-key">${escHtml(c.key || 'TK')}</span>
+        <span class="epic-task-title">${escHtml(c.title)}</span>
+        <span class="status-pill status-${c.col}">${c.col === 'done' ? 'Tamamlandı' : c.col === 'doing' ? 'Yapılıyor' : 'Yapılacak'}</span>
+        ${c.assignee ? `<span class="assignee-avatar" style="width:20px;height:20px;font-size:10px;background:${getAssigneeColor(c.assignee)}">${escHtml(initials(c.assignee))}</span>` : ''}
+      </div>
+    `).join('') || '<div class="text-muted" style="font-size:12px;padding:8px 0;">Bu epic altında henüz görev bulunmuyor.</div>';
+
+    return `
+      <div class="epic-manage-card">
+        <div class="epic-card-header">
+          <div class="epic-card-title-wrap">
+            <span class="epic-color-bar" style="background:${epic.color || 'var(--primary)'}"></span>
+            <div>
+              <h3 class="epic-card-title">${escHtml(epic.name)}</h3>
+              <div class="epic-card-meta">${epicCards.length} Görev · ${totalSP} SP · ${totalSpt}/${totalEst} sa</div>
+            </div>
+          </div>
+          <div class="epic-card-actions">
+            <button class="btn btn-sm btn-danger" onclick="deleteEpic('${epic.id}')">Sil</button>
+          </div>
+        </div>
+        <div class="epic-progress-section">
+          <div class="progress-bar-label">
+            <span>İlerleme: %${pct}</span>
+            <span class="text-muted">${doneCards.length}/${epicCards.length} Tamamlandı</span>
+          </div>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" style="width:${pct}%;background:${epic.color || 'var(--primary)'}"></div>
+          </div>
+        </div>
+        <div class="epic-tasks-container">
+          <div class="epic-tasks-header">Görevler (${epicCards.length})</div>
+          <div class="epic-tasks-list">${taskCardsList}</div>
+        </div>
+      </div>
+    `;
+  }).join('') || '<div class="empty-state"><div class="empty-icon">🏷️</div><div>Henüz bir Epic oluşturulmamış.</div></div>';
+
+  container.innerHTML = `
+    <div class="manager-view-wrap">
+      <div class="manager-view-header">
+        <div>
+          <h2 class="manager-view-title">🏷️ Epics Yönetimi</h2>
+          <p class="manager-view-subtitle">Büyük hedefleri ve proje aşamalarını oluşturun, ilerlemelerini anlık takip edin.</p>
+        </div>
+        <div class="manager-quick-add">
+          <input class="form-input" type="text" id="viewNewEpicName" placeholder="Yeni Epic adı…">
+          <input class="form-input" type="color" id="viewNewEpicColor" value="#6366f1" style="width:44px;padding:2px 4px;cursor:pointer;height:36px;">
+          <button class="btn btn-primary btn-sm" id="viewAddEpicBtn">✚ Epic Ekle</button>
+        </div>
+      </div>
+
+      <div class="manager-kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Toplam Epic</div>
+          <div class="kpi-value">${totalEpics}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Epic Görevleri</div>
+          <div class="kpi-value">${cardsWithEpic.length}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Tamamlanan Görevler</div>
+          <div class="kpi-value text-success">${doneWithEpic.length}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Genel İlerleme</div>
+          <div class="kpi-value">${overallEpicPct}%</div>
+        </div>
+      </div>
+
+      <div class="epics-grid">${epicsHtml}</div>
+    </div>
+  `;
+
+  const btn = document.getElementById('viewAddEpicBtn');
+  if (btn) {
+    btn.onclick = async () => {
+      const name = (document.getElementById('viewNewEpicName')?.value || '').trim();
+      const color = document.getElementById('viewNewEpicColor')?.value || '#6366f1';
+      if (!name) return;
+      try {
+        const epic = await API.addEpic({ name, color });
+        epics.push(epic);
+        renderEpicsView(cards, epics);
+        if (typeof renderAll === 'function') renderAll();
+        showToast('Epic eklendi');
+      } catch {
+        showToast('Epic eklenemedi', 'error');
+      }
+    };
+  }
+}
+window.renderEpicsView = renderEpicsView;
+
+// ── Sprints View Render (Menu-driven, 104 Weeks for 2026-2027) ──
+window._sprintFilter = window._sprintFilter || 'all';
+window._sprintSearch = window._sprintSearch || '';
+
+function renderSprintsView(cards = [], sprints = []) {
+  const container = document.getElementById('sprintsView');
+  if (!container) return;
+
+  const activeSprint = sprints.find(s => s.active);
+  const completedSprints = sprints.filter(s => {
+    if (s.active) return false;
+    const sc = cards.filter(c => c.sprintId === s.id);
+    return sc.length > 0 && sc.every(c => c.col === 'done');
+  });
+  const futureSprints = sprints.filter(s => !s.active && !completedSprints.includes(s));
+
+  // Filtered sprint list
+  let filtered = sprints;
+  if (window._sprintFilter === 'active') {
+    filtered = sprints.filter(s => s.active);
+  } else if (window._sprintFilter === 'completed') {
+    filtered = completedSprints;
+  } else if (window._sprintFilter === 'future') {
+    filtered = futureSprints;
+  }
+
+  if (window._sprintSearch.trim()) {
+    const q = window._sprintSearch.toLowerCase().trim();
+    filtered = filtered.filter(s => 
+      (s.name && s.name.toLowerCase().includes(q)) ||
+      (s.startDate && s.startDate.includes(q)) ||
+      (s.endDate && s.endDate.includes(q))
+    );
+  }
+
+  // Active Hero HTML
+  let heroHtml = '';
+  if (activeSprint) {
+    const aCards = cards.filter(c => c.sprintId === activeSprint.id);
+    const aDone = aCards.filter(c => c.col === 'done');
+    const aDoing = aCards.filter(c => c.col === 'doing');
+    const aTodo = aCards.filter(c => c.col === 'todo');
+    const aPct = aCards.length ? Math.round((aDone.length / aCards.length) * 100) : 0;
+    const aSP = aCards.reduce((acc, c) => acc + (Number(c.storyPoints) || 0), 0);
+
+    heroHtml = `
+      <div class="active-sprint-hero">
+        <div class="active-sprint-hero-header">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="sprint-active-badge" style="font-size:12px;padding:3px 10px;">🟢 Aktif Sprint</span>
+              <h3 style="font-size:18px;font-weight:800;margin:0;">${escHtml(activeSprint.name)}</h3>
+            </div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">
+              📅 ${activeSprint.startDate || '—'} → ${activeSprint.endDate || '—'} &nbsp;·&nbsp; 
+              <strong>${aCards.length} Görev</strong> &nbsp;·&nbsp; ${aSP} Story Points
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="switchView('board')">📋 Board'a Git</button>
+            <button class="btn btn-secondary btn-sm" onclick="switchView('backlog')">📦 Backlog'a Git</button>
+          </div>
+        </div>
+        <div>
+          <div class="progress-bar-label">
+            <span>Tamamlanma Oranı: %${aPct}</span>
+            <span>${aDone.length} Tamamlandı · ${aDoing.length} Yapılıyor · ${aTodo.length} Yapılacak</span>
+          </div>
+          <div class="progress-bar-track" style="height:10px;">
+            <div class="progress-bar-fill" style="width:${aPct}%;background:linear-gradient(90deg, #4f46e5, #10b981)"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Table rows
+  const rowsHtml = filtered.map(s => {
+    const sCards = cards.filter(c => c.sprintId === s.id);
+    const sDone = sCards.filter(c => c.col === 'done');
+    const sPct = sCards.length ? Math.round((sDone.length / sCards.length) * 100) : 0;
+    const sSP = sCards.reduce((acc, c) => acc + (Number(c.storyPoints) || 0), 0);
+    const isCompleted = completedSprints.includes(s);
+
+    let statusPill = '';
+    if (s.active) {
+      statusPill = '<span class="status-pill status-doing" style="font-weight:700;">🟢 Aktif</span>';
+    } else if (isCompleted) {
+      statusPill = '<span class="status-pill status-done">✅ Tamamlandı</span>';
+    } else {
+      statusPill = '<span class="status-pill status-todo">📅 Planlandı</span>';
+    }
+
+    return `
+      <tr>
+        <td style="font-weight:700;">
+          ${escHtml(s.name)}
+        </td>
+        <td>${statusPill}</td>
+        <td style="color:var(--text-secondary);font-size:12px;">
+          ${s.startDate || '—'} → ${s.endDate || '—'}
+        </td>
+        <td><strong>${sCards.length}</strong> <span style="color:var(--text-muted);font-size:11px;">(${sSP} SP)</span></td>
+        <td style="min-width:140px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="progress-bar-track" style="height:6px;flex:1;">
+              <div class="progress-bar-fill" style="width:${sPct}%;background:${s.active ? 'var(--primary)' : isCompleted ? 'var(--success)' : '#94a3b8'}"></div>
+            </div>
+            <span style="font-size:11px;font-weight:600;min-width:32px;">%${sPct}</span>
+          </div>
+        </td>
+        <td style="text-align:right;">
+          <div style="display:inline-flex;gap:6px;">
+            ${!s.active ? `<button class="btn btn-sm btn-secondary" onclick="activateSprint('${s.id}')">Aktif Yap</button>` : ''}
+            <button class="btn btn-sm btn-danger" onclick="deleteSprint('${s.id}')">Sil</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('') || `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted);">Eşleşen sprint bulunamadı</td></tr>`;
+
+  container.innerHTML = `
+    <div class="manager-view-wrap">
+      <div class="manager-view-header">
+        <div>
+          <h2 class="manager-view-title">⚡ Sprint Yönetimi (2026 - 2027)</h2>
+          <p class="manager-view-subtitle">104 haftalık sprint döngüsü (31 Aralık 2027 sonuna kadar) ve takım hedefleri.</p>
+        </div>
+        <div class="manager-quick-add">
+          <input class="form-input" type="text" id="viewNewSprintName" placeholder="Sprint adı (ör. Sprint 105)" style="min-width:170px;">
+          <input class="form-input" type="date" id="viewNewSprintStart" title="Başlangıç">
+          <input class="form-input" type="date" id="viewNewSprintEnd" title="Bitiş">
+          <button class="btn btn-primary btn-sm" id="viewAddSprintBtn">✚ Sprint Ekle</button>
+        </div>
+      </div>
+
+      <div class="manager-kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Toplam Sprint</div>
+          <div class="kpi-value">${sprints.length}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Aktif Sprint</div>
+          <div class="kpi-value text-primary">${activeSprint ? activeSprint.name : 'Yok'}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Tamamlanan Sprintler</div>
+          <div class="kpi-value text-success">${completedSprints.length}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Planlanan Sprintler</div>
+          <div class="kpi-value">${futureSprints.length}</div>
+        </div>
+      </div>
+
+      ${heroHtml}
+
+      <div class="sprints-toolbar">
+        <div class="sprint-filters-wrap">
+          <button class="sprint-filter-pill ${window._sprintFilter === 'all' ? 'active' : ''}" data-filter="all">Tümü (${sprints.length})</button>
+          <button class="sprint-filter-pill ${window._sprintFilter === 'active' ? 'active' : ''}" data-filter="active">🟢 Aktif (${activeSprint ? 1 : 0})</button>
+          <button class="sprint-filter-pill ${window._sprintFilter === 'completed' ? 'active' : ''}" data-filter="completed">✅ Tamamlanan (${completedSprints.length})</button>
+          <button class="sprint-filter-pill ${window._sprintFilter === 'future' ? 'active' : ''}" data-filter="future">📅 Planlanan (${futureSprints.length})</button>
+        </div>
+        <div style="flex:1;max-width:320px;">
+          <input class="form-input" type="text" id="sprintSearchInput" value="${escHtml(window._sprintSearch)}" placeholder="🔍 Sprint veya tarih ara…">
+        </div>
+      </div>
+
+      <div class="sprints-table-container">
+        <table class="sprints-table">
+          <thead>
+            <tr>
+              <th>Sprint</th>
+              <th>Durum</th>
+              <th>Tarih Aralığı</th>
+              <th>Görev Sayısı</th>
+              <th>İlerleme</th>
+              <th style="text-align:right;">İşlemler</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // Attach filter pill listeners
+  container.querySelectorAll('.sprint-filter-pill').forEach(btn => {
+    btn.onclick = () => {
+      window._sprintFilter = btn.dataset.filter;
+      renderSprintsView(cards, sprints);
+    };
+  });
+
+  // Attach search listener
+  const sInput = document.getElementById('sprintSearchInput');
+  if (sInput) {
+    sInput.oninput = (e) => {
+      window._sprintSearch = e.target.value;
+      renderSprintsView(cards, sprints);
+      const newInput = document.getElementById('sprintSearchInput');
+      if (newInput) {
+        newInput.focus();
+        newInput.setSelectionRange(newInput.value.length, newInput.value.length);
+      }
+    };
+  }
+
+  // Attach add sprint listener
+  const addBtn = document.getElementById('viewAddSprintBtn');
+  if (addBtn) {
+    addBtn.onclick = async () => {
+      const name = (document.getElementById('viewNewSprintName')?.value || '').trim();
+      const startDate = document.getElementById('viewNewSprintStart')?.value || '';
+      const endDate = document.getElementById('viewNewSprintEnd')?.value || '';
+      if (!name) return;
+      try {
+        const sp = await API.addSprint({ name, startDate, endDate });
+        sprints.push(sp);
+        renderSprintsView(cards, sprints);
+        if (typeof renderAll === 'function') renderAll();
+        showToast('Sprint eklendi');
+      } catch {
+        showToast('Sprint eklenemedi', 'error');
+      }
+    };
+  }
+}
+window.renderSprintsView = renderSprintsView;
+
+// ── Labels View Render (Menu-driven) ───────────────────────
+function renderLabelsView(cards = [], labels = []) {
+  const container = document.getElementById('labelsView');
+  if (!container) return;
+
+  const totalLabels = labels.length;
+  const cardsWithLabels = cards.filter(c => c.labels && c.labels.length > 0);
+
+  const labelsHtml = labels.map(label => {
+    const labelCards = cards.filter(c => (c.labels || []).includes(label.id));
+    return `
+      <div class="label-manage-card">
+        <div class="label-card-left">
+          <span class="label-color-indicator" style="background:${label.color || '#6366f1'}"></span>
+          <div>
+            <div class="label-card-name">${escHtml(label.name)}</div>
+            <div class="label-card-sub">${labelCards.length} görevde kullanılıyor</div>
+          </div>
+        </div>
+        <div>
+          <button class="btn btn-sm btn-danger" onclick="deleteLabel('${label.id}')">✕ Sil</button>
+        </div>
+      </div>
+    `;
+  }).join('') || '<div class="empty-state"><div class="empty-icon">🎨</div><div>Henüz etiket bulunmuyor.</div></div>';
+
+  container.innerHTML = `
+    <div class="manager-view-wrap">
+      <div class="manager-view-header">
+        <div>
+          <h2 class="manager-view-title">🎨 Etiket Yönetimi</h2>
+          <p class="manager-view-subtitle">Görevleri kategorilere ayırmak ve filtrelemek için etiketleri yönetin.</p>
+        </div>
+        <div class="manager-quick-add">
+          <input class="form-input" type="text" id="viewNewLabelName" placeholder="Etiket adı (ör. Finans, API)…">
+          <input class="form-input" type="color" id="viewNewLabelColor" value="#6366f1" style="width:44px;padding:2px 4px;cursor:pointer;height:36px;">
+          <button class="btn btn-primary btn-sm" id="viewAddLabelBtn">✚ Etiket Ekle</button>
+        </div>
+      </div>
+
+      <div class="manager-kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Toplam Etiket</div>
+          <div class="kpi-value">${totalLabels}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Etiketli Görevler</div>
+          <div class="kpi-value">${cardsWithLabels.length}</div>
+        </div>
+      </div>
+
+      <div class="labels-grid-view">${labelsHtml}</div>
+    </div>
+  `;
+
+  const btn = document.getElementById('viewAddLabelBtn');
+  if (btn) {
+    btn.onclick = async () => {
+      const name = (document.getElementById('viewNewLabelName')?.value || '').trim();
+      const color = document.getElementById('viewNewLabelColor')?.value || '#6366f1';
+      if (!name) return;
+      try {
+        const l = await API.addLabel({ name, color });
+        labels.push(l);
+        window.LABELS = labels;
+        window.LABEL_MAP = Object.fromEntries(labels.map(x => [x.id, x]));
+        renderLabelsView(cards, labels);
+        if (typeof renderAll === 'function') renderAll();
+        showToast('Etiket eklendi');
+      } catch {
+        showToast('Etiket eklenemedi', 'error');
+      }
+    };
+  }
+}
+window.renderLabelsView = renderLabelsView;
+
+// ── Team View Render (Menu-driven) ─────────────────────────
+function renderTeamView(users = [], cards = []) {
+  const container = document.getElementById('teamView');
+  if (!container) return;
+
+  const teamUsers = (users && users.length > 0) ? users : (window.users || []);
+  const totalCards = cards.length;
+  const doneCards = cards.filter(c => c.col === 'done').length;
+  const overallPct = totalCards ? Math.round((doneCards / totalCards) * 100) : 0;
+
+  const membersHtml = teamUsers.map(u => {
+    const uCards = cards.filter(c => {
+      const a = (c.assignee || '').toLowerCase().trim();
+      return a === (u.name || '').toLowerCase().trim() || a === (u.username || '').toLowerCase().trim();
+    });
+    const uDone = uCards.filter(c => c.col === 'done');
+    const uDoing = uCards.filter(c => c.col === 'doing');
+    const uTodo = uCards.filter(c => c.col === 'todo');
+    const uPct = uCards.length ? Math.round((uDone.length / uCards.length) * 100) : 0;
+    const uSP = uCards.reduce((acc, c) => acc + (Number(c.storyPoints) || 0), 0);
+
+    let roleBadge = '<span class="status-pill status-todo">Üye</span>';
+    if (u.role === 'superadmin') roleBadge = '<span class="status-pill" style="background:rgba(234,179,8,0.15);color:#d97706;font-weight:700;">Super Admin</span>';
+    else if (u.role === 'admin') roleBadge = '<span class="status-pill status-doing" style="font-weight:700;">Admin</span>';
+
+    return `
+      <div class="team-member-card">
+        <div class="team-member-header">
+          <div class="team-avatar-lg" style="background:${u.avatarColor || getAssigneeColor(u.name)}">
+            ${escHtml(initials(u.name || u.username))}
+          </div>
+          <div class="team-member-info">
+            <div class="team-member-name">${escHtml(u.name || u.username)}</div>
+            <div class="team-member-role">${escHtml(u.username || '')} · ${roleBadge}</div>
+          </div>
+        </div>
+
+        <div class="team-stats-breakdown">
+          <span><strong>${uCards.length}</strong> Görev (${uSP} SP)</span>
+          <span><strong class="text-success">${uDone.length}</strong> Bitti · <strong class="text-warning">${uDoing.length}</strong> Sürüyor</span>
+        </div>
+
+        <div>
+          <div class="progress-bar-label">
+            <span>Tamamlanma Oranı: %${uPct}</span>
+          </div>
+          <div class="progress-bar-track" style="height:6px;">
+            <div class="progress-bar-fill" style="width:${uPct}%;background:${u.avatarColor || 'var(--primary)'}"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('') || '<div class="empty-state"><div class="empty-icon">👥</div><div>Takım üyesi bulunmuyor.</div></div>';
+
+  container.innerHTML = `
+    <div class="manager-view-wrap">
+      <div class="manager-view-header">
+        <div>
+          <h2 class="manager-view-title">👥 Takım & Kullanıcı Yönetimi</h2>
+          <p class="manager-view-subtitle">Takım üyeleri, görev dağılımları ve sprint performansları.</p>
+        </div>
+      </div>
+
+      <div class="manager-kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Toplam Takım Üyesi</div>
+          <div class="kpi-value">${teamUsers.length}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Toplam Görev Dağılımı</div>
+          <div class="kpi-value">${totalCards}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Kişi Başı Ortalama</div>
+          <div class="kpi-value">${Math.round(totalCards / (teamUsers.length || 1))} Görev</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Takım Tamamlama Oranı</div>
+          <div class="kpi-value text-success">${overallPct}%</div>
+        </div>
+      </div>
+
+      <div class="team-grid-view">${membersHtml}</div>
+    </div>
+  `;
+}
+window.renderTeamView = renderTeamView;
+
 // ── Custom Application Confirm Dialog ──────────────────────
 function showConfirm(message, title = 'Onay Gerekli') {
   return new Promise((resolve) => {

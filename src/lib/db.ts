@@ -348,7 +348,7 @@ export function initDb(): void {
             }
         }
 
-        if (!demoDb.cards || demoDb.cards.length < 500 || !demoDb.sprints || demoDb.sprints.length < 52) {
+        if (!demoDb.cards || demoDb.cards.length < 1000 || !demoDb.sprints || demoDb.sprints.length < 104) {
             demoDb = createDefaultDemoDb();
         }
 
@@ -680,8 +680,8 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                 }
             }
 
-            // In demo DB, ensure all 10 users and 2026-2027 weekly data exist (at least 520 cards)
-            if (tenantId === 'demo' && (db.users.length < 10 || db.sprints.length < 52 || db.cards.length < 500)) {
+            // In demo DB, ensure all 10 users and 2026-2027 weekly data exist (104 sprints & 1,040 cards)
+            if (tenantId === 'demo' && (db.users.length < 10 || db.sprints.length < 104 || db.cards.length < 1000)) {
                 db = createDefaultDemoDb();
                 if (dbBinding) {
                     await saveTenantDbToD1(dbBinding, key, db);

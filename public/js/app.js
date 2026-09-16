@@ -63,7 +63,11 @@ async function boot() {
             API.getLabels(),
             API.getNotifications()
         ]);
+        window.cards = cards;
+        window.epics = epics;
         window.sprints = sprints;
+        window.users = users;
+        window.labels = labels;
         window.LABELS = labels;
         window.LABEL_MAP = Object.fromEntries(labels.map(l => [l.id, l]));
         
@@ -89,6 +93,18 @@ async function boot() {
     }
 }
 
+function switchView(viewName) {
+    currentView = viewName;
+    document.querySelectorAll('.view-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.view === viewName);
+    });
+    document.querySelectorAll('.view-container').forEach(c => {
+        c.classList.toggle('active', c.id === 'view-' + viewName);
+    });
+    renderAll();
+}
+window.switchView = switchView;
+
 function renderAll() {
     renderBoard(cards, epics);
     if (currentView === 'list') renderListView(cards, epics);
@@ -97,6 +113,10 @@ function renderAll() {
     if (currentView === 'gantt') renderGantt(cards);
     if (currentView === 'reports') renderReports(cards, epics, sprints);
     if (currentView === 'my-tasks') renderMyTasksView(cards, epics);
+    if (currentView === 'epics') renderEpicsView(cards, epics);
+    if (currentView === 'sprints') renderSprintsView(cards, sprints);
+    if (currentView === 'labels') renderLabelsView(cards, labels);
+    if (currentView === 'team') renderTeamView(window.users || [], cards);
     updateSprintBadge();
 }
 
@@ -116,19 +136,7 @@ function updateSprintBadge() {
 // ── View switcher ─────────────────────────────────────────
 document.querySelectorAll('.view-tab').forEach(btn => {
     btn.addEventListener('click', () => {
-        currentView = btn.dataset.view;
-        document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.view-container').forEach(c => c.classList.remove('active'));
-        btn.classList.add('active');
-        
-        const container = document.getElementById('view-' + currentView);
-        if (container) container.classList.add('active');
-        
-        if (currentView === 'list') renderListView(cards, epics);
-        if (currentView === 'backlog') renderBacklogView(cards, sprints, epics);
-        if (currentView === 'dashboard') renderDashboard(cards, epics, sprints);
-        if (currentView === 'gantt') renderGantt(cards);
-        if (currentView === 'reports') renderReports(cards, epics, sprints);
+        switchView(btn.dataset.view);
     });
 });
 
@@ -394,8 +402,9 @@ function renderEpicList() {
 
 const manageEpicsBtn = document.getElementById('manageEpicsBtn');
 if (manageEpicsBtn) {
-    manageEpicsBtn.addEventListener('click', () => {
-        renderEpicList(); openModal('epicModal');
+    manageEpicsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        switchView('epics');
     });
 }
 
@@ -445,8 +454,9 @@ function renderSprintList() {
 
 const manageSprintsBtn = document.getElementById('manageSprintsBtn');
 if (manageSprintsBtn) {
-    manageSprintsBtn.addEventListener('click', () => {
-        renderSprintList(); openModal('sprintModal');
+    manageSprintsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        switchView('sprints');
     });
 }
 
@@ -1066,9 +1076,10 @@ window.deleteAdminUser = async function(userId) {
     }
 };
 
-safeAddListener('manageUsersBtn', 'click', () => {
-    loadAdminData();
-    openModal('userModal');
+safeAddListener('manageUsersBtn', 'click', (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (typeof loadAdminData === 'function') loadAdminData();
+    switchView('team');
 });
 
 // Admin Modal Tabs Helper
@@ -1173,9 +1184,9 @@ safeAddListener('btnCreateTeamSubmit', 'click', async () => {
 });
 
 // ── Custom Labels Management UI ───────────────────────────
-safeAddListener('manageLabelsBtn', 'click', () => {
-    renderLabelsList();
-    openModal('labelModal');
+safeAddListener('manageLabelsBtn', 'click', (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    switchView('labels');
 });
 
 function renderLabelsList() {
