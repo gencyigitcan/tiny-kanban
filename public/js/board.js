@@ -379,10 +379,32 @@ function renderGantt(cards) {
   const pct = d => (Math.max(0, (new Date(d) - minD)) / ((maxD - minD) || 1)) * 100;
   const todayPct = pct(today);
 
-  const dayHeaders = days.map(d => {
-    const isToday = d.toDateString() === today.toDateString();
-    return `<div class="gantt-day${isToday ? ' today' : ''}">${d.getDate()}<br><span style="font-size:9px">${d.toLocaleDateString('tr-TR', { month: 'short' })}</span></div>`;
-  }).join('');
+  let timelineHeaders = '';
+  if (totalDays > 75) {
+    const months = [];
+    let curM = new Date(minD.getFullYear(), minD.getMonth(), 1);
+    const endM = new Date(maxD.getFullYear(), maxD.getMonth(), 1);
+    while (curM <= endM) {
+      months.push(new Date(curM));
+      curM.setMonth(curM.getMonth() + 1);
+    }
+    const totalMs = maxD.getTime() - minD.getTime() || 1;
+    timelineHeaders = months.map(m => {
+      const isCurMonth = m.getFullYear() === today.getFullYear() && m.getMonth() === today.getMonth();
+      const mStart = Math.max(minD.getTime(), new Date(m.getFullYear(), m.getMonth(), 1).getTime());
+      const mEnd = Math.min(maxD.getTime(), new Date(m.getFullYear(), m.getMonth() + 1, 1).getTime());
+      const widthPct = Math.max(1, ((mEnd - mStart) / totalMs) * 100);
+      const label = m.toLocaleDateString('tr-TR', { month: 'short', year: '2-digit' });
+      return `<div class="gantt-day${isCurMonth ? ' today' : ''}" style="flex: 0 0 ${widthPct.toFixed(2)}%; min-width: 55px; text-align: center; padding: 10px 2px;">
+        <span style="font-weight:600; font-size:11px;">${label}</span>
+      </div>`;
+    }).join('');
+  } else {
+    timelineHeaders = days.map(d => {
+      const isToday = d.toDateString() === today.toDateString();
+      return `<div class="gantt-day${isToday ? ' today' : ''}">${d.getDate()}<br><span style="font-size:9px">${d.toLocaleDateString('tr-TR', { month: 'short' })}</span></div>`;
+    }).join('');
+  }
 
   const priColor = { high: 'var(--pri-high)', medium: 'var(--pri-med)', low: 'var(--pri-low)' };
 
@@ -418,7 +440,7 @@ function renderGantt(cards) {
   container.innerHTML = `<div class="gantt-view"><div class="gantt-wrap">
     <div class="gantt-header">
       <div class="gantt-label-col">Görev</div>
-      <div class="gantt-timeline-header">${dayHeaders}</div>
+      <div class="gantt-timeline-header">${timelineHeaders}</div>
     </div>
     ${rows}
   </div></div>`;
@@ -518,7 +540,7 @@ function renderReports(cards, epics = [], sprints = []) {
       <div class="reports-header-row no-print">
         <div>
           <h2>📊 Efor ve Proje İlerleme Raporu</h2>
-          <p class="reports-subtitle">2026 Çalışma Yılı Efor Dağılımları, Hedef Sapmaları ve Performans Analizi</p>
+          <p class="reports-subtitle">2026 - 2027 Yol Haritası Efor Dağılımları, Takım İlerlemesi ve Performans Analizi (Nova Takımı)</p>
         </div>
         <div class="reports-actions">
           <button class="btn btn-secondary" onclick="exportToCSV(cards, epics, sprints)">📥 CSV Dışa Aktar</button>
@@ -529,7 +551,7 @@ function renderReports(cards, epics = [], sprints = []) {
       <!-- Printable Only Header -->
       <div class="print-only-header">
         <h1>Kanban Proje Raporu</h1>
-        <p>Tarih: ${new Date().toLocaleDateString('tr-TR')} · Çalışma Dönemi: 2026 Takvim Yılı</p>
+        <p>Tarih: ${new Date().toLocaleDateString('tr-TR')} · Çalışma Dönemi: 2026 - 2027 Takvim Yılları (Nova Takımı - 10 Kişi)</p>
         <hr style="margin:16px 0; border:0; border-top:1px solid #ddd">
       </div>
 

@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import writeFileAtomic from 'write-file-atomic';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { DbSchema, Workspace, TenantIndex, ActivityLog } from '../types/index.js';
+import { createDefaultDemoDb } from './demo_data.js';
 
 export type Environment = 'production' | 'test' | 'development';
 export type DbScope = 'personal' | 'demo' | string;
@@ -291,19 +292,26 @@ export function initDb(): void {
             }
         }
 
-        if (demoDb.users.length === 0) {
+        if (demoDb.users.length < 10) {
             demoDb.users = [
                 { id: 'usr-1', username: 'admin', name: 'Ali Yılmaz', passwordHash: hashPassword('password'), avatarColor: '#4f46e5', role: 'admin', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
                 { id: 'usr-2', username: 'zeynep', name: 'Zeynep Kaya', passwordHash: hashPassword('password'), avatarColor: '#0ea5e9', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
-                { id: 'usr-3', username: 'mehmet', name: 'Mehmet Demir', passwordHash: hashPassword('password'), avatarColor: '#10b981', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() }
+                { id: 'usr-3', username: 'mehmet', name: 'Mehmet Demir', passwordHash: hashPassword('password'), avatarColor: '#10b981', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
+                { id: 'usr-4', username: 'selin', name: 'Selin Yıldız', passwordHash: hashPassword('password'), avatarColor: '#f59e0b', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
+                { id: 'usr-5', username: 'caner', name: 'Caner Öztürk', passwordHash: hashPassword('password'), avatarColor: '#8b5cf6', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
+                { id: 'usr-6', username: 'burcu', name: 'Burcu Çelik', passwordHash: hashPassword('password'), avatarColor: '#ec4899', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
+                { id: 'usr-7', username: 'emre', name: 'Emre Aydın', passwordHash: hashPassword('password'), avatarColor: '#06b6d4', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
+                { id: 'usr-8', username: 'gamze', name: 'Gamze Şahin', passwordHash: hashPassword('password'), avatarColor: '#14b8a6', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
+                { id: 'usr-9', username: 'tolga', name: 'Tolga Kurt', passwordHash: hashPassword('password'), avatarColor: '#f97316', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
+                { id: 'usr-10', username: 'derya', name: 'Derya Arslan', passwordHash: hashPassword('password'), avatarColor: '#64748b', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() }
             ];
         }
         if (!demoDb.labels || demoDb.labels.length === 0) {
-            demoDb.labels = DEFAULT_LABELS.slice(0, 3);
+            demoDb.labels = DEFAULT_LABELS;
         }
         if (!demoDb.workspaces || demoDb.workspaces.length === 0) {
             demoDb.workspaces = [
-                { id: 'demo', name: 'Demo Panosu', type: 'team', ownerId: 'usr-1', createdAt: Date.now() }
+                { id: 'demo', name: 'Demo Panosu (Nova Takımı)', type: 'team', ownerId: 'usr-1', createdAt: Date.now() }
             ];
         }
         writeTenantDbFileSync('demo', 'production', demoDb);
@@ -335,7 +343,14 @@ function initTenantIndexFiles(): void {
                 userToTenants: {
                     'admin': ['demo'],
                     'zeynep': ['demo'],
-                    'mehmet': ['demo']
+                    'mehmet': ['demo'],
+                    'selin': ['demo'],
+                    'caner': ['demo'],
+                    'burcu': ['demo'],
+                    'emre': ['demo'],
+                    'gamze': ['demo'],
+                    'tolga': ['demo'],
+                    'derya': ['demo']
                 }
             };
             writeFileAtomic.sync(prodIndexPath, JSON.stringify(prodIndex, null, 2));
@@ -514,12 +529,14 @@ export async function writeDb(data: DbSchema, scopeOrReq?: DbScope | { dbScope?:
 export function readTenantDbFileSync(tenantId: string, env: Environment): DbSchema {
     if (!isNodeRuntime()) {
         if (env === 'test') return createDefaultTestDb();
+        if (tenantId === 'demo') return createDefaultDemoDb();
         return structuredClone(EMPTY_DB);
     }
     const filePath = resolveFilePath(tenantId, env);
     try {
         if (!fs.existsSync(filePath)) {
             if (env === 'test') return createDefaultTestDb();
+            if (tenantId === 'demo') return createDefaultDemoDb();
             return structuredClone(EMPTY_DB);
         }
         const raw = fs.readFileSync(filePath, 'utf8');
@@ -563,7 +580,7 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
         const row = await dbBinding.prepare("SELECT value FROM json_store WHERE key = ?").bind(key).first();
         if (row && typeof row.value === 'string') {
             const parsed = JSON.parse(row.value) as Partial<DbSchema>;
-            const db: DbSchema = {
+            let db: DbSchema = {
                 cards: Array.isArray(parsed.cards) ? parsed.cards : [],
                 epics: Array.isArray(parsed.epics) ? parsed.epics : [],
                 sprints: Array.isArray(parsed.sprints) ? parsed.sprints : [],
@@ -592,6 +609,12 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                 }
             }
 
+            // In demo DB, ensure all 10 users and 2026-2027 data exist
+            if (tenantId === 'demo' && (db.users.length < 10 || db.sprints.length < 52)) {
+                db = createDefaultDemoDb();
+                await saveTenantDbToD1(dbBinding, key, db);
+            }
+
             return db;
         }
     } catch (e) {
@@ -603,7 +626,7 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
     if (env === 'test') {
         initialDb = createDefaultTestDb();
     } else if (tenantId === 'demo') {
-        initialDb = readTenantDbFileSync('demo', 'production');
+        initialDb = isNodeRuntime() ? readTenantDbFileSync('demo', 'production') : createDefaultDemoDb();
     } else {
         initialDb = readTenantDbFileSync(tenantId, env);
     }

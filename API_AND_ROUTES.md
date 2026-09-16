@@ -10,7 +10,7 @@ Bu belge, Tiny Kanban projesinde arayüz sayfaları, yönetim uç noktaları, ki
 |---|---|---|
 | **`/board.html`** | HTML | **Ana Kanban Panosu:** Kişisel çalışma alanınız, takım panolarınız veya bireysel kullanıcı panoları bu sayfada çalışır. Sol üst köşedeki çalışma alanı seçiciden panolar arası geçiş yapılabilir. |
 | **`/`** veya **`/index.html`** | HTML | **Tanıtım & Karşılama Sayfası:** Bireysel proje sunumu, teknik mimari incelemesi ve demo talep formu. |
-| **`/demo.html`** | HTML | **Genel Demo Panosu:** 6 sprintlik örnek gerçekçi verilerin yer aldığı herkese açık demo alanı. |
+| **`/demo.html`** | HTML | **Genel Demo Panosu (Nova Takımı):** 2026 ve 2027 takvim yılları (52 sprint), 10 kişilik mühendislik ekibinin efor, velocity ve takım çalışması verilerini içeren herkese açık demo alanı. |
 
 ---
 

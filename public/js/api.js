@@ -24,6 +24,8 @@ function getLocalData() {
             cards: Array.isArray(parsed.cards) ? parsed.cards : [],
             epics: Array.isArray(parsed.epics) ? parsed.epics : [],
             sprints: Array.isArray(parsed.sprints) ? parsed.sprints : [],
+            users: Array.isArray(parsed.users) ? parsed.users : [],
+            labels: Array.isArray(parsed.labels) ? parsed.labels : []
         };
     } catch {
         return structuredClone(EMPTY_DB);
@@ -398,11 +400,22 @@ const API = {
         try {
             return await request('/api/users');
         } catch (e) {
-            // Local fallback users
+            // Local fallback users: check if seeded in localStorage, else return 10-person Nova team
+            const local = getLocalData();
+            if (local.users && local.users.length >= 10) {
+                return local.users;
+            }
             return [
-                { id: 'usr-1', username: 'admin', name: 'Ali Yılmaz', avatarColor: '#4f46e5' },
-                { id: 'usr-2', username: 'zeynep', name: 'Zeynep Kaya', avatarColor: '#0ea5e9' },
-                { id: 'usr-3', username: 'mehmet', name: 'Mehmet Demir', avatarColor: '#10b981' }
+                { id: 'usr-1', username: 'admin', name: 'Ali Yılmaz', avatarColor: '#4f46e5', role: 'admin' },
+                { id: 'usr-2', username: 'zeynep', name: 'Zeynep Kaya', avatarColor: '#0ea5e9', role: 'user' },
+                { id: 'usr-3', username: 'mehmet', name: 'Mehmet Demir', avatarColor: '#10b981', role: 'user' },
+                { id: 'usr-4', username: 'selin', name: 'Selin Yıldız', avatarColor: '#f59e0b', role: 'user' },
+                { id: 'usr-5', username: 'caner', name: 'Caner Öztürk', avatarColor: '#8b5cf6', role: 'user' },
+                { id: 'usr-6', username: 'burcu', name: 'Burcu Çelik', avatarColor: '#ec4899', role: 'user' },
+                { id: 'usr-7', username: 'emre', name: 'Emre Aydın', avatarColor: '#06b6d4', role: 'user' },
+                { id: 'usr-8', username: 'gamze', name: 'Gamze Şahin', avatarColor: '#14b8a6', role: 'user' },
+                { id: 'usr-9', username: 'tolga', name: 'Tolga Kurt', avatarColor: '#f97316', role: 'user' },
+                { id: 'usr-10', username: 'derya', name: 'Derya Arslan', avatarColor: '#64748b', role: 'user' }
             ];
         }
     },
