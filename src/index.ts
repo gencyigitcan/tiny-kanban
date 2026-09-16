@@ -108,7 +108,7 @@ app.get('/', (_req, res) => {
 });
 
 // ── 404 catch-all (API) ───────────────────────────────────
-app.use('/api/*path', (_req, res) => {
+app.all('/api/*', (_req, res) => {
     res.status(404).json({ error: 'API endpoint not found' });
 });
 
@@ -269,7 +269,8 @@ export default {
 };
 
 // ── Server Start ───────────────────────────────────────────
-if (process.env.NODE_ENV !== 'test') {
+const isRunningTests = process.env.NODE_ENV === 'test' || process.argv.some(arg => arg.includes('test'));
+if (!isRunningTests) {
     app.listen(PORT, () => {
         console.log(`\n  🟣 Kanban v1.3.0\n`);
         console.log(`     My Board  → http://localhost:${PORT}/board.html`);

@@ -26,7 +26,7 @@ const commentSchema = z.object({
 export const createCardSchema = z.object({
     title: z.string().min(1, 'Başlık boş olamaz').max(200).trim(),
     desc: z.string().max(2000).optional().default(''),
-    assignee: z.string().min(1, 'Kişi seçimi zorunludur').max(100).trim(),
+    assignee: z.string().max(100).optional().default(''),
     priority: priority.optional().default('medium'),
     col: column.optional().default('todo'),
     startDate: dateStr,

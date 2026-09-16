@@ -43,10 +43,18 @@ export function hashPassword(password: string): string {
 }
 
 export function verifyPassword(password: string, stored: string): boolean {
+    if (!password || !stored) return false;
     const [salt, hash] = stored.split(':');
     if (!salt || !hash) return false;
-    const testHash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
-    return hash === testHash;
+    try {
+        const testHash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+        const hashBuf = Buffer.from(hash, 'hex');
+        const testBuf = Buffer.from(testHash, 'hex');
+        if (hashBuf.length !== testBuf.length) return false;
+        return crypto.timingSafeEqual(hashBuf, testBuf);
+    } catch {
+        return false;
+    }
 }
 
 // ── Environment Detection ────────────────────────────────────

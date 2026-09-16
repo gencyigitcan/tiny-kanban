@@ -13,11 +13,15 @@ For deep technical specifications, architecture blueprints, and operations manua
 
 | Role / Specification | Document | Scope & Focus |
 | :--- | :--- | :--- |
+| **Solutions & Cloud Architect** | [`architect.md`](./architect.md) | Edge compute topology, data plane vs control plane, failover runbooks |
 | **Software Engineer** | [`Software Dev.md`](./Software%20Dev.md) | Full technical architecture, types, REST contracts, and frontend state engine |
 | **DevOps & Cloud Architect** | [`devops engineer.md`](./devops%20engineer.md) | Cloudflare Pages, Workers, D1 SQL, multi-env isolation, and CI/CD pipelines |
+| **Database Engineer** | [`database engineer.md`](./database%20engineer.md) | D1 SQLite distributed document store, indexing, batch preloading, backups |
+| **Security Engineer** | [`security engineer.md`](./security%20engineer.md) & [`SECURITY.md`](./SECURITY.md) | STRIDE threat model, PBKDF2 cryptography, RBAC, and 100-step security audit |
+| **QA & Test Automation** | [`qa engineer.md`](./qa%20engineer.md) | Test pyramid, E2E regression, CI/CD gates, automated verification matrices |
 | **Product Manager / BA** | [`business analyst.md`](./business%20analyst.md) | PRD, user personas, approval gates, agile metrics, and acceptance criteria |
-| **Chief Technology Officer** | [`intent.md`](./intent.md) | High-level philosophy, Architecture Decision Records (ADRs), and roadmap |
-| **Security Engineer** | [`security engineer.md`](./security%20engineer.md) | STRIDE threat model, PBKDF2 cryptography, RBAC, and audit trail controls |
+| **Chief Technology Officer** | [`intent.md`](./intent.md) | High-level philosophy, Architecture Decision Records (ADRs 001-005) |
+| **Strategic Product Roadmap** | [`ROADMAP.md`](./ROADMAP.md) | Full project review, technical scorecard, and 2026-2027 phased roadmap |
 
 ---
 

@@ -32,8 +32,11 @@ export function errorHandler(
     res: Response,
     _next: NextFunction,
 ): void {
-    const status = err instanceof AppError ? err.statusCode : 500;
-    const message = err.message || 'Internal server error';
+    const status = err instanceof AppError ? err.statusCode : ((err as any).status || (err as any).statusCode || 500);
+    const isProd = process.env.NODE_ENV === 'production';
+    const message = (status >= 500 && isProd)
+        ? 'Sunucu tarafında beklenmeyen bir hata oluştu.'
+        : (err.message || 'Internal server error');
 
     if (status >= 500) {
         console.error('[ERROR]', err);

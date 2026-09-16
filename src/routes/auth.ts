@@ -110,7 +110,7 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
         await saveTenantIndex(index, env);
 
         // Create session token scoped to this workspace
-        const randomBytes = crypto.randomBytes(24).toString('hex');
+        const randomBytes = crypto.randomBytes(32).toString('hex');
         const token = `${tenantId}:${randomBytes}`;
         const newSession: Session = {
             token,
@@ -196,6 +196,7 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
 
     res.status(202).json({
         pending: true,
+        userId: newUser.id,
         message: 'Kayıt talebiniz Super Admin onayına iletildi. Onaylandıktan sonra giriş yapabilirsiniz.',
         user: {
             id: newUser.id,
@@ -310,7 +311,7 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
     }));
 
     // Create session token prefixed with active workspace ID
-    const randomToken = crypto.randomBytes(24).toString('hex');
+    const randomToken = crypto.randomBytes(32).toString('hex');
     const token = `${activeTenantId}:${randomToken}`;
     const newSession: Session = {
         token,
@@ -343,6 +344,7 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
             name: user.name,
             avatarColor: user.avatarColor,
             role: user.role || 'user',
+            status: user.status || 'approved',
             tenantId: activeTenantId,
             workspaces: accessibleWorkspaces
         },
@@ -378,7 +380,7 @@ authRouter.post('/switch-workspace', requireAuth, asyncHandler(async (req, res) 
     const targetDb = readDb({ tenantId: workspaceId, environment: env });
 
     // Generate new token for the target workspace
-    const randomToken = crypto.randomBytes(24).toString('hex');
+    const randomToken = crypto.randomBytes(32).toString('hex');
     const newToken = `${workspaceId}:${randomToken}`;
     const newSession: Session = {
         token: newToken,
@@ -399,13 +401,30 @@ authRouter.post('/switch-workspace', requireAuth, asyncHandler(async (req, res) 
 /** POST /api/auth/logout */
 authRouter.post('/logout', (req, res) => {
     const authHeader = req.headers.authorization;
+    const env = req.environment || getEnvironment(req);
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.split(' ')[1];
         const tenantId = token.includes(':') ? token.split(':')[0] : 'personal';
-        const db = readDb(tenantId);
-        if (db.sessions.some(s => s.token === token)) {
+        const db = readDb({ tenantId, environment: env });
+        const session = db.sessions.find(s => s.token === token);
+        if (session) {
+            const user = db.users.find(u => u.id === session.userId);
+            if (user) {
+                logActivity({
+                    userId: user.id,
+                    username: user.username,
+                    name: user.name,
+                    userRole: user.role || 'user',
+                    action: 'LOGOUT',
+                    entityType: 'auth',
+                    entityId: user.id,
+                    details: `${user.name} (${user.username}) oturumu başarıyla sonlandırıldı.`,
+                    workspaceId: tenantId,
+                    environment: env
+                }, req);
+            }
             db.sessions = db.sessions.filter(s => s.token !== token);
-            writeDbSync(db, tenantId);
+            writeDbSync(db, { tenantId, environment: env });
         }
     }
     res.json({ ok: true });

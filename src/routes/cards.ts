@@ -35,6 +35,13 @@ cardRouter.get('/', (req, res) => {
     res.json(readDb(req).cards);
 });
 
+/** GET /api/cards/:id */
+cardRouter.get('/:id', (req, res) => {
+    const card = readDb(req).cards.find(c => c.id === req.params.id);
+    if (!card) throw new NotFoundError('Card not found');
+    res.json(card);
+});
+
 /** POST /api/cards */
 cardRouter.post('/', validate(createCardSchema), (req, res) => {
     const body = req.body as Omit<Card, 'id' | 'key' | 'comments' | 'createdAt'>;

@@ -93,12 +93,33 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
         throw new AppError('Unauthorized: User not found', 401);
     }
 
+    if (user.status === 'pending') {
+        throw new AppError('Forbidden: Hesabınız henüz onaylanmamıştır', 403);
+    }
+
+    if (user.status === 'rejected') {
+        throw new AppError('Forbidden: Hesap başvurunuz reddedilmiştir', 403);
+    }
+
     if (user.expiresAt && Date.now() > user.expiresAt) {
         throw new AppError('Unauthorized: Account expired', 401);
     }
 
+    // Cross-tenant workspace validation (BOLA / IDOR mitigation)
+    const requestedWorkspace = (req.headers['x-workspace'] || req.headers['x-tenant-id'] || req.query?.workspace) as string | undefined;
+    if (requestedWorkspace && requestedWorkspace !== 'demo') {
+        const userWorkspaces = user.workspaces || (user.tenantId ? [user.tenantId] : []);
+        if (user.role === 'superadmin' || userWorkspaces.includes(requestedWorkspace)) {
+            req.tenantId = requestedWorkspace;
+            req.dbScope = requestedWorkspace;
+        } else {
+            throw new AppError('Forbidden: Yetkisiz çalışma alanı erişimi', 403);
+        }
+    } else {
+        req.tenantId = isDemoReq ? 'demo' : sessionTenantId;
+        req.dbScope = req.tenantId;
+    }
+
     req.user = user;
-    req.tenantId = isDemoReq ? 'demo' : sessionTenantId;
-    req.dbScope = req.tenantId;
     return next();
 }

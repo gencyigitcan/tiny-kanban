@@ -7,7 +7,9 @@
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "build": "tsc --noEmit && node build.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "tsx tests/integration.ts",
+    "test:security": "tsx tests/security_100_checks.ts"
   },
   "dependencies": {
     "cors": "^2.8.6",
