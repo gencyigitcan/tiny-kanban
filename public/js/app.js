@@ -484,10 +484,12 @@ window.deleteSprint = deleteSprint;
 
 // ── Modal helpers ─────────────────────────────────────────
 function openModal(id) {
-    document.getElementById(id).classList.add('open');
+    const el = document.getElementById(id);
+    if (el) el.classList.add('open');
 }
 function closeModal(id) {
-    document.getElementById(id).classList.remove('open');
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('open');
 }
 document.querySelectorAll('.modal-overlay').forEach(ov => {
     ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open'); });
@@ -504,12 +506,15 @@ document.addEventListener('keydown', e => {
 
 // ── Authentication UI Helpers and Event Handlers ─────────
 window.addEventListener('unauthorized', () => {
-    showAuthScreen();
+    const isDemo = window.IS_DEMO_PAGE === true || window.location.pathname.includes('demo');
+    if (!isDemo) showAuthScreen();
 });
 
 function showAuthScreen() {
-    document.getElementById('authOverlay').classList.add('open');
-    document.getElementById('headerUser').style.display = 'none';
+    const overlay = document.getElementById('authOverlay');
+    if (overlay) overlay.classList.add('open');
+    const headerUser = document.getElementById('headerUser');
+    if (headerUser) headerUser.style.display = 'none';
     if (syncIntervalId) {
         clearInterval(syncIntervalId);
         syncIntervalId = null;
@@ -517,9 +522,11 @@ function showAuthScreen() {
 }
 
 function hideAuthScreen() {
-    document.getElementById('authOverlay').classList.remove('open');
-    if (currentUser) {
-        document.getElementById('headerUser').style.display = 'flex';
+    const overlay = document.getElementById('authOverlay');
+    if (overlay) overlay.classList.remove('open');
+    const headerUser = document.getElementById('headerUser');
+    if (headerUser && currentUser) {
+        headerUser.style.display = 'flex';
     }
 }
 
@@ -782,7 +789,7 @@ document.addEventListener('click', (e) => {
     const dropdown = document.getElementById('workspaceDropdown');
     const wsBtn = document.getElementById('workspaceSwitcherBtn');
     if (dropdown && dropdown.style.display !== 'none') {
-        if (!dropdown.contains(e.target) && !wsBtn.contains(e.target)) {
+        if (!dropdown.contains(e.target) && (!wsBtn || !wsBtn.contains(e.target))) {
             dropdown.style.display = 'none';
         }
     }
@@ -1315,7 +1322,8 @@ window.approveDemoRequest = approveDemoRequest;
 
 async function clickNotification(event, id, cardId) {
     if (event.target.tagName === 'BUTTON') return;
-    document.getElementById('notifDropdown').classList.remove('open');
+    const notifDropdown = document.getElementById('notifDropdown');
+    if (notifDropdown) notifDropdown.classList.remove('open');
     try {
         await API.readNotification(id);
         const n = notifications.find(x => x.id === id);

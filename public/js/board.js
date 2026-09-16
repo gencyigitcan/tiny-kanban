@@ -148,8 +148,10 @@ function renderBoard(cards, epics = [], readonly = false) {
       );
       tmp.innerHTML = cardHTML(card, epics, readonly);
       const el = tmp.firstElementChild;
-      if (hidden) el.classList.add('hidden');
-      frag.appendChild(el);
+      if (el) {
+        if (hidden) el.classList.add('hidden');
+        frag.appendChild(el);
+      }
     });
     body.appendChild(frag);
     if (emptyState) emptyState.style.display = colCards.length === 0 ? 'flex' : 'none';
