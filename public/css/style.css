@@ -98,10 +98,11 @@ a {
   justify-content: space-between;
   gap: 16px;
   box-sizing: border-box;
-  z-index: 1000;
+  position: relative;
+  z-index: 2000;
   box-shadow: 0 1px 3px rgba(9, 30, 66, 0.25);
-  overflow-x: hidden;
-  width: 100vw;
+  overflow: visible !important;
+  width: 100%;
 }
 
 .jira-nav-left {
@@ -110,6 +111,7 @@ a {
   gap: 8px;
   flex: 1;
   min-width: 0;
+  overflow: visible !important;
 }
 
 .jira-app-switcher {
@@ -175,10 +177,12 @@ a {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+  overflow: visible !important;
 }
 
 .jira-nav-dropdown-wrap {
   position: relative;
+  overflow: visible !important;
 }
 
 .jira-nav-menu-btn {
@@ -218,7 +222,7 @@ a {
   box-shadow: 0 4px 16px rgba(9, 30, 66, 0.25);
   border: 1px solid #dfe1e6;
   padding: 6px 0;
-  z-index: 1100;
+  z-index: 2500;
   display: flex;
   flex-direction: column;
 }
@@ -291,6 +295,7 @@ a {
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+  overflow: visible !important;
 }
 
 .jira-search-wrap {
@@ -385,6 +390,7 @@ a {
 
 .jira-user-menu-wrap {
   position: relative;
+  overflow: visible !important;
 }
 
 .jira-avatar-btn {
@@ -413,12 +419,14 @@ a {
   right: 0;
   background: #ffffff;
   color: #172b4d;
-  min-width: 180px;
+  min-width: 250px;
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(9, 30, 66, 0.25);
   border: 1px solid #dfe1e6;
   padding: 6px 0;
-  z-index: 1100;
+  z-index: 2500;
+  display: flex;
+  flex-direction: column;
 }
 
 .jira-user-info-box {
@@ -3274,6 +3282,7 @@ kbd {
 .notification-container {
   position: relative;
   display: inline-flex;
+  overflow: visible !important;
 }
 .btn-notification {
   background: none;
@@ -3310,17 +3319,18 @@ kbd {
 }
 .notif-dropdown {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 8px);
   right: 0;
-  margin-top: 8px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
+  margin-top: 0;
+  background: #ffffff;
+  color: #172b4d;
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(9, 30, 66, 0.25);
   width: 320px;
   display: none;
   flex-direction: column;
-  z-index: 500;
+  z-index: 2500;
   overflow: hidden;
   animation: authFadeIn 0.18s ease;
 }

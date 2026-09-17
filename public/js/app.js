@@ -1278,13 +1278,26 @@ async function renderWorkspaceSwitcher() {
 }
 
 function closeAllJiraDropdowns() {
-    ['workspaceDropdown', 'topNavViewsDropdown', 'topNavManageDropdown', 'jiraUserDropdown', 'notifDropdown'].forEach(id => {
+    ['workspaceDropdown', 'topNavViewsDropdown', 'topNavManageDropdown', 'jiraUserDropdown', 'appSwitcherDropdown', 'notifDropdown'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
+        if (el) {
+            el.style.display = 'none';
+            el.classList.remove('open');
+        }
     });
 }
+window.closeAllJiraDropdowns = closeAllJiraDropdowns;
 
 // Toggle Jira topnav dropdowns
+safeAddListener('jiraAppSwitcher', 'click', (e) => {
+    e.stopPropagation();
+    const dropdown = document.getElementById('appSwitcherDropdown');
+    if (!dropdown) return;
+    const isHidden = dropdown.style.display === 'none';
+    closeAllJiraDropdowns();
+    if (isHidden) dropdown.style.display = 'flex';
+});
+
 safeAddListener('workspaceSwitcherBtn', 'click', (e) => {
     e.stopPropagation();
     const dropdown = document.getElementById('workspaceDropdown');
@@ -1317,9 +1330,21 @@ safeAddListener('userProfileBadge', 'click', (e) => {
     if (dropdown && isHidden) dropdown.style.display = 'flex';
 });
 
+safeAddListener('notifBellBtn', 'click', (e) => {
+    e.stopPropagation();
+    const dd = document.getElementById('notifDropdown');
+    if (!dd) return;
+    const isHidden = dd.style.display === 'none' && !dd.classList.contains('open');
+    closeAllJiraDropdowns();
+    if (isHidden) {
+        dd.classList.add('open');
+        dd.style.display = 'flex';
+    }
+});
+
 document.addEventListener('click', (e) => {
-    const ids = ['workspaceDropdown', 'topNavViewsDropdown', 'topNavManageDropdown', 'jiraUserDropdown', 'notifDropdown'];
-    const triggers = ['workspaceSwitcherBtn', 'topNavViewsBtn', 'topNavManageBtn', 'userProfileBadge', 'notifBellBtn'];
+    const ids = ['workspaceDropdown', 'topNavViewsDropdown', 'topNavManageDropdown', 'jiraUserDropdown', 'notifDropdown', 'appSwitcherDropdown'];
+    const triggers = ['workspaceSwitcherBtn', 'topNavViewsBtn', 'topNavManageBtn', 'userProfileBadge', 'notifBellBtn', 'jiraAppSwitcher'];
     
     const clickedTrigger = triggers.some(tId => {
         const t = document.getElementById(tId);
@@ -1874,17 +1899,6 @@ safeAddListener('addLabelBtn', 'click', async () => {
 });
 
 // ── Notifications Management UI ───────────────────────────
-safeAddListener('notifBellBtn', 'click', (e) => {
-    e.stopPropagation();
-    const dd = document.getElementById('notifDropdown');
-    if (dd) dd.classList.toggle('open');
-});
-
-document.addEventListener('click', () => {
-    const dd = document.getElementById('notifDropdown');
-    if (dd) dd.classList.remove('open');
-});
-
 safeAddListener('notifDropdown', 'click', (e) => {
     e.stopPropagation();
 });

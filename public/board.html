@@ -15,9 +15,28 @@
     <!-- JIRA GLOBAL TOPBAR (FULL PAGE WIDTH) -->
     <header class="jira-global-nav" id="jiraGlobalNav">
         <div class="jira-nav-left">
-            <button class="jira-app-switcher" id="jiraAppSwitcher" title="Atlassian Menüsü" type="button">
-                <span>⠿</span>
-            </button>
+            <div class="jira-nav-dropdown-wrap" id="wrapAppSwitcher">
+                <button class="jira-app-switcher" id="jiraAppSwitcher" title="Atlassian Menüsü" type="button">
+                    <span>⠿</span>
+                </button>
+                <div class="jira-nav-dropdown" id="appSwitcherDropdown" style="display: none;">
+                    <div class="jira-dropdown-header">Atlassian Uygulamaları</div>
+                    <a href="/board" class="jira-dropdown-item active" style="text-decoration: none;">
+                        <span class="menu-icon">🔷</span> <span><strong>Tiny Jira</strong> (Proje &amp; Pano)</span>
+                    </a>
+                    <a href="#confluence" class="jira-dropdown-item" onclick="showToast('Confluence Dokümantasyon alanı yakında!', 'info'); return false;" style="text-decoration: none;">
+                        <span class="menu-icon">📘</span> <span>Confluence Dokümantasyon</span>
+                    </a>
+                    <a href="#jsm" class="jira-dropdown-item" onclick="showToast('Jira Service Management yakında!', 'info'); return false;" style="text-decoration: none;">
+                        <span class="menu-icon">🎧</span> <span>Service Management</span>
+                    </a>
+                    <div class="jira-dropdown-divider"></div>
+                    <div class="jira-dropdown-header">Hızlı İşlemler</div>
+                    <button class="jira-dropdown-item" type="button" onclick="openCardDetail(null); closeAllJiraDropdowns();">
+                        <span class="menu-icon">✚</span> <span>Yeni Görev / Bilet Oluştur</span>
+                    </button>
+                </div>
+            </div>
             <button class="jira-sidebar-toggle-btn" id="sidebarToggleBtn" type="button" title="Kenar Çubuğunu Aç/Kapat">
                 ☰
             </button>
