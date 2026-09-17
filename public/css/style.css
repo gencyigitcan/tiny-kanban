@@ -2115,6 +2115,30 @@ kbd {
 }
 
 @media (max-width: 768px) {
+  .app-sidebar {
+    width: 64px !important;
+    min-width: 64px !important;
+  }
+  .app-sidebar .sidebar-app-name,
+  .app-sidebar .sidebar-version,
+  .app-sidebar .ws-name,
+  .app-sidebar .ws-arrow,
+  .app-sidebar .sidebar-section-title,
+  .app-sidebar .sidebar-nav .view-tab span:not(.nav-icon),
+  .app-sidebar .sidebar-new-ticket-btn span.label,
+  .app-sidebar .user-profile-info,
+  .app-sidebar .sidebar-env-switch {
+    display: none !important;
+  }
+  .app-sidebar .sidebar-new-ticket-btn {
+    padding: 10px 0;
+    justify-content: center;
+  }
+  .app-sidebar .sidebar-nav .view-tab {
+    justify-content: center;
+    padding: 10px 0;
+  }
+
   .board-wrap {
     flex-direction: column;
     padding: 16px;
