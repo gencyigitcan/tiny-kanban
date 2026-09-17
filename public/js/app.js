@@ -22,7 +22,7 @@ let syncIntervalId = null;
 // ── Boot ──────────────────────────────────────────────────
 async function boot() {
     const isDemo = window.IS_DEMO_PAGE === true || window.location.pathname.includes('demo');
-    const token = localStorage.getItem('tiny_kanban_token');
+    const token = localStorage.getItem('tiny_kanban_token') || localStorage.getItem('kanban_token');
     
     // Switch to auth screen only if NOT on demo page and no token
     if (!isDemo && !token) {
@@ -48,7 +48,9 @@ async function boot() {
                 window.currentUser = currentUser;
                 updateUserHeader();
             } catch (e) {
-                console.error('Session verify failed, showing login screen:', e);
+                console.warn('Session verify failed, clearing stale token:', e);
+                localStorage.removeItem('tiny_kanban_token');
+                localStorage.removeItem('kanban_token');
                 showAuthScreen();
                 return;
             }
@@ -86,7 +88,9 @@ async function boot() {
         setupBackgroundSync();
     } catch (err) {
         console.error('Boot error:', err);
-        if (err.message?.includes('yetkisiz') || err.message === 'Unauthorized') {
+        if (err.message?.includes('yetkisiz') || err.message === 'Unauthorized' || err.message?.includes('Oturum')) {
+            localStorage.removeItem('tiny_kanban_token');
+            localStorage.removeItem('kanban_token');
             if (!isDemo) showAuthScreen();
             return;
         }
@@ -1851,7 +1855,7 @@ async function approveDemoRequest(event, notificationId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('tiny_kanban_token')}`
+                'Authorization': `Bearer ${localStorage.getItem('tiny_kanban_token') || localStorage.getItem('kanban_token')}`
             },
             body: JSON.stringify({ notificationId })
         });

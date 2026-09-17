@@ -9,7 +9,7 @@ const IS_DEMO = window.IS_DEMO_PAGE === true || window.location.pathname.include
 
 // REST wrapper helper that sends requests directly to the server API
 async function request(url, options = {}) {
-    const token = localStorage.getItem('tiny_kanban_token');
+    const token = localStorage.getItem('tiny_kanban_token') || localStorage.getItem('kanban_token');
     options.headers = {
         ...(options.headers || {})
     };
@@ -33,11 +33,19 @@ async function request(url, options = {}) {
     }
 
     if (r.status === 401) {
+        const errBody = await r.json().catch(() => ({}));
+        
+        // When attempting login or register, throw the exact server message (e.g. "Kullanıcı adı veya şifre hatalı")
+        if (url.includes('/api/auth/login') || url.includes('/api/auth/demo-login') || url.includes('/api/auth/register')) {
+            throw new Error(errBody.error || 'Kullanıcı adı veya şifre hatalı');
+        }
+
         if (!IS_DEMO) {
             localStorage.removeItem('tiny_kanban_token');
+            localStorage.removeItem('kanban_token');
             window.dispatchEvent(new Event('unauthorized'));
         }
-        throw new Error('Oturum süresi doldu veya yetkisiz erişim');
+        throw new Error(errBody.error || 'Oturum süresi doldu veya yetkisiz erişim');
     }
 
     if (!r.ok) {
@@ -145,6 +153,7 @@ const API = {
         });
         if (res.token) {
             localStorage.setItem('tiny_kanban_token', res.token);
+            localStorage.setItem('kanban_token', res.token);
         }
         return res;
     },
@@ -156,6 +165,7 @@ const API = {
         });
         if (res.token) {
             localStorage.setItem('tiny_kanban_token', res.token);
+            localStorage.setItem('kanban_token', res.token);
         }
         return res;
     },
@@ -167,6 +177,7 @@ const API = {
         });
         if (res.token) {
             localStorage.setItem('tiny_kanban_token', res.token);
+            localStorage.setItem('kanban_token', res.token);
         }
         return res;
     },
@@ -177,6 +188,7 @@ const API = {
             console.warn('Logout request failed:', e);
         } finally {
             localStorage.removeItem('tiny_kanban_token');
+            localStorage.removeItem('kanban_token');
         }
     },
     async getMe() {
@@ -240,11 +252,16 @@ const API = {
         return await request('/api/auth/demo-users');
     },
     async demoLogin(username) {
-        return await request('/api/auth/demo-login', {
+        const res = await request('/api/auth/demo-login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username })
         });
+        if (res.token) {
+            localStorage.setItem('tiny_kanban_token', res.token);
+            localStorage.setItem('kanban_token', res.token);
+        }
+        return res;
     },
     async getUsers() {
         return await request('/api/users');

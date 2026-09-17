@@ -72,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Token ve kullanıcı bilgisini localStorage'a kaydet
                 if (data.token) {
                     localStorage.setItem('kanban_token', data.token);
+                    localStorage.setItem('tiny_kanban_token', data.token);
                 }
                 if (data.user) {
                     localStorage.setItem('kanban_user', JSON.stringify(data.user));

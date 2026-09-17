@@ -281,6 +281,7 @@
                     successDiv.style.display = 'block';
                 } else if (data.token) {
                     localStorage.setItem('tiny_kanban_token', data.token);
+                    localStorage.setItem('kanban_token', data.token);
                     window.location.href = '/board';
                 } else {
                     form.style.display = 'none';
