@@ -21,6 +21,19 @@ import { requireAuth } from '../middleware/auth.js';
 import { registerSchema, loginSchema, requestDemoSchema } from '../lib/schemas.js';
 import type { User, Session } from '../types/index.js';
 
+export const DEMO_USERNAMES = new Set([
+    'admin',
+    'zeynep',
+    'mehmet',
+    'selin',
+    'caner',
+    'burcu',
+    'emre',
+    'gamze',
+    'tolga',
+    'derya'
+]);
+
 export const authRouter = Router();
 
 const PASTEL_COLORS = [
@@ -43,8 +56,17 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
     const env = req.environment || getEnvironment(req);
     const index = await getTenantIndex(env);
 
+    // Guard: Demo usernames are strictly reserved for the sandbox demo workspace
+    if (DEMO_USERNAMES.has(normalizedUsername)) {
+        throw new AppError('Bu kullanıcı adı demo sistemi için ayrılmıştır, yeni kayıt yapılamaz', 400);
+    }
+
     const personalDb = readDb({ tenantId: 'personal', environment: env });
-    const existingSuperAdmin = personalDb.users.find(u => u.role === 'superadmin' && u.status === 'approved');
+    const existingSuperAdmin = personalDb.users.find(u =>
+        u.role === 'superadmin' &&
+        u.status === 'approved' &&
+        !DEMO_USERNAMES.has(u.username?.toLowerCase() || '')
+    );
     const isFirstSuperAdmin = !existingSuperAdmin;
 
     // Existing superadmin updating profile or password
@@ -103,7 +125,11 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
 
     // If super admin registration, update/insert usr-superadmin in personal DB and link workspaces
     if (isSuperAdminRegister) {
-        const superIdx = personalDb.users.findIndex(u => u.id === 'usr-superadmin' || u.role === 'superadmin' || u.username.toLowerCase() === normalizedUsername);
+        const superIdx = personalDb.users.findIndex(u =>
+            u.username.toLowerCase() === normalizedUsername ||
+            (u.email && u.email.toLowerCase() === normalizedUsername) ||
+            (isFirstSuperAdmin && u.id === 'usr-superadmin')
+        );
         if (superIdx >= 0) {
             personalDb.users[superIdx].passwordHash = newUser.passwordHash;
             personalDb.users[superIdx].username = normalizedUsername;
@@ -256,51 +282,10 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
     let db: any = null;
     let user: User | undefined;
 
-    // 1. Check master personal DB (primary instance workspace)
-    const personalDb = readDb({ tenantId: 'personal', environment: env });
-    const personalCandidate = personalDb.users.find(userMatches);
-    if (personalCandidate && verifyPassword(password, personalCandidate.passwordHash)) {
-        user = personalCandidate;
-        activeTenantId = 'personal';
-        db = personalDb;
-    }
-
-    // 2. Check company / shared team workspace if explicitly provided
-    if (!user && company && company.trim()) {
-        const companyWs = index.workspaces.find(w => w.name.toLowerCase() === company.toLowerCase().trim() || w.id === company.trim());
-        if (companyWs) {
-            const companyDb = readDb({ tenantId: companyWs.id, environment: env });
-            const candidate = companyDb.users.find(userMatches);
-            if (candidate && verifyPassword(password, candidate.passwordHash)) {
-                user = candidate;
-                activeTenantId = companyWs.id;
-                db = companyDb;
-            }
-        }
-    }
-
-    // 3. Check user's assigned workspaces from index
-    if (!user) {
-        const userWsIds = index.userToTenants[normalizedUsername] || [];
-        for (const wsId of userWsIds) {
-            const wsDb = readDb({ tenantId: wsId, environment: env });
-            const candidate = wsDb.users.find(userMatches);
-            if (candidate) {
-                const isValid = candidate.passwordHash 
-                    ? verifyPassword(password, candidate.passwordHash)
-                    : (wsId === 'demo' && (password === 'password' || password === 'admin'));
-                if (isValid || (wsId === 'demo' && password === 'password')) {
-                    user = candidate;
-                    activeTenantId = wsId;
-                    db = wsDb;
-                    break;
-                }
-            }
-        }
-    }
-
-    // 4. Fallback: check Demo DB if user belongs to Demo workspace
-    if (!user) {
+    // ── 1. DEMO PERSONA STRICT QUARANTINE ─────────────────────────
+    // If logging in with ANY demo username (e.g. 'admin' for Ali Yılmaz, 'zeynep', etc.),
+    // they MUST ONLY connect to the demo workspace and NEVER touch personalDb or private user tickets!
+    if (DEMO_USERNAMES.has(normalizedUsername)) {
         const demoDb = readDb({ tenantId: 'demo', environment: env });
         const candidate = demoDb.users.find(userMatches);
         if (candidate) {
@@ -313,9 +298,60 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
                 db = demoDb;
             }
         }
+        if (!user) {
+            throw new AppError('Kullanıcı adı veya şifre hatalı', 401);
+        }
     }
 
-    const isPasswordValid = user && (verifyPassword(password, user.passwordHash) || (activeTenantId === 'demo' && password === 'password'));
+    // ── 2. NON-DEMO USERS (Corporate / Personal Accounts) ─────────
+    if (!user) {
+        // A. Check user's assigned workspaces from index (excluding demo)
+        const userWsIds = (index.userToTenants[normalizedUsername] || []).filter(id => id !== 'demo');
+        for (const wsId of userWsIds) {
+            const wsDb = readDb({ tenantId: wsId, environment: env });
+            const candidate = wsDb.users.find(userMatches);
+            if (candidate && candidate.passwordHash && verifyPassword(password, candidate.passwordHash)) {
+                user = candidate;
+                activeTenantId = wsId;
+                db = wsDb;
+                break;
+            }
+        }
+    }
+
+    // B. Check company / shared team workspace if explicitly provided
+    if (!user && company && company.trim()) {
+        const companyWs = index.workspaces.find(w =>
+            (w.name.toLowerCase() === company.toLowerCase().trim() || w.id === company.trim()) && w.id !== 'demo'
+        );
+        if (companyWs) {
+            const companyDb = readDb({ tenantId: companyWs.id, environment: env });
+            const candidate = companyDb.users.find(userMatches);
+            if (candidate && candidate.passwordHash && verifyPassword(password, candidate.passwordHash)) {
+                user = candidate;
+                activeTenantId = companyWs.id;
+                db = companyDb;
+            }
+        }
+    }
+
+    // C. Check master personal DB ONLY for legitimate non-demo personal accounts
+    if (!user) {
+        const personalDb = readDb({ tenantId: 'personal', environment: env });
+        const personalCandidate = personalDb.users.find(u =>
+            userMatches(u) && !DEMO_USERNAMES.has(u.username?.toLowerCase() || '')
+        );
+        if (personalCandidate && personalCandidate.passwordHash && verifyPassword(password, personalCandidate.passwordHash)) {
+            user = personalCandidate;
+            activeTenantId = 'personal';
+            db = personalDb;
+        }
+    }
+
+    const isPasswordValid = Boolean(user && (
+        (activeTenantId === 'demo' && (password === 'password' || verifyPassword(password, user.passwordHash))) ||
+        (user.passwordHash && verifyPassword(password, user.passwordHash))
+    ));
     if (!user || !isPasswordValid) {
         throw new AppError('Kullanıcı adı veya şifre hatalı', 401);
     }
@@ -336,21 +372,29 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
     user.lastLoginAt = Date.now();
     writeDbSync(db, { tenantId: activeTenantId, environment: env });
 
-    // Get all workspaces accessible by this user
-    const directWsIds = index.userToTenants[normalizedUsername] || [];
-    const allWsSet = new Set<string>([...directWsIds, activeTenantId, ...(user.workspaces || [])]);
+    // Calculate accessible workspaces strictly by role and tenant assignment
+    let accessibleWorkspaces: Array<{ id: string; name: string }>;
+    if (activeTenantId === 'demo' || user.tenantId === 'demo') {
+        user.workspaces = ['demo'];
+        user.tenantId = 'demo';
+        accessibleWorkspaces = [{ id: 'demo', name: 'Demo Panosu' }];
+    } else {
+        const directWsIds = (index.userToTenants[normalizedUsername] || []).filter(id => id !== 'demo');
+        const userWsSet = new Set<string>([...directWsIds, activeTenantId, ...(user.workspaces || []).filter(id => id !== 'demo')]);
 
-    // Role-based privilege: Super Admin always has full access to 'personal'
-    if (user.role === 'superadmin') {
-        allWsSet.add('personal');
+        // Personal workspace can ONLY be included if the user explicitly owns or is assigned 'personal'
+        if (user.role === 'superadmin' && (user.workspaces?.includes('personal') || directWsIds.includes('personal') || user.tenantId === 'personal')) {
+            userWsSet.add('personal');
+        } else if (!user.workspaces?.includes('personal') && !directWsIds.includes('personal') && user.tenantId !== 'personal') {
+            userWsSet.delete('personal');
+        }
+
+        const wsNameMap = Object.fromEntries(index.workspaces.map(w => [w.id, w.name]));
+        accessibleWorkspaces = Array.from(userWsSet).map(id => ({
+            id,
+            name: wsNameMap[id] || (id === 'personal' ? 'Kişisel Çalışma Alanı' : id)
+        }));
     }
-    const userWorkspaceIds = Array.from(allWsSet);
-
-    const wsNameMap = Object.fromEntries(index.workspaces.map(w => [w.id, w.name]));
-    const accessibleWorkspaces = userWorkspaceIds.map(id => ({
-        id,
-        name: wsNameMap[id] || (id === 'personal' ? 'Kişisel Çalışma Alanı' : id === 'demo' ? 'Demo Panosu' : id)
-    }));
 
     // Create session token prefixed with active workspace ID
     const randomToken = crypto.randomBytes(32).toString('hex');
@@ -493,16 +537,29 @@ authRouter.post('/switch-workspace', requireAuth, asyncHandler(async (req, res) 
         throw new AppError('Çalışma alanı ID gereklidir', 400);
     }
 
+    const username = req.user!.username.toLowerCase();
+    const isDemoUser = req.user?.tenantId === 'demo' || req.tenantId === 'demo' || DEMO_USERNAMES.has(username);
+
+    // Strictly deny demo users from switching to any workspace other than 'demo'
+    if (isDemoUser && workspaceId !== 'demo') {
+        throw new AppError('Demo kullanıcıları kişisel veya kurumsal çalışma alanlarına geçiş yapamaz', 403);
+    }
+
     const env = req.environment || getEnvironment(req);
     const index = await getTenantIndex(env);
-    const username = req.user!.username.toLowerCase();
     const isSuperAdmin = req.user!.role === 'superadmin';
 
     const directWsIds = index.userToTenants[username] || [];
     const userWsSet = new Set([...directWsIds, ...(req.user!.workspaces || [])]);
-    if (isSuperAdmin) userWsSet.add('personal');
 
-    if (!isSuperAdmin && !userWsSet.has(workspaceId)) {
+    // Personal workspace can ONLY be switched to if explicitly assigned
+    if (isSuperAdmin && (req.user!.workspaces?.includes('personal') || directWsIds.includes('personal') || req.user!.tenantId === 'personal')) {
+        userWsSet.add('personal');
+    } else if (workspaceId === 'personal' && !userWsSet.has('personal')) {
+        throw new AppError('Kişisel çalışma alanına yetkisiz erişim', 403);
+    }
+
+    if (!userWsSet.has(workspaceId)) {
         throw new AppError('Bu çalışma alanına erişim yetkiniz bulunmamaktadır', 403);
     }
 

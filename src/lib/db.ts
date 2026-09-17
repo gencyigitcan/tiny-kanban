@@ -205,42 +205,29 @@ export function ensurePersonalDbIntegrity(db: DbSchema, env?: Environment): bool
         changed = true;
     }
 
-    // Ensure starter cards for personal workspace exist
-    for (const uCard of DEFAULT_PERSONAL_CARDS) {
-        const exists = db.cards.some(c =>
-            c.id === uCard.id ||
-            (c.title && c.title.trim().toLowerCase() === uCard.title.trim().toLowerCase())
-        );
-        if (!exists) {
+    // Ensure starter cards for personal workspace exist only if cards array is completely empty
+    if (db.cards.length === 0) {
+        for (const uCard of DEFAULT_PERSONAL_CARDS) {
             db.cards.push(structuredClone(uCard));
             changed = true;
         }
     }
 
-    const currentEnv = env || (process.env.NODE_ENV === 'test' ? 'test' : 'production');
-    if (currentEnv !== 'test') {
-        if (!Array.isArray(db.users)) {
-            db.users = [];
+    // ── SECURITY & MULTI-TENANT PRIVACY GUARANTEE ───────────────
+    // 'admin' (Ali Yılmaz) belongs exclusively to 'demo' workspace.
+    // It must NEVER exist in personalDb or have access to personal cards!
+    // Purge any accidental or legacy 'admin' / 'usr-admin' entries from personalDb.
+    if (Array.isArray(db.users)) {
+        const adminIdx = db.users.findIndex(u => u.username?.toLowerCase() === 'admin' || u.id === 'usr-admin');
+        if (adminIdx >= 0) {
+            db.users.splice(adminIdx, 1);
             changed = true;
         }
-        const adminUser = db.users.find(u => u.username === 'admin');
-        if (!adminUser) {
-            db.users.unshift({
-                id: 'usr-admin',
-                username: 'admin',
-                email: 'admin@company.com',
-                name: 'Sistem Yöneticisi',
-                passwordHash: hashPassword('password'),
-                avatarColor: '#0747a6',
-                role: 'superadmin',
-                status: 'approved',
-                tenantId: 'personal',
-                workspaces: ['personal'],
-                createdAt: Date.now()
-            });
-            changed = true;
-        } else if (!adminUser.passwordHash || !verifyPassword('password', adminUser.passwordHash)) {
-            adminUser.passwordHash = hashPassword('password');
+    }
+    if (Array.isArray(db.sessions)) {
+        const initialSessLen = db.sessions.length;
+        db.sessions = db.sessions.filter(s => s.userId !== 'usr-admin' && !s.token.startsWith('personal:demo_'));
+        if (db.sessions.length !== initialSessLen) {
             changed = true;
         }
     }
@@ -670,6 +657,13 @@ export function readTenantDbFileSync(tenantId: string, env: Environment): DbSche
             }
             return alignedDb;
         }
+        if (tenantId === 'personal') {
+            const changed = ensurePersonalDbIntegrity(db, env);
+            if (changed && isNodeRuntime()) {
+                writeTenantDbFileSync('personal', env, db);
+            }
+            return db;
+        }
         return db;
     } catch {
         if (env === 'test') return createDefaultTestDb();
@@ -711,15 +705,11 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                 logs: Array.isArray(parsed.logs) ? parsed.logs : []
             };
 
-            // In production personal DB, if superUser exists, ensure email & workspaces
+            // In production personal DB, ensure integrity and workspace linking
             if (env === 'production' && tenantId === 'personal') {
-                let changed = false;
-                if (db.cards.length === 0) {
-                    changed = ensurePersonalDbIntegrity(db) || changed;
-                }
+                let changed = ensurePersonalDbIntegrity(db);
                 let superUser = db.users.find(u =>
-                    u.role === 'superadmin' ||
-                    u.id === 'usr-superadmin'
+                    (u.role === 'superadmin' || u.id === 'usr-superadmin') && u.username?.toLowerCase() !== 'admin'
                 );
                 if (superUser) {
                     if (superUser.status !== 'approved') {
