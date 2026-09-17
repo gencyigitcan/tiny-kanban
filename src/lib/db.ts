@@ -8,6 +8,7 @@ import writeFileAtomic from 'write-file-atomic';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { DbSchema, Workspace, TenantIndex, ActivityLog } from '../types/index.js';
 import { createDefaultDemoDb, YIGITCAN_USER_CARDS } from './demo_data.js';
+import { alignDemoDbToCurrentDate } from './demo_timeline.js';
 
 export type Environment = 'production' | 'test' | 'development';
 export type DbScope = 'personal' | 'demo' | string;
@@ -374,6 +375,7 @@ export function initDb(): void {
                 { id: 'demo', name: 'Demo Panosu (Nova Takımı)', type: 'team', ownerId: 'usr-1', createdAt: Date.now() }
             ];
         }
+        alignDemoDbToCurrentDate(demoDb);
         writeTenantDbFileSync('demo', 'production', demoDb);
 
         // ── 3. TEST DATABASE (test_db.json) ──────────────────────
@@ -601,7 +603,7 @@ export function readTenantDbFileSync(tenantId: string, env: Environment): DbSche
         }
         const raw = fs.readFileSync(filePath, 'utf8');
         const parsed = JSON.parse(raw) as Partial<DbSchema>;
-        return {
+        const db: DbSchema = {
             cards: Array.isArray(parsed.cards) ? parsed.cards : [],
             epics: Array.isArray(parsed.epics) ? parsed.epics : [],
             sprints: Array.isArray(parsed.sprints) ? parsed.sprints : [],
@@ -613,6 +615,14 @@ export function readTenantDbFileSync(tenantId: string, env: Environment): DbSche
             workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : [],
             logs: Array.isArray(parsed.logs) ? parsed.logs : []
         };
+        if (tenantId === 'demo') {
+            const { db: alignedDb, changed } = alignDemoDbToCurrentDate(db);
+            if (changed && isNodeRuntime()) {
+                writeTenantDbFileSync('demo', env, alignedDb);
+            }
+            return alignedDb;
+        }
+        return db;
     } catch {
         if (env === 'test') return createDefaultTestDb();
         return structuredClone(EMPTY_DB);
@@ -681,11 +691,15 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
             }
 
             // In demo DB, ensure all 10 users and 2026-2027 weekly data exist (104 sprints & 1,040 cards)
-            if (tenantId === 'demo' && (db.users.length < 10 || db.sprints.length < 104 || db.cards.length < 1000)) {
-                db = createDefaultDemoDb();
-                if (dbBinding) {
-                    await saveTenantDbToD1(dbBinding, key, db);
+            if (tenantId === 'demo') {
+                if (db.users.length < 10 || db.sprints.length < 104 || db.cards.length < 1000) {
+                    db = createDefaultDemoDb();
                 }
+                const { db: alignedDb, changed } = alignDemoDbToCurrentDate(db);
+                if ((changed || db.users.length < 10) && dbBinding) {
+                    await saveTenantDbToD1(dbBinding, key, alignedDb);
+                }
+                return alignedDb;
             }
 
             return db;
@@ -737,6 +751,19 @@ export function logActivity(
     }
 
     const currentTenant = (reqOrScope as any)?.tenantId || (reqOrScope as any)?.headers?.['x-tenant-id'] || entry.workspaceId || 'personal';
+
+    // If action happened in demo workspace, record in demoDb as well
+    if (currentTenant === 'demo' || entry.workspaceId === 'demo') {
+        try {
+            const demoDb = readDb({ tenantId: 'demo', environment: env });
+            demoDb.logs = demoDb.logs || [];
+            demoDb.logs.unshift(newLog);
+            if (demoDb.logs.length > 2000) demoDb.logs.length = 2000;
+            writeDbSync(demoDb, { tenantId: 'demo', environment: env });
+        } catch (e) {
+            console.error('Failed to log to demoDb:', e);
+        }
+    }
 
     // If this is a card action, also attach to the card's local activity history
     if (entry.entityType === 'card' && entry.entityId) {

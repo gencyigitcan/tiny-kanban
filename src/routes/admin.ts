@@ -18,7 +18,7 @@ import {
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { AppError, asyncHandler } from '../middleware/error.js';
-import type { User } from '../types/index.js';
+import type { User, ActivityLog } from '../types/index.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
@@ -355,22 +355,61 @@ adminRouter.get('/logs', asyncHandler(async (req, res) => {
         throw new AppError('Aktivite günlüğünü görüntüleme yetkisi sadece yönetici ve Super Admin kullanıcılara aittir', 403);
     }
     const env = req.environment || getEnvironment(req);
-    const personalDb = readDb({ tenantId: 'personal', environment: env });
-    let logs = (personalDb.logs || []).slice().reverse();
+    const isSuperAdmin = req.user?.role === 'superadmin';
 
-    // Query parameters filtering: user, action, cardKey, q
-    const { user, action, cardKey, q } = req.query as { user?: string; action?: string; cardKey?: string; q?: string };
+    // Query parameters filtering: user, action, cardKey, q, workspace
+    const { user, action, cardKey, q, workspace } = req.query as {
+        user?: string;
+        action?: string;
+        cardKey?: string;
+        q?: string;
+        workspace?: string;
+    };
+
+    let rawLogs: ActivityLog[] = [];
+
+    if (isSuperAdmin) {
+        if (workspace === 'demo') {
+            const demoDb = readDb({ tenantId: 'demo', environment: env });
+            rawLogs = (demoDb.logs || []).slice();
+        } else if (workspace === 'personal' || workspace === 'production') {
+            const personalDb = readDb({ tenantId: 'personal', environment: env });
+            rawLogs = (personalDb.logs || []).filter(l => l.workspaceId !== 'demo');
+        } else {
+            // workspace === 'all' or default: combine personal + demo, deduplicate by ID
+            const personalDb = readDb({ tenantId: 'personal', environment: env });
+            const demoDb = readDb({ tenantId: 'demo', environment: env });
+            const logMap = new Map<string, ActivityLog>();
+            for (const l of personalDb.logs || []) logMap.set(l.id, l);
+            for (const l of demoDb.logs || []) logMap.set(l.id, l);
+            rawLogs = Array.from(logMap.values());
+        }
+    } else {
+        // Regular admin: scoped to their tenant
+        const tId = req.tenantId || 'personal';
+        const targetDb = readDb({ tenantId: tId, environment: env });
+        rawLogs = (targetDb.logs || []).slice();
+    }
+
+    // Sort newest first
+    rawLogs.sort((a, b) => b.createdAt - a.createdAt);
+    let logs = rawLogs;
+
+    // Filter by user
     if (user && user !== 'all') {
         const uLower = user.toLowerCase();
         logs = logs.filter(l => (l.username && l.username.toLowerCase() === uLower) || (l.name && l.name.toLowerCase().includes(uLower)) || l.userId === user);
     }
+    // Filter by action
     if (action && action !== 'all') {
         logs = logs.filter(l => l.action === action);
     }
+    // Filter by cardKey
     if (cardKey) {
         const ckLower = cardKey.toLowerCase();
         logs = logs.filter(l => (l.details && l.details.toLowerCase().includes(ckLower)) || l.entityId === cardKey);
     }
+    // Filter by keyword query
     if (q) {
         const qLower = q.toLowerCase();
         logs = logs.filter(l =>

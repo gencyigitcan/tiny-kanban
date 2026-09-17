@@ -3895,3 +3895,46 @@ kbd {
   line-height: 1.4;
   word-break: break-word;
 }
+
+/* ============================================================
+   MULTI-ENVIRONMENT AUTH OVERLAY & DEMO PERSONA STYLES
+   ============================================================ */
+.auth-mode-btn {
+  background: transparent;
+  color: var(--text-secondary);
+}
+.auth-mode-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+.auth-mode-btn.active {
+  background: var(--surface) !important;
+  color: var(--text-primary) !important;
+  box-shadow: var(--shadow-sm);
+}
+.btn-demo-quick-chip {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-demo-quick-chip:hover {
+  background: var(--surface);
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.demo-persona-card {
+  transition: all 0.2s ease;
+}
+.demo-persona-card:hover {
+  border-color: var(--accent);
+}

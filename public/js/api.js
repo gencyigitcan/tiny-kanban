@@ -232,8 +232,19 @@ const API = {
         if (params.action) qs.set('action', params.action);
         if (params.cardKey) qs.set('cardKey', params.cardKey);
         if (params.q) qs.set('q', params.q);
+        if (params.workspace) qs.set('workspace', params.workspace);
         const query = qs.toString() ? `?${qs.toString()}` : '';
         return await request(`/api/admin/logs${query}`);
+    },
+    async getDemoUsers() {
+        return await request('/api/auth/demo-users');
+    },
+    async demoLogin(username) {
+        return await request('/api/auth/demo-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+        });
     },
     async getUsers() {
         return await request('/api/users');

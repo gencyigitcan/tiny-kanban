@@ -302,7 +302,15 @@
 
             <!-- Filter Controls -->
             <div class="audit-filter-bar" style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; background: var(--surface); padding: 14px 16px; border-radius: 10px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); align-items: flex-end;">
-                <div style="flex: 1; min-width: 220px;">
+                <div style="min-width: 170px;" id="auditEnvFilterWrap">
+                    <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">🏢 Ortam</label>
+                    <select class="form-select" id="viewAuditFilterEnv" style="font-size: 13px; padding: 7px 12px; width: 100%; font-weight: 500;">
+                        <option value="all">Tüm Ortamlar (Canlı + Demo)</option>
+                        <option value="personal">🌐 Canlı Sistem (Production)</option>
+                        <option value="demo">🚀 Nova Demo Ortamı</option>
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 200px;">
                     <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Arama</label>
                     <input class="form-input" type="text" id="viewAuditFilterSearch" placeholder="🔍 Başlık, detay, kullanıcı veya işlem…" style="font-size: 13px; padding: 7px 12px; width: 100%;">
                 </div>
@@ -600,7 +608,14 @@
 
                     <!-- Filter Bar for Audit Logs -->
                     <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; background: var(--bg-secondary); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
-                        <div style="flex: 1; min-width: 160px;">
+                        <div style="min-width: 130px;" id="panelLogEnvWrap">
+                            <select class="form-select" id="logFilterEnv" style="font-size: 12px; padding: 6px 10px; font-weight: 500;">
+                                <option value="all">🏢 Tüm Ortamlar</option>
+                                <option value="personal">🌐 Canlı Sistem</option>
+                                <option value="demo">🚀 Demo Ortamı</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1; min-width: 150px;">
                             <input class="form-input" type="text" id="logFilterSearch" placeholder="🔍 Arama (kart başlığı, detay, işlem)…" style="font-size: 12px; padding: 6px 10px;">
                         </div>
                         <div style="min-width: 140px;">
@@ -707,65 +722,160 @@
     <div class="kbd-hint"><kbd>N</kbd> Yeni görev &nbsp;·&nbsp; <kbd>Esc</kbd> Kapat</div>
 
     <!-- ============================================================
-     AUTH VIEW OVERLAY
+     AUTH VIEW OVERLAY (MULTI-ENVIRONMENT: PRODUCTION & NOVA DEMO)
      ============================================================ -->
     <div class="auth-overlay" id="authOverlay">
-        <div class="auth-card">
-            <div class="auth-brand">
+        <div class="auth-card" style="max-width: 500px; width: 95%; padding: 24px;">
+            <div class="auth-brand" style="margin-bottom: 16px;">
                 <div class="auth-logo">K</div>
-                <h1 class="auth-title">Kanban</h1>
-                <p class="auth-subtitle">Küçük ekipler için Jira-like iş takip tahtası</p>
-            </div>
-            
-            <div class="auth-tabs">
-                <button class="auth-tab active" id="tabLogin">Giriş Yap</button>
-                <button class="auth-tab" id="tabRegister">Kayıt Ol</button>
+                <h1 class="auth-title">Tiny Kanban</h1>
+                <p class="auth-subtitle">Modern Çevik İş ve Sprint Takip Platformu</p>
             </div>
 
-            <!-- Login Form -->
-            <form id="loginForm" class="auth-form active">
-                <div class="form-group">
-                    <label class="form-label" for="loginUser">Kullanıcı Adı veya E-posta</label>
-                    <input class="form-input" type="text" id="loginUser" required placeholder="Kullanıcı adı veya e-posta" autocomplete="username">
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="loginPassword">Şifre</label>
-                    <input class="form-input" type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password">
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="loginCompany">Şirket / Çalışma Alanı (İsteğe bağlı)</label>
-                    <input class="form-input" type="text" id="loginCompany" placeholder="Boş bırakılabilir (Otomatik bulunur)">
-                </div>
-                <div class="auth-error" id="loginError"></div>
-                <button type="submit" class="btn btn-primary auth-submit-btn">Giriş Yap</button>
-            </form>
+            <!-- Environment Mode Switcher (Canlı Sistem vs Nova Demo) -->
+            <div class="auth-mode-selector" style="display: flex; gap: 6px; margin-bottom: 18px; background: var(--bg-secondary); padding: 4px; border-radius: 10px; border: 1px solid var(--border);">
+                <button type="button" class="auth-mode-btn active" id="btnModeLive" style="flex: 1; padding: 9px 8px; border-radius: 8px; font-weight: 600; font-size: 13px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
+                    <span>🌐</span> Canlı Sistem <span style="font-size: 10px; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 1px 6px; border-radius: 4px; font-weight: 700;">PROD</span>
+                </button>
+                <button type="button" class="auth-mode-btn" id="btnModeDemo" style="flex: 1; padding: 9px 8px; border-radius: 8px; font-weight: 600; font-size: 13px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
+                    <span>🚀</span> Nova Demo Ortamı <span style="font-size: 10px; background: rgba(99, 102, 241, 0.15); color: #6366f1; padding: 1px 6px; border-radius: 4px; font-weight: 700;">ÖNİZLEME</span>
+                </button>
+            </div>
 
-            <!-- Register Form -->
-            <form id="registerForm" class="auth-form">
-                <div class="form-group">
-                    <label class="form-label" for="regName">Tam Adınız</label>
-                    <input class="form-input" type="text" id="regName" required placeholder="Adınız ve Soyadınız">
+            <!-- SECTION 1: LIVE SYSTEM SECTION -->
+            <div id="authLiveSection" class="auth-section active">
+                <div class="auth-tabs" style="margin-bottom: 16px;">
+                    <button type="button" class="auth-tab active" id="tabLogin">Giriş Yap</button>
+                    <button type="button" class="auth-tab" id="tabRegister">✚ Yeni Hesap Aç (Kayıt Ol)</button>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="regUser">Kullanıcı Adı veya E-posta</label>
-                    <input class="form-input" type="text" id="regUser" required placeholder="Kullanıcı adı veya e-posta" autocomplete="username">
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="regPassword">Şifre</label>
-                    <input class="form-input" type="password" id="regPassword" required placeholder="En az 6 karakter" autocomplete="new-password">
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="regCompany">Şirket / Takım Adı (İsteğe bağlı)</label>
-                    <input class="form-input" type="text" id="regCompany" placeholder="ör. Şirket adı veya bireysel için boş bırakın">
-                </div>
-                <div class="auth-error" id="registerError"></div>
-                <div class="register-success-box" id="regSuccessBox" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:12px; border-radius:8px; font-size:13px; margin-bottom:12px; line-height:1.5;"></div>
-                <button type="submit" class="btn btn-primary auth-submit-btn" id="btnRegisterSubmit">Hesap Oluştur</button>
-            </form>
 
-            <div class="auth-footer-note">
-                Varsayılan hesaplar: <code>admin</code>, <code>zeynep</code> (Şifre: <code>password</code>)<br>
-                <a href="/register" style="color:var(--accent); font-weight:600; text-decoration:underline; display:inline-block; margin-top:6px;">Ayrı Kayıt ve Talep Sayfası ➔</a>
+                <!-- Live Login Form -->
+                <form id="loginForm" class="auth-form active">
+                    <div class="form-group">
+                        <label class="form-label" for="loginUser">Kullanıcı Adı veya E-posta</label>
+                        <input class="form-input" type="text" id="loginUser" required placeholder="ör. gencyigitcan veya mail@sirket.com" autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="loginPassword">Şifre</label>
+                        <input class="form-input" type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="loginCompany">Şirket / Takım Adı (İsteğe bağlı)</label>
+                        <input class="form-input" type="text" id="loginCompany" placeholder="Boş bırakılabilir (Otomatik yönlendirilir)">
+                    </div>
+                    <div class="auth-error" id="loginError"></div>
+                    <button type="submit" class="btn btn-primary auth-submit-btn" style="height: 42px; font-size: 14px; font-weight: 600;">
+                        🌐 Canlı Sisteme Giriş Yap
+                    </button>
+                </form>
+
+                <!-- Live Register Form -->
+                <form id="registerForm" class="auth-form">
+                    <div class="form-group">
+                        <label class="form-label" for="regName">Adınız ve Soyadınız</label>
+                        <input class="form-input" type="text" id="regName" required placeholder="Adınız Soyadınız">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="regUser">Kullanıcı Adı veya E-posta</label>
+                        <input class="form-input" type="text" id="regUser" required placeholder="kullaniciadi veya ad@sirket.com" autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="regPassword">Şifre</label>
+                        <input class="form-input" type="password" id="regPassword" required placeholder="En az 6 karakter" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="regCompany">Şirket / Takım Adı (İsteğe bağlı)</label>
+                        <input class="form-input" type="text" id="regCompany" placeholder="Şirket adı veya bireysel için boş bırakın">
+                    </div>
+                    <div class="auth-error" id="registerError"></div>
+                    <div class="register-success-box" id="regSuccessBox" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:12px; border-radius:8px; font-size:13px; margin-bottom:12px; line-height:1.5;"></div>
+                    <button type="submit" class="btn btn-primary auth-submit-btn" id="btnRegisterSubmit" style="height: 42px; font-size: 14px; font-weight: 600;">
+                        ✚ Canlı Sistem Hesabı Oluştur
+                    </button>
+                    <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">
+                        🛡️ Güvenlik gereği yeni canlı hesaplar Super Admin onayı ile aktive edilir.
+                    </p>
+                </form>
+
+                <div class="auth-footer-note" style="margin-top: 14px;">
+                    Canlı sistem yöneticisi: <code>Yiğitcan Genç</code><br>
+                    <span style="font-size: 11px; color: var(--text-secondary);">Demo ortamını incelemek için yukarıdaki <strong>"Nova Demo Ortamı"</strong> sekmesine tıklayabilirsiniz.</span>
+                </div>
+            </div>
+
+            <!-- SECTION 2: NOVA DEMO SECTION -->
+            <div id="authDemoSection" class="auth-section" style="display: none;">
+                <div class="demo-info-banner" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(14, 165, 233, 0.08) 100%); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                        <span style="font-size: 18px;">🚀</span>
+                        <strong style="font-size: 13px; color: var(--accent);">Nova Mühendislik Takımı (10 Kişi)</strong>
+                        <span style="font-size: 10px; background: var(--accent); color: #fff; padding: 1px 6px; border-radius: 10px; font-weight: 700; margin-left: auto;">Kayan Canlı Takvim</span>
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin: 0; line-height: 1.5;">
+                        Demo ortamı dinamik takvim motoruyla bugünün haftasına otomatik hizalanır. Dilediğiniz ekip üyesini seçerek <strong>şifresiz tek tıkla</strong> önizleme yapabilirsiniz.
+                    </p>
+                </div>
+
+                <!-- Member Selector Dropdown -->
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" for="demoUserSelect" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>👥 Ekip Üyesi Seçin (Giriş Yapılacak Rol)</span>
+                        <span style="font-size: 11px; color: var(--accent); font-weight: 600;">Şifre Gerekmez</span>
+                    </label>
+                    <select class="form-select" id="demoUserSelect" style="font-size: 13px; padding: 9px 12px; width: 100%; font-weight: 500;">
+                        <option value="admin" data-name="Ali Yılmaz" data-color="#4f46e5" data-title="Proje Yöneticisi & Takım Lideri">👑 Ali Yılmaz (admin) — Proje Yöneticisi & Takım Lideri</option>
+                        <option value="zeynep" data-name="Zeynep Kaya" data-color="#0ea5e9" data-title="Kıdemli UI/UX Tasarımcısı">🎨 Zeynep Kaya (zeynep) — Kıdemli UI/UX Tasarımcısı</option>
+                        <option value="mehmet" data-name="Mehmet Demir" data-color="#10b981" data-title="Backend & Bulut Mühendisi">💻 Mehmet Demir (mehmet) — Backend & Bulut Mühendisi</option>
+                        <option value="selin" data-name="Selin Yıldız" data-color="#f59e0b" data-title="Mobil Uygulama Geliştiricisi">📱 Selin Yıldız (selin) — Mobil Uygulama Geliştiricisi</option>
+                        <option value="caner" data-name="Caner Öztürk" data-color="#8b5cf6" data-title="DevOps & Sistem Mimarı">⚙️ Caner Öztürk (caner) — DevOps & Sistem Mimarı</option>
+                        <option value="burcu" data-name="Burcu Çelik" data-color="#ec4899" data-title="QA & Test Otomasyon Mühendisi">🧪 Burcu Çelik (burcu) — QA & Test Otomasyon Mühendisi</option>
+                        <option value="emre" data-name="Emre Aydın" data-color="#06b6d4" data-title="Veri Analisti & Raporlama">📊 Emre Aydın (emre) — Veri Analisti & Raporlama</option>
+                        <option value="gamze" data-name="Gamze Şahin" data-color="#14b8a6" data-title="Scrum Master & Çevik Koç">📋 Gamze Şahin (gamze) — Scrum Master & Çevik Koç</option>
+                        <option value="tolga" data-name="Tolga Kurt" data-color="#f97316" data-title="Siber Güvenlik Uzmanı">🔒 Tolga Kurt (tolga) — Siber Güvenlik Uzmanı</option>
+                        <option value="derya" data-name="Derya Arslan" data-color="#64748b" data-title="Product Owner (Ürün Yöneticisi)">🚀 Derya Arslan (derya) — Product Owner (Ürün Yöneticisi)</option>
+                    </select>
+                </div>
+
+                <!-- Selected Persona Preview Card -->
+                <div id="demoPersonaPreview" style="background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm);">
+                    <div id="demoPreviewAvatar" style="width: 42px; height: 42px; border-radius: 50%; background: #4f46e5; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink: 0;">
+                        AY
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span id="demoPreviewName" style="font-weight: 700; font-size: 14px; color: var(--text-primary);">Ali Yılmaz</span>
+                            <span id="demoPreviewUsername" style="font-size: 11px; color: var(--text-muted); font-family: monospace;">@admin</span>
+                        </div>
+                        <div id="demoPreviewTitle" style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">Proje Yöneticisi & Takım Lideri</div>
+                    </div>
+                    <div style="font-size: 10px; background: rgba(16, 185, 129, 0.12); color: #10b981; padding: 3px 8px; border-radius: 6px; font-weight: 700;">
+                        Aktif Rol
+                    </div>
+                </div>
+
+                <!-- Quick Persona Chips -->
+                <div style="margin-bottom: 16px;">
+                    <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">Hızlı Kişi Seç:</div>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <button type="button" class="btn-demo-quick-chip" onclick="window.selectDemoUser('admin')">👑 Ali (Yönetici)</button>
+                        <button type="button" class="btn-demo-quick-chip" onclick="window.selectDemoUser('zeynep')">🎨 Zeynep (Tasarım)</button>
+                        <button type="button" class="btn-demo-quick-chip" onclick="window.selectDemoUser('mehmet')">💻 Mehmet (Backend)</button>
+                        <button type="button" class="btn-demo-quick-chip" onclick="window.selectDemoUser('selin')">📱 Selin (Mobil)</button>
+                        <button type="button" class="btn-demo-quick-chip" onclick="window.selectDemoUser('caner')">⚙️ Caner (DevOps)</button>
+                    </div>
+                </div>
+
+                <div class="auth-error" id="demoLoginError"></div>
+
+                <!-- 1-Click Action Button -->
+                <button type="button" class="btn btn-primary auth-submit-btn" id="btnSubmitDemoLogin" style="height: 44px; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%); box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);">
+                    <span id="btnSubmitDemoLoginText">🚀 Ali Yılmaz Olarak Demo Panoya Giriş Yap ➔</span>
+                </button>
+
+                <div class="auth-footer-note" style="margin-top: 14px;">
+                    💡 Ziyaretçiler demo panosunda kart oluşturabilir, durum değiştirebilir ve yorum ekleyebilir.<br>
+                    Süper Admin demo hareketlerini denetim merkezinden anlık izleyebilir.
+                </div>
             </div>
         </div>
     </div>

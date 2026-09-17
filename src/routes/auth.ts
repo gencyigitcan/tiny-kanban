@@ -383,6 +383,96 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
     });
 }));
 
+/** GET /api/auth/demo-users - Returns demo personas for quick 1-click selection */
+authRouter.get('/demo-users', asyncHandler(async (req, res) => {
+    const env = req.environment || getEnvironment(req);
+    const demoDb = readDb({ tenantId: 'demo', environment: env });
+    
+    // Professional member titles for Nova Engineering Team
+    const titles: Record<string, string> = {
+        'admin': 'Proje Yöneticisi & Takım Lideri',
+        'zeynep': 'Kıdemli UI/UX Tasarımcısı',
+        'mehmet': 'Backend & Bulut Mühendisi',
+        'selin': 'Mobil Uygulama Geliştiricisi',
+        'caner': 'DevOps & Sistem Mimarı',
+        'burcu': 'QA & Test Otomasyon Mühendisi',
+        'emre': 'Veri Analisti & Raporlama',
+        'gamze': 'Scrum Master & Çevik Koç',
+        'tolga': 'Siber Güvenlik Uzmanı',
+        'derya': 'Product Owner (Ürün Yöneticisi)'
+    };
+
+    const users = (demoDb.users || []).map(u => ({
+        id: u.id,
+        username: u.username,
+        name: u.name,
+        avatarColor: u.avatarColor,
+        role: u.role || 'user',
+        title: titles[u.username.toLowerCase()] || (u.role === 'admin' ? 'Yönetici' : 'Ekip Üyesi')
+    }));
+
+    res.json({ users });
+}));
+
+/** POST /api/auth/demo-login - 1-click quick persona login for Nova Demo team */
+authRouter.post('/demo-login', asyncHandler(async (req, res) => {
+    const { username } = req.body || {};
+    const normalizedUsername = (username || 'admin').toLowerCase().trim();
+    const env = req.environment || getEnvironment(req);
+    const demoDb = readDb({ tenantId: 'demo', environment: env });
+
+    let user = demoDb.users.find(u => u.username.toLowerCase() === normalizedUsername);
+    if (!user) {
+        user = demoDb.users[0];
+    }
+
+    if (!user) {
+        throw new AppError('Demo kullanıcısı bulunamadı', 404);
+    }
+
+    user.lastLoginAt = Date.now();
+
+    const randomToken = crypto.randomBytes(32).toString('hex');
+    const token = `demo:${randomToken}`;
+    const newSession: Session = {
+        token,
+        userId: user.id,
+        tenantId: 'demo',
+        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000
+    };
+    demoDb.sessions.push(newSession);
+    writeDbSync(demoDb, { tenantId: 'demo', environment: env });
+
+    logActivity({
+        userId: user.id,
+        username: user.username,
+        name: user.name,
+        userRole: user.role || 'user',
+        action: 'LOGIN',
+        entityType: 'auth',
+        entityId: user.id,
+        details: `[DEMO GİRİŞİ] ${user.name} (@${user.username}) Nova Demo ortamına hızlı giriş yaptı.`,
+        workspaceId: 'demo',
+        environment: env
+    }, req);
+
+    res.json({
+        token,
+        user: {
+            id: user.id,
+            username: user.username,
+            email: user.email || `${user.username}@novateam.demo`,
+            name: user.name,
+            avatarColor: user.avatarColor,
+            role: user.role || 'user',
+            workspaces: [{ id: 'demo', name: 'Nova Demo Panosu' }]
+        },
+        workspaces: [{ id: 'demo', name: 'Nova Demo Panosu' }],
+        activeWorkspaceId: 'demo',
+        environment: env
+    });
+}));
+
 /** POST /api/auth/switch-workspace */
 authRouter.post('/switch-workspace', requireAuth, asyncHandler(async (req, res) => {
     const { workspaceId } = req.body;

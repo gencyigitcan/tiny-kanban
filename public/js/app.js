@@ -740,6 +740,7 @@ function showAuthScreen() {
         clearInterval(syncIntervalId);
         syncIntervalId = null;
     }
+    initDemoPersonas();
 }
 
 function hideAuthScreen() {
@@ -933,6 +934,111 @@ function setupBackgroundSync() {
         }
     }, 5000);
 }
+
+// ── Multi-Environment Mode Selector (Live vs Demo) ───────
+safeAddListener('btnModeLive', 'click', () => {
+    const btnLive = document.getElementById('btnModeLive');
+    const btnDemo = document.getElementById('btnModeDemo');
+    const liveSec = document.getElementById('authLiveSection');
+    const demoSec = document.getElementById('authDemoSection');
+    if (btnLive) btnLive.classList.add('active');
+    if (btnDemo) btnDemo.classList.remove('active');
+    if (liveSec) liveSec.style.display = 'block';
+    if (demoSec) demoSec.style.display = 'none';
+});
+
+safeAddListener('btnModeDemo', 'click', () => {
+    const btnLive = document.getElementById('btnModeLive');
+    const btnDemo = document.getElementById('btnModeDemo');
+    const liveSec = document.getElementById('authLiveSection');
+    const demoSec = document.getElementById('authDemoSection');
+    if (btnDemo) btnDemo.classList.add('active');
+    if (btnLive) btnLive.classList.remove('active');
+    if (liveSec) liveSec.style.display = 'none';
+    if (demoSec) demoSec.style.display = 'block';
+    updateDemoPersonaPreview();
+});
+
+function updateDemoPersonaPreview() {
+    const sel = document.getElementById('demoUserSelect');
+    if (!sel) return;
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt) return;
+
+    const name = opt.getAttribute('data-name') || opt.textContent.split('(')[0].replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ ]/g, '').trim();
+    const color = opt.getAttribute('data-color') || '#4f46e5';
+    const title = opt.getAttribute('data-title') || 'Nova Ekip Üyesi';
+    const username = opt.value;
+
+    const previewAvatar = document.getElementById('demoPreviewAvatar');
+    if (previewAvatar) {
+        previewAvatar.textContent = initials(name);
+        previewAvatar.style.backgroundColor = color;
+    }
+    const previewName = document.getElementById('demoPreviewName');
+    if (previewName) previewName.textContent = name;
+    const previewUser = document.getElementById('demoPreviewUsername');
+    if (previewUser) previewUser.textContent = '@' + username;
+    const previewTitle = document.getElementById('demoPreviewTitle');
+    if (previewTitle) previewTitle.textContent = title;
+
+    const btnText = document.getElementById('btnSubmitDemoLoginText');
+    if (btnText) {
+        btnText.textContent = `🚀 ${name} Olarak Demo Panoya Giriş Yap ➔`;
+    }
+}
+
+function selectDemoUser(username) {
+    const sel = document.getElementById('demoUserSelect');
+    if (sel) {
+        sel.value = username;
+        updateDemoPersonaPreview();
+    }
+}
+window.selectDemoUser = selectDemoUser;
+
+async function initDemoPersonas() {
+    try {
+        const res = await API.getDemoUsers().catch(() => null);
+        if (res && res.users && res.users.length > 0) {
+            const sel = document.getElementById('demoUserSelect');
+            if (sel) {
+                const currentVal = sel.value || 'admin';
+                sel.innerHTML = res.users.map(u => {
+                    const icon = u.role === 'admin' ? '👑' : (u.username === 'zeynep' ? '🎨' : (u.username === 'mehmet' ? '💻' : (u.username === 'selin' ? '📱' : (u.username === 'caner' ? '⚙️' : (u.username === 'burcu' ? '🧪' : '👤')))));
+                    return `<option value="${escHtml(u.username)}" data-name="${escHtml(u.name)}" data-color="${escHtml(u.avatarColor || '#4f46e5')}" data-title="${escHtml(u.title || 'Ekip Üyesi')}" ${u.username === currentVal ? 'selected' : ''}>${icon} ${escHtml(u.name)} (${escHtml(u.username)}) — ${escHtml(u.title || 'Ekip Üyesi')}</option>`;
+                }).join('');
+            }
+        }
+    } catch (e) {
+        console.debug('Demo personas load skipped:', e);
+    }
+    updateDemoPersonaPreview();
+}
+
+safeAddListener('demoUserSelect', 'change', updateDemoPersonaPreview);
+
+// ── Demo Login Submission Action ──────────────────────────
+safeAddListener('btnSubmitDemoLogin', 'click', async () => {
+    const sel = document.getElementById('demoUserSelect');
+    const username = sel ? sel.value : 'admin';
+    const errorDiv = document.getElementById('demoLoginError');
+    if (errorDiv) { errorDiv.textContent = ''; errorDiv.style.display = 'none'; }
+
+    try {
+        const res = await API.demoLogin(username);
+        currentUser = res.user;
+        window.currentUser = currentUser;
+        updateUserHeader();
+        await boot();
+        showToast(`🚀 Nova Demo Panosuna ${currentUser.name} olarak giriş yapıldı!`);
+    } catch (err) {
+        if (errorDiv) {
+            errorDiv.textContent = err.message || 'Demo girişi yapılamadı';
+            errorDiv.style.display = 'block';
+        }
+    }
+});
 
 // ── Auth Tab Switch ──────────────────────────────────────
 safeAddListener('tabLogin', 'click', () => {
@@ -1268,18 +1374,20 @@ async function loadAdminData() {
 
 let _auditLogFilterDebounce = null;
 
-async function fetchAndRenderLogs(containerId, countBadgeId, searchId, userSelectId, actionSelectId) {
+async function fetchAndRenderLogs(containerId, countBadgeId, searchId, userSelectId, actionSelectId, envSelectId) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
     const searchInput = searchId ? document.getElementById(searchId) : null;
     const userSelect = userSelectId ? document.getElementById(userSelectId) : null;
     const actionSelect = actionSelectId ? document.getElementById(actionSelectId) : null;
+    const envSelect = envSelectId ? document.getElementById(envSelectId) : null;
     const countBadge = countBadgeId ? document.getElementById(countBadgeId) : null;
 
     const searchVal = searchInput ? searchInput.value.trim() : '';
     const userVal = userSelect ? userSelect.value : '';
     const actionVal = actionSelect ? actionSelect.value : '';
+    const envVal = envSelect ? envSelect.value : 'all';
 
     container.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px;">Aktivite kayıtları getiriliyor…</div>';
     if (countBadge) countBadge.textContent = 'Filtreleniyor…';
@@ -1302,7 +1410,8 @@ async function fetchAndRenderLogs(containerId, countBadgeId, searchId, userSelec
         const res = await API.getAuditLogs({
             user: userVal,
             action: actionVal,
-            q: searchVal
+            q: searchVal,
+            workspace: envVal
         });
         const logs = res.logs || [];
 
@@ -1344,6 +1453,10 @@ async function fetchAndRenderLogs(containerId, countBadgeId, searchId, userSelec
             const hue = [...authorName].reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360;
             const avatarBg = `hsl(${hue}, 60%, 45%)`;
 
+            const envBadge = l.workspaceId === 'demo'
+                ? `<span style="font-size: 10px; background: rgba(99, 102, 241, 0.12); color: #6366f1; border: 1px solid rgba(99, 102, 241, 0.25); padding: 1px 6px; border-radius: 4px; font-weight: 700;">🚀 Demo</span>`
+                : `<span style="font-size: 10px; background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); padding: 1px 6px; border-radius: 4px; font-weight: 700;">🌐 Canlı</span>`;
+
             return `
                 <div style="display: flex; gap: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 13px; align-items: flex-start; transition: var(--transition); box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
                     <div style="width: 34px; height: 34px; border-radius: 50%; background: ${avatarBg}; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 12px; flex-shrink: 0; margin-top: 1px;">
@@ -1355,6 +1468,7 @@ async function fetchAndRenderLogs(containerId, countBadgeId, searchId, userSelec
                                 <span style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${escHtml(authorName)}</span>
                                 <span style="font-size: 12px; color: var(--text-muted);">(@${escHtml(l.username || '')})</span>
                                 <span style="font-size: 10px; background: rgba(99, 102, 241, 0.1); color: var(--accent); padding: 1px 6px; border-radius: 4px; font-weight: 600;">${escHtml(l.userRole || 'user')}</span>
+                                ${envBadge}
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <span style="color: ${meta.color}; background: ${meta.bg}; border: 1px solid ${meta.color}40; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; white-space: nowrap;">
@@ -1376,11 +1490,11 @@ async function fetchAndRenderLogs(containerId, countBadgeId, searchId, userSelec
 }
 
 async function renderAuditLogs() {
-    await fetchAndRenderLogs('adminLogsList', 'logResultsCount', 'logFilterSearch', 'logFilterUser', 'logFilterAction');
+    await fetchAndRenderLogs('adminLogsList', 'logResultsCount', 'logFilterSearch', 'logFilterUser', 'logFilterAction', 'logFilterEnv');
 }
 
 async function renderAuditView() {
-    await fetchAndRenderLogs('viewAuditLogsList', 'viewAuditResultsCount', 'viewAuditFilterSearch', 'viewAuditFilterUser', 'viewAuditFilterAction');
+    await fetchAndRenderLogs('viewAuditLogsList', 'viewAuditResultsCount', 'viewAuditFilterSearch', 'viewAuditFilterUser', 'viewAuditFilterAction', 'viewAuditFilterEnv');
 }
 window.renderAuditView = renderAuditView;
 
@@ -1468,15 +1582,24 @@ safeAddListener('logFilterSearch', 'input', () => {
     _auditLogFilterDebounce = setTimeout(() => { renderAuditLogs(); }, 300);
 });
 
+safeAddListener('logFilterEnv', 'change', () => {
+    renderAuditLogs();
+});
+
 safeAddListener('btnClearLogFilters', 'click', () => {
     const s = document.getElementById('logFilterSearch'); if (s) s.value = '';
     const u = document.getElementById('logFilterUser'); if (u) u.value = '';
     const a = document.getElementById('logFilterAction'); if (a) a.value = '';
+    const e = document.getElementById('logFilterEnv'); if (e) e.value = 'all';
     renderAuditLogs();
 });
 
 // Full-screen View-Audit Listeners
 safeAddListener('btnRefreshAuditView', 'click', () => {
+    renderAuditView();
+});
+
+safeAddListener('viewAuditFilterEnv', 'change', () => {
     renderAuditView();
 });
 
@@ -1497,6 +1620,7 @@ safeAddListener('btnClearAuditViewFilters', 'click', () => {
     const s = document.getElementById('viewAuditFilterSearch'); if (s) s.value = '';
     const u = document.getElementById('viewAuditFilterUser'); if (u) u.value = '';
     const a = document.getElementById('viewAuditFilterAction'); if (a) a.value = '';
+    const e = document.getElementById('viewAuditFilterEnv'); if (e) e.value = 'all';
     renderAuditView();
 });
 
