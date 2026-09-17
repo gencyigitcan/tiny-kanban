@@ -40,8 +40,8 @@
         </div>
         <div class="header-filters">
             <select class="filter-select" id="filterSprint" title="Sprint Filtresi">
-                <option value="active">⚡ Aktif Sprint (Sprint 37)</option>
-                <option value="all">🌐 Tüm Sprintler (52 Hafta)</option>
+                <option value="active">⚡ Aktif Sprint (Sprint 37 · 14-20 Eyl 2026)</option>
+                <option value="all">🌐 Tüm Sprintler (104 Hafta · 2026-2027)</option>
             </select>
             <select class="filter-select" id="filterAssignee">
                 <option value="">Tüm kişiler</option>
@@ -54,7 +54,7 @@
             </select>
         </div>
         <div class="header-actions">
-            <button class="btn btn-primary" id="addTaskBtn">✚ <span class="label">Yeni Görev</span></button>
+            <button class="btn btn-primary" id="addTaskBtn" onclick="openCardDetail(null)" style="font-weight:600; box-shadow:0 0 16px rgba(99,102,241,0.35);">✚ <span class="label">Yeni Ticket Ekle</span></button>
             <button class="btn btn-secondary" id="manageEpicsBtn">🏷️ <span class="label">Epics</span></button>
             <button class="btn btn-secondary" id="manageSprintsBtn">⚡ <span class="label">Sprints</span></button>
             <button class="btn btn-secondary" id="manageLabelsBtn">🎨 <span class="label">Etiketler</span></button>
@@ -83,8 +83,11 @@
             <section class="column" data-col="todo">
                 <div class="col-header">
                     <div class="col-header-top">
-                        <div class="col-title-wrap"><span class="col-dot"></span><span
-                                class="col-title">Yapılacak</span></div>
+                        <div class="col-title-wrap">
+                            <span class="col-dot"></span>
+                            <span class="col-title">Yapılacak</span>
+                            <button type="button" class="col-quick-plus-btn" onclick="openCardDetail(null, 'todo')" title="Yapılacak sütununa yeni ticket ekle">✚</button>
+                        </div>
                         <span class="col-count" data-count="todo">0</span>
                     </div>
                     <div class="wip-badge">Limit yok</div>
@@ -96,14 +99,23 @@
                         <div>Görev yok — <kbd>N</kbd> ile ekle</div>
                     </div>
                 </div>
-                <div class="quick-add"><input class="quick-add-input" type="text" placeholder="+ Hızlı ekle (Enter)"
-                        data-col="todo"></div>
+                <div class="col-footer-actions">
+                    <button type="button" class="col-add-ticket-btn" onclick="openCardDetail(null, 'todo')">
+                        ✚ Yeni Ticket Ekle
+                    </button>
+                    <div class="quick-add">
+                        <input class="quick-add-input" type="text" placeholder="+ Hızlı başlık yaz (Enter)" data-col="todo">
+                    </div>
+                </div>
             </section>
             <section class="column" data-col="doing">
                 <div class="col-header">
                     <div class="col-header-top">
-                        <div class="col-title-wrap"><span class="col-dot"></span><span
-                                class="col-title">Yapılıyor</span></div>
+                        <div class="col-title-wrap">
+                            <span class="col-dot"></span>
+                            <span class="col-title">Yapılıyor</span>
+                            <button type="button" class="col-quick-plus-btn" onclick="openCardDetail(null, 'doing')" title="Yapılıyor sütununa yeni ticket ekle">✚</button>
+                        </div>
                         <span class="col-count" data-count="doing">0</span>
                     </div>
                     <div class="wip-badge">Limit yok</div>
@@ -115,14 +127,23 @@
                         <div>Devam eden yok</div>
                     </div>
                 </div>
-                <div class="quick-add"><input class="quick-add-input" type="text" placeholder="+ Hızlı ekle (Enter)"
-                        data-col="doing"></div>
+                <div class="col-footer-actions">
+                    <button type="button" class="col-add-ticket-btn" onclick="openCardDetail(null, 'doing')">
+                        ✚ Yeni Ticket Ekle
+                    </button>
+                    <div class="quick-add">
+                        <input class="quick-add-input" type="text" placeholder="+ Hızlı başlık yaz (Enter)" data-col="doing">
+                    </div>
+                </div>
             </section>
             <section class="column" data-col="done">
                 <div class="col-header">
                     <div class="col-header-top">
-                        <div class="col-title-wrap"><span class="col-dot"></span><span
-                                class="col-title">Tamamlandı</span></div>
+                        <div class="col-title-wrap">
+                            <span class="col-dot"></span>
+                            <span class="col-title">Tamamlandı</span>
+                            <button type="button" class="col-quick-plus-btn" onclick="openCardDetail(null, 'done')" title="Tamamlandı sütununa yeni ticket ekle">✚</button>
+                        </div>
                         <span class="col-count" data-count="done">0</span>
                     </div>
                     <div class="wip-badge">Limit yok</div>
@@ -134,8 +155,14 @@
                         <div>Tamamlanan görevler burada</div>
                     </div>
                 </div>
-                <div class="quick-add"><input class="quick-add-input" type="text" placeholder="+ Hızlı ekle (Enter)"
-                        data-col="done"></div>
+                <div class="col-footer-actions">
+                    <button type="button" class="col-add-ticket-btn" onclick="openCardDetail(null, 'done')">
+                        ✚ Yeni Ticket Ekle
+                    </button>
+                    <div class="quick-add">
+                        <input class="quick-add-input" type="text" placeholder="+ Hızlı başlık yaz (Enter)" data-col="done">
+                    </div>
+                </div>
             </section>
         </main>
     </div>

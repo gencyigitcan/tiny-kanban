@@ -176,20 +176,62 @@ function renderBoard(cards, epics = [], readonly = false) {
 }
 
 // ── List view render ─────────────────────────────────────
+window._listFilter = window._listFilter || 'current';
+function setListFilter(filter) {
+  window._listFilter = filter;
+  if (typeof renderAll === 'function') renderAll();
+}
+window.setListFilter = setListFilter;
+
 function renderListView(cards, epics = []) {
   const container = document.getElementById('listView');
   if (!container) return;
   const colLabel = { todo: 'Yapılacak', doing: 'Yapılıyor', done: 'Tamamlandı' };
   const colBadge = { todo: 'col-badge-todo', doing: 'col-badge-doing', done: 'col-badge-done' };
-  const rows = cards.map(c => {
+  
+  const allSprints = window.sprints || [];
+  const activeSprintIdx = allSprints.findIndex(s => s.active);
+  const pastSprintIds = new Set(allSprints.slice(0, activeSprintIdx > 0 ? activeSprintIdx : 0).map(s => s.id));
+  const futureSprintIds = new Set(allSprints.slice(activeSprintIdx >= 0 ? activeSprintIdx : 0).map(s => s.id));
+  const activeSprint = allSprints.find(s => s.active);
+
+  let filteredCards = cards;
+  if (window._listFilter === 'current') {
+    filteredCards = cards.filter(c => !c.sprintId || futureSprintIds.has(c.sprintId));
+  } else if (window._listFilter === 'active') {
+    filteredCards = cards.filter(c => activeSprint && c.sprintId === activeSprint.id);
+  } else if (window._listFilter === 'past') {
+    filteredCards = cards.filter(c => pastSprintIds.has(c.sprintId));
+  } else if (window._listFilter === 'backlog') {
+    filteredCards = cards.filter(c => !c.sprintId);
+  }
+
+  const controlsHTML = `
+    <div class="list-view-controls">
+      <div class="list-filter-group">
+        <button type="button" class="list-filter-btn ${window._listFilter === 'current' ? 'active' : ''}" onclick="setListFilter('current')">🎯 Aktif & Gelecek (Eylül 2026+)</button>
+        <button type="button" class="list-filter-btn ${window._listFilter === 'active' ? 'active' : ''}" onclick="setListFilter('active')">⚡ Aktif Sprint (Sprint 37)</button>
+        <button type="button" class="list-filter-btn ${window._listFilter === 'past' ? 'active' : ''}" onclick="setListFilter('past')">🕒 Geçmiş / Tamamlananlar</button>
+        <button type="button" class="list-filter-btn ${window._listFilter === 'backlog' ? 'active' : ''}" onclick="setListFilter('backlog')">📁 Sprintsiz Backlog</button>
+        <button type="button" class="list-filter-btn ${window._listFilter === 'all' ? 'active' : ''}" onclick="setListFilter('all')">🌐 Tüm Görevler (${cards.length})</button>
+      </div>
+      <button type="button" class="btn btn-sm btn-primary" onclick="openCardDetail(null)" style="font-size:12px;">✚ Yeni Ticket Ekle</button>
+    </div>
+  `;
+
+  const rows = filteredCards.map(c => {
     const epic = epics.find(e => e.id === c.epicId);
+    const sprintObj = allSprints.find(s => s.id === c.sprintId);
     const labels = (c.labels || []).map(id => window.LABEL_MAP[id]).filter(Boolean);
     const subtasks = c.subtasks || [];
     const done = subtasks.filter(s => s.done).length;
     return `<tr onclick="openCardDetail('${c.id}')" style="cursor:pointer">
       <td><span class="card-key-badge">${c.key || ''}</span></td>
       <td class="list-title-cell">
-        ${epic ? `<div><span class="epic-pill" style="background:${epic.color}20;color:${epic.color};font-size:10px;padding:1px 6px;border-radius:20px;font-weight:600">${escHtml(epic.name)}</span></div>` : ''}
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
+          ${epic ? `<span class="epic-pill" style="background:${epic.color}20;color:${epic.color};font-size:10px;padding:1px 6px;border-radius:20px;font-weight:600">${escHtml(epic.name)}</span>` : ''}
+          ${sprintObj ? `<span class="sprint-tag" style="background:rgba(99,102,241,0.1);color:var(--accent);font-size:10px;padding:1px 6px;border-radius:12px;">${sprintObj.active ? '🟢 ' : ''}${escHtml(sprintObj.name)}</span>` : '<span style="font-size:10px;color:var(--text-muted)">Backlog</span>'}
+        </div>
         ${escHtml(c.title)}
         ${labels.length ? `<div style="margin-top:4px;display:flex;gap:3px;flex-wrap:wrap">${labels.map(l => `<span class="label-tag" style="background:${l.bg};color:${l.color}">${escHtml(l.name)}</span>`).join('')}</div>` : ''}
       </td>
@@ -202,24 +244,44 @@ function renderListView(cards, epics = []) {
       <td>${subtasks.length ? `${done}/${subtasks.length}` : '—'}</td>
     </tr>`;
   }).join('');
+
   container.innerHTML = `<div class="list-view">
+    ${controlsHTML}
     <table class="list-table">
       <thead><tr>
-        <th>Anahtar</th><th>Başlık</th><th>Durum</th><th>Kişi</th><th>Öncelik</th><th>Bitiş</th><th>SP</th><th>Efor (H/T)</th><th>Alt Görev</th>
+        <th>Anahtar</th><th>Başlık & Sprint</th><th>Durum</th><th>Kişi</th><th>Öncelik</th><th>Bitiş</th><th>SP</th><th>Efor (H/T)</th><th>Alt Görev</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted)">Görev yok</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted)">Seçili filtrede görev yok</td></tr>'}</tbody>
     </table>
   </div>`;
 }
 
 // ── Backlog view render ──────────────────────────────────
+window._showPastSprints = window._showPastSprints || false;
+
+function togglePastSprints() {
+  window._showPastSprints = !window._showPastSprints;
+  if (typeof renderAll === 'function') renderAll();
+}
+window.togglePastSprints = togglePastSprints;
+
+function scrollToActiveSprint() {
+  const el = document.getElementById('backlog-active-sprint');
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el.classList.add('pulse-highlight');
+    setTimeout(() => el.classList.remove('pulse-highlight'), 1200);
+  }
+}
+window.scrollToActiveSprint = scrollToActiveSprint;
+
 function renderBacklogView(cards, sprints, epics = []) {
   const container = document.getElementById('backlogView');
   if (!container) return;
-  const activeSprint = sprints.find(s => s.active) || null;
 
-  function sprintGroup(sprint, sprintCards) {
+  function sprintGroup(sprint, sprintCards, isExtraActiveHighlight = false) {
     const isActive = sprint && sprint.active;
+    const totalSP = sprintCards.reduce((acc, c) => acc + (c.storyPoints || 0), 0);
     const rowsHTML = sprintCards.map(c => {
       const epic = epics.find(e => e.id === c.epicId);
       const over = (c.spentEffort || 0) > (c.estimatedEffort || 0) && (c.estimatedEffort || 0) > 0;
@@ -229,7 +291,7 @@ function renderBacklogView(cards, sprints, epics = []) {
         <div class="backlog-row-meta">
           ${epic ? `<span class="epic-pill" style="background:${epic.color}20;color:${epic.color}">${escHtml(epic.name)}</span>` : ''}
           ${c.spentEffort != null || c.estimatedEffort != null ? `<span class="effort-badge ${over ? 'effort-over' : 'effort-ok'}">⏱️ ${c.spentEffort || 0}/${c.estimatedEffort || 0} sa</span>` : ''}
-          ${c.storyPoints != null ? `<span class="sp-badge">${c.storyPoints}</span>` : ''}
+          ${c.storyPoints != null ? `<span class="sp-badge">${c.storyPoints} SP</span>` : ''}
           ${dueBadge(c.dueDate)}
           ${c.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="width:18px;height:18px;font-size:9px;background:${getAssigneeColor(c.assignee)}">${escHtml(initials(c.assignee))}</span></span>` : ''}
         </div>
@@ -238,31 +300,111 @@ function renderBacklogView(cards, sprints, epics = []) {
 
     const name = sprint ? sprint.name : 'Backlog (Sprint\'siz)';
     const dates = sprint?.startDate && sprint?.endDate ? `${sprint.startDate} → ${sprint.endDate}` : '';
-    return `<div class="backlog-sprint-group">
+    const groupCls = isExtraActiveHighlight ? 'backlog-sprint-group backlog-sprint-active-card' : 'backlog-sprint-group';
+    const groupId = isActive ? 'id="backlog-active-sprint"' : (sprint ? `id="backlog-sprint-${sprint.id}"` : 'id="backlog-unassigned"');
+
+    return `<div class="${groupCls}" ${groupId}>
       <div class="backlog-sprint-header">
         <div class="backlog-sprint-info">
           <span class="backlog-sprint-name">${escHtml(name)}</span>
-          ${isActive ? `<span class="sprint-active-badge">🟢 Aktif Sprint</span>` : ''}
-          ${dates ? `<span class="sprint-dates">${dates}</span>` : ''}
+          ${isActive ? `<span class="sprint-active-badge">🟢 Aktif Sprint (Eylül 2026)</span>` : ''}
+          ${dates ? `<span class="sprint-dates">📅 ${dates}</span>` : ''}
+          ${totalSP > 0 ? `<span class="sprint-total-sp" style="font-size:11px;font-weight:600;color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 8px;border-radius:10px;">⚡ Toplam: ${totalSP} SP</span>` : ''}
         </div>
         <div class="backlog-sprint-actions">
           ${sprint && !isActive ? `<button class="btn btn-sm btn-secondary" onclick="activateSprint('${sprint.id}')">Aktif Yap</button>` : ''}
-          <span style="font-size:12px;color:var(--text-muted)">${sprintCards.length} görev</span>
+          <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openCardDetail(null)" style="padding:4px 8px;font-size:11px;" title="Bu sprinte yeni ticket ekle">✚ Ticket Ekle</button>
+          <span style="font-size:12px;color:var(--text-muted);font-weight:600">${sprintCards.length} görev</span>
         </div>
       </div>
       <div class="backlog-list" data-sprint-id="${sprint ? sprint.id : ''}" ondragover="onBacklogDragOver(event)" ondragleave="onBacklogDragLeave(event)" ondrop="onBacklogDrop(event)">${rowsHTML}</div>
     </div>`;
   }
 
-  let html = '';
-  sprints.forEach(s => {
-    const sc = cards.filter(c => c.sprintId === s.id);
-    html += sprintGroup(s, sc);
-  });
-  const unassigned = cards.filter(c => !c.sprintId);
-  html += sprintGroup(null, unassigned);
+  // Find active sprint
+  let activeSprintIdx = sprints.findIndex(s => s.active);
+  if (activeSprintIdx === -1 && sprints.length) {
+    activeSprintIdx = 0;
+  }
 
-  container.innerHTML = `<div class="backlog-view">${html}</div>`;
+  let pastSprints = [];
+  let activeSprint = null;
+  let futureSprints = [];
+
+  if (activeSprintIdx !== -1) {
+    pastSprints = sprints.slice(0, activeSprintIdx);
+    activeSprint = sprints[activeSprintIdx];
+    futureSprints = sprints.slice(activeSprintIdx + 1);
+  } else {
+    futureSprints = sprints;
+  }
+
+  const unassigned = cards.filter(c => !c.sprintId);
+  const pastCardsCount = pastSprints.reduce((acc, s) => acc + cards.filter(c => c.sprintId === s.id).length, 0);
+
+  // Build Past Sprints Collapsible Bar
+  let pastHTML = '';
+  if (pastSprints.length > 0) {
+    let pastListHTML = '';
+    pastSprints.forEach(s => {
+      const sc = cards.filter(c => c.sprintId === s.id);
+      pastListHTML += sprintGroup(s, sc);
+    });
+
+    pastHTML = `
+      <div class="backlog-past-wrapper" style="margin-bottom: 20px;">
+        <div class="backlog-past-toggle-bar">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="togglePastSprints()" style="display:flex;align-items:center;gap:8px;font-weight:600;background:rgba(255,255,255,0.03);border:1px solid var(--border-color);padding:8px 16px;border-radius:8px;cursor:pointer;">
+            <span>${window._showPastSprints ? '▼' : '▶'}</span>
+            <span>🕒 Tamamlanan / Geçmiş Sprintleri ${window._showPastSprints ? 'Gizle' : 'Göster'}</span>
+            <span style="background:rgba(100,116,139,0.2);color:var(--text-secondary);font-size:11px;padding:2px 8px;border-radius:12px;">${pastSprints.length} Hafta · ${pastCardsCount} Görev</span>
+          </button>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;color:var(--text-secondary);">📍 Şu anki Dönem: <strong>Eylül 2026</strong></span>
+            <button type="button" class="btn btn-primary btn-sm" onclick="openCardDetail(null)" style="font-size:12px;padding:6px 12px;">✚ Yeni Ticket</button>
+          </div>
+        </div>
+        <div id="pastSprintsContainer" style="display: ${window._showPastSprints ? 'block' : 'none'}; margin-top: 14px; border-left: 2px dashed rgba(255,255,255,0.1); padding-left: 12px;">
+          ${pastListHTML}
+        </div>
+      </div>
+    `;
+  }
+
+  // Active Sprint
+  let activeHTML = '';
+  if (activeSprint) {
+    const activeCards = cards.filter(c => c.sprintId === activeSprint.id);
+    activeHTML = sprintGroup(activeSprint, activeCards, true);
+  }
+
+  // Unassigned Backlog
+  const unassignedHTML = sprintGroup(null, unassigned);
+
+  // Future Sprints
+  let futureHTML = '';
+  futureSprints.forEach(s => {
+    const sc = cards.filter(c => c.sprintId === s.id);
+    futureHTML += sprintGroup(s, sc);
+  });
+
+  container.innerHTML = `
+    <div class="backlog-view">
+      ${pastHTML}
+      <div class="backlog-active-section">
+        ${activeHTML}
+      </div>
+      <div class="backlog-unassigned-section" style="margin-top: 20px;">
+        ${unassignedHTML}
+      </div>
+      <div class="backlog-future-section" style="margin-top: 24px;">
+        <div style="font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+          <span>🗓️ Gelecek Sprintler (${futureSprints.length} Hafta)</span>
+        </div>
+        ${futureHTML}
+      </div>
+    </div>
+  `;
 }
 
 // ── Dashboard view render ────────────────────────────────
@@ -371,32 +513,82 @@ function renderDashboard(cards, epics = [], sprints = []) {
 }
 
 // ── Gantt view render ────────────────────────────────────
+window._ganttRange = window._ganttRange || 'current';
+
+function setGanttRange(range) {
+  window._ganttRange = range;
+  if (typeof renderAll === 'function') renderAll();
+}
+window.setGanttRange = setGanttRange;
+
+function scrollGanttToToday() {
+  const scrollWrap = document.querySelector('.gantt-wrap');
+  const line = document.getElementById('ganttTodayLine');
+  if (scrollWrap && line) {
+    const parent = scrollWrap.parentElement;
+    if (parent) {
+      const scrollPos = line.offsetLeft - (parent.clientWidth / 2);
+      parent.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
+    }
+  }
+}
+window.scrollGanttToToday = scrollGanttToToday;
+
 function renderGantt(cards) {
   const container = document.getElementById('ganttView');
   if (!container) return;
 
-  const withDates = cards.filter(c => c.dueDate);
-  if (!withDates.length) {
-    container.innerHTML = `<div class="gantt-view"><div style="text-align:center;padding:48px;color:var(--text-muted)">Bitiş tarihi olan görev yok. Gantt için görevlere tarih ekleyin.</div></div>`;
-    return;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // Range determination
+  let minD, maxD;
+  let rangeFilteredCards = cards;
+
+  if (window._ganttRange === 'current') {
+    // Current Period: Aug 1, 2026 to Nov 30, 2026 (centered around Sep 17, 2026)
+    minD = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    maxD = new Date(today.getFullYear(), today.getMonth() + 2, 28);
+    rangeFilteredCards = cards.filter(c => {
+      if (!c.dueDate && !c.startDate) return false;
+      const dStart = c.startDate ? new Date(c.startDate) : new Date(c.createdAt || today);
+      const dEnd = c.dueDate ? new Date(c.dueDate) : dStart;
+      return dEnd >= minD && dStart <= maxD;
+    });
+  } else if (window._ganttRange === '2026') {
+    minD = new Date(2026, 0, 1);
+    maxD = new Date(2026, 11, 31);
+    rangeFilteredCards = cards.filter(c => {
+      if (!c.dueDate && !c.startDate) return false;
+      const d = new Date(c.dueDate || c.startDate);
+      return d.getFullYear() === 2026;
+    });
+  } else if (window._ganttRange === '2027') {
+    minD = new Date(2027, 0, 1);
+    maxD = new Date(2027, 11, 31);
+    rangeFilteredCards = cards.filter(c => {
+      if (!c.dueDate && !c.startDate) return false;
+      const d = new Date(c.dueDate || c.startDate);
+      return d.getFullYear() === 2027;
+    });
+  } else {
+    // All
+    const withDates = cards.filter(c => c.dueDate);
+    const allDates = withDates.map(c => new Date(c.dueDate));
+    minD = new Date(Math.min(...allDates, today));
+    maxD = new Date(Math.max(...allDates, today));
+    minD.setDate(minD.getDate() - 2);
+    maxD.setDate(maxD.getDate() + 4);
+    rangeFilteredCards = cards;
   }
 
-  // Date range: today ± 30 days or min/max of card dates
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const allDates = withDates.map(c => new Date(c.dueDate));
-  let minD = new Date(Math.min(...allDates, today));
-  let maxD = new Date(Math.max(...allDates, today));
-  minD.setDate(minD.getDate() - 2);
-  maxD.setDate(maxD.getDate() + 4);
-
-  const days = [];
-  for (let d = new Date(minD); d <= maxD; d.setDate(d.getDate() + 1)) days.push(new Date(d));
-  const totalDays = days.length;
+  const withDates = rangeFilteredCards.filter(c => c.dueDate);
+  const totalDays = Math.max(1, Math.round((maxD - minD) / 86400000));
   const pct = d => (Math.max(0, (new Date(d) - minD)) / ((maxD - minD) || 1)) * 100;
   const todayPct = pct(today);
 
+  // Build timeline headers
   let timelineHeaders = '';
-  if (totalDays > 75) {
+  if (totalDays > 60) {
     const months = [];
     let curM = new Date(minD.getFullYear(), minD.getMonth(), 1);
     const endM = new Date(maxD.getFullYear(), maxD.getMonth(), 1);
@@ -408,58 +600,87 @@ function renderGantt(cards) {
     timelineHeaders = months.map(m => {
       const isCurMonth = m.getFullYear() === today.getFullYear() && m.getMonth() === today.getMonth();
       const mStart = Math.max(minD.getTime(), new Date(m.getFullYear(), m.getMonth(), 1).getTime());
-      const mEnd = Math.min(maxD.getTime(), new Date(m.getFullYear(), m.getMonth() + 1, 1).getTime());
+      const mEnd = Math.min(maxD.getTime(), new Date(m.getFullYear(), m.getMonth() + 1, 0, 23, 59, 59).getTime());
       const widthPct = Math.max(1, ((mEnd - mStart) / totalMs) * 100);
       const label = m.toLocaleDateString('tr-TR', { month: 'short', year: '2-digit' });
-      return `<div class="gantt-day${isCurMonth ? ' today' : ''}" style="flex: 0 0 ${widthPct.toFixed(2)}%; min-width: 55px; text-align: center; padding: 10px 2px;">
-        <span style="font-weight:600; font-size:11px;">${label}</span>
+      return `<div class="gantt-day${isCurMonth ? ' today' : ''}" style="flex: 0 0 ${widthPct.toFixed(2)}%; min-width: 65px; text-align: center; padding: 10px 2px;">
+        <span style="font-weight:700; font-size:12px; ${isCurMonth ? 'color:#10b981;' : ''}">${label}</span>
       </div>`;
     }).join('');
   } else {
+    const days = [];
+    for (let d = new Date(minD); d <= maxD; d.setDate(d.getDate() + 1)) days.push(new Date(d));
     timelineHeaders = days.map(d => {
       const isToday = d.toDateString() === today.toDateString();
-      return `<div class="gantt-day${isToday ? ' today' : ''}">${d.getDate()}<br><span style="font-size:9px">${d.toLocaleDateString('tr-TR', { month: 'short' })}</span></div>`;
+      return `<div class="gantt-day${isToday ? ' today' : ''}" style="min-width:32px;">${d.getDate()}<br><span style="font-size:9px">${d.toLocaleDateString('tr-TR', { month: 'short' })}</span></div>`;
     }).join('');
   }
 
   const priColor = { high: 'var(--pri-high)', medium: 'var(--pri-med)', low: 'var(--pri-low)' };
 
-  const rows = cards.map(c => {
+  const rows = rangeFilteredCards.map(c => {
     if (!c.dueDate) return `<div class="gantt-row">
       <div class="gantt-row-label" onclick="openCardDetail('${c.id}')">${escHtml(c.title.slice(0, 30))}${c.title.length > 30 ? '…' : ''}</div>
       <div class="gantt-row-timeline"><div class="gantt-no-date">Tarih belirlenmemiş</div></div>
     </div>`;
 
-    // Başlangıç: startDate varsa kullan, yoksa createdAt (oluşturma tarihi)
-    const rawStart = c.startDate
-      ? new Date(c.startDate)
-      : new Date(c.createdAt || Date.now());
+    const rawStart = c.startDate ? new Date(c.startDate) : new Date(c.createdAt || Date.now());
     rawStart.setHours(0, 0, 0, 0);
 
     const clampedStart = new Date(Math.max(rawStart, minD));
+    const clampedEnd = new Date(Math.min(new Date(c.dueDate), maxD));
     const barStart = pct(clampedStart);
-    const barEnd = pct(c.dueDate);
-    const barW = Math.max(0.5, barEnd - barStart);
+    const barEnd = pct(clampedEnd);
+    const barW = Math.max(1.2, barEnd - barStart);
 
     return `<div class="gantt-row">
-      <div class="gantt-row-label" onclick="openCardDetail('${c.id}')">${escHtml(c.title.slice(0, 30))}${c.title.length > 30 ? '…' : ''}</div>
+      <div class="gantt-row-label" onclick="openCardDetail('${c.id}')" title="${escHtml(c.title)}">
+        <span class="card-key-badge" style="font-size:9px;margin-right:4px;">${c.key || ''}</span>
+        ${escHtml(c.title.slice(0, 26))}${c.title.length > 26 ? '…' : ''}
+      </div>
       <div class="gantt-row-timeline" style="position:relative">
-        <div style="position:absolute;top:0;bottom:0;left:${todayPct.toFixed(1)}%;width:1px;background:var(--accent);opacity:.5;z-index:1"></div>
+        ${(todayPct >= 0 && todayPct <= 100) ? `<div style="position:absolute;top:0;bottom:0;left:${todayPct.toFixed(1)}%;width:2px;background:#ef4444;opacity:.6;z-index:1"></div>` : ''}
         <div class="gantt-bar" style="left:${barStart.toFixed(1)}%;width:${barW.toFixed(1)}%;background:${priColor[c.priority]};z-index:2"
-             onclick="openCardDetail('${c.id}')" title="${c.title} &#10;Başlangıç: ${rawStart.toLocaleDateString('tr-TR')} &#10;Bitiş: ${c.dueDate}">
+             onclick="openCardDetail('${c.id}')" title="${c.key}: ${c.title} &#10;Başlangıç: ${rawStart.toLocaleDateString('tr-TR')} &#10;Bitiş: ${c.dueDate}">
           ${escHtml(c.title.slice(0, 18))}
         </div>
       </div>
     </div>`;
   }).join('');
 
-  container.innerHTML = `<div class="gantt-view"><div class="gantt-wrap">
-    <div class="gantt-header">
-      <div class="gantt-label-col">Görev</div>
-      <div class="gantt-timeline-header">${timelineHeaders}</div>
+  const controlsHTML = `
+    <div class="gantt-controls-bar">
+      <div class="gantt-range-group">
+        <button type="button" class="gantt-btn ${window._ganttRange === 'current' ? 'active' : ''}" onclick="setGanttRange('current')">🎯 Aktif Dönem (Eylül 2026 ± 2 Ay)</button>
+        <button type="button" class="gantt-btn ${window._ganttRange === '2026' ? 'active' : ''}" onclick="setGanttRange('2026')">📅 2026 Yılı</button>
+        <button type="button" class="gantt-btn ${window._ganttRange === '2027' ? 'active' : ''}" onclick="setGanttRange('2027')">📅 2027 Yılı</button>
+        <button type="button" class="gantt-btn ${window._ganttRange === 'all' ? 'active' : ''}" onclick="setGanttRange('all')">🌐 Tüm 2 Yıl (104 Hafta)</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button type="button" class="btn btn-sm btn-secondary" onclick="scrollGanttToToday()" style="font-size:12px;">📍 Bugüne Git (17 Eyl 2026)</button>
+        <button type="button" class="btn btn-sm btn-primary" onclick="openCardDetail(null)" style="font-size:12px;">✚ Yeni Ticket Ekle</button>
+      </div>
     </div>
-    ${rows}
-  </div></div>`;
+  `;
+
+  container.innerHTML = `<div class="gantt-view">
+    ${controlsHTML}
+    <div class="gantt-wrap" style="position:relative;">
+      ${(todayPct >= 0 && todayPct <= 100) ? `
+        <div id="ganttTodayLine" style="position:absolute;top:0;bottom:0;left:calc(180px + (100% - 180px) * ${todayPct / 100});width:2px;background:#ef4444;box-shadow:0 0 10px rgba(239,68,68,0.8);z-index:5;pointer-events:none;">
+          <span class="gantt-today-badge">📍 Bugün (17 Eyl 2026)</span>
+        </div>` : ''}
+      <div class="gantt-header">
+        <div class="gantt-label-col">Görev</div>
+        <div class="gantt-timeline-header">${timelineHeaders}</div>
+      </div>
+      ${rows || '<div style="text-align:center;padding:48px;color:var(--text-muted)">Seçili zaman aralığında görev bulunamadı.</div>'}
+    </div>
+  </div>`;
+
+  setTimeout(() => {
+    scrollGanttToToday();
+  }, 120);
 }
 
 // ── Reports view render ──────────────────────────────────

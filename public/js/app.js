@@ -175,16 +175,16 @@ async function onDrop(e) {
 let _editSubtasks = [];
 let _editComments = [];
 
-function openCardDetail(id) {
+function openCardDetail(id, defaultCol) {
     const isNew = !id;
     const card = isNew ? null : cards.find(c => c.id === id);
-    document.getElementById('cardModalTitle').textContent = isNew ? 'Yeni Görev' : `${card?.key || ''}: Görevi Düzenle`;
+    document.getElementById('cardModalTitle').textContent = isNew ? '➕ Yeni Ticket / Görev Oluştur' : `${card?.key || ''}: Görevi Düzenle`;
     document.getElementById('editCardId').value = id || '';
     document.getElementById('cardTitle').value = card?.title || '';
     document.getElementById('cardDesc').value = card?.desc || '';
     document.getElementById('cardAssignee').value = card?.assignee || '';
     document.getElementById('cardPriority').value = card?.priority || 'medium';
-    document.getElementById('cardColumn').value = card?.col || 'todo';
+    document.getElementById('cardColumn').value = card?.col || defaultCol || 'todo';
     document.getElementById('cardSP').value = card?.storyPoints ?? '';
     document.getElementById('cardEstimatedEffort').value = card?.estimatedEffort ?? '';
     document.getElementById('cardSpentEffort').value = card?.spentEffort ?? '';
@@ -196,10 +196,29 @@ function openCardDetail(id) {
     epicSel.innerHTML = '<option value="">— Epic seç —</option>' +
         epics.map(e => `<option value="${e.id}" ${card?.epicId === e.id ? 'selected' : ''}>${escHtml(e.name)}</option>`).join('');
 
-    // Sprints dropdown
+    // Sprints dropdown with active sprint pre-selected
+    const activeSprint = (window.sprints || sprints || []).find(s => s.active);
+    const currentFilterSprint = document.getElementById('filterSprint')?.value;
+    let defaultSprintId = '';
+    if (card?.sprintId) {
+        defaultSprintId = card.sprintId;
+    } else if (isNew) {
+        if (currentFilterSprint && currentFilterSprint !== 'all' && currentFilterSprint !== 'active') {
+            defaultSprintId = currentFilterSprint;
+        } else if (activeSprint) {
+            defaultSprintId = activeSprint.id;
+        }
+    }
+
     const sprintSel = document.getElementById('cardSprint');
-    sprintSel.innerHTML = '<option value="">— Sprint seç —</option>' +
-        sprints.map(s => `<option value="${s.id}" ${card?.sprintId === s.id ? 'selected' : ''}>${escHtml(s.name)}</option>`).join('');
+    sprintSel.innerHTML = '<option value="">📁 Sprint\'siz (Backlog)</option>' +
+        sprints.map(s => {
+            const isSel = (card ? card.sprintId === s.id : s.id === defaultSprintId);
+            const activeMark = s.active ? '🟢 ' : '';
+            const activeText = s.active ? ' (Aktif Sprint)' : '';
+            const dateText = s.startDate && s.endDate ? ` · ${s.startDate} → ${s.endDate}` : '';
+            return `<option value="${s.id}" ${isSel ? 'selected' : ''}>${activeMark}${escHtml(s.name)}${activeText}${dateText}</option>`;
+        }).join('');
 
     // Labels
     const selectedLabels = new Set(card?.labels || []);
@@ -219,6 +238,7 @@ function openCardDetail(id) {
     openModal('cardModal');
     document.getElementById('cardTitle').focus();
 }
+window.openCardDetail = openCardDetail;
 
 function toggleLabel(el) {
     el.classList.toggle('selected');
@@ -356,11 +376,19 @@ document.querySelectorAll('.quick-add-input').forEach(input => {
         const col = input.dataset.col;
         if (!title) return;
         try {
-            const card = await API.addCard({ title, col });
+            const activeSprint = (window.sprints || sprints || []).find(s => s.active);
+            const currentFilterSprint = document.getElementById('filterSprint')?.value;
+            let sprintId = null;
+            if (currentFilterSprint && currentFilterSprint !== 'all' && currentFilterSprint !== 'active') {
+                sprintId = currentFilterSprint;
+            } else if (activeSprint) {
+                sprintId = activeSprint.id;
+            }
+            const card = await API.addCard({ title, col, sprintId });
             cards.push(card);
             input.value = '';
             renderAll();
-            showToast('Eklendi ✓');
+            showToast('Ticket başarıyla eklendi ✓');
         } catch { showToast('Eklenemedi', 'error'); }
     });
 });
