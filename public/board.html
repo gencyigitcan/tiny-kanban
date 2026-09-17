@@ -45,14 +45,17 @@
         </div>
         <div class="header-filters">
             <select class="filter-select" id="filterSprint" title="Sprint Filtresi">
-                <option value="active">⚡ Aktif Sprint</option>
-                <option value="all">🌐 Tüm Sprintler</option>
+                <option value="active">🟢 Aktif Sprint (Sprint 37 · 14-20 Eyl 2026)</option>
+                <option value="all">🌐 Tüm Sprintler (104 Hafta · 2026-2027)</option>
             </select>
-            <select class="filter-select" id="filterAssignee">
-                <option value="">Tüm kişiler</option>
+            <select class="filter-select" id="filterEpic" title="Proje / Epic Filtresi">
+                <option value="">📁 Tüm Projeler / Epics</option>
             </select>
-            <select class="filter-select" id="filterPriority">
-                <option value="">Tüm öncelikler</option>
+            <select class="filter-select" id="filterAssignee" title="Kişi Filtresi">
+                <option value="">👤 Tüm Kişiler</option>
+            </select>
+            <select class="filter-select" id="filterPriority" title="Öncelik Filtresi">
+                <option value="">🎯 Tüm Öncelikler</option>
                 <option value="high">🔴 Yüksek</option>
                 <option value="medium">🟠 Orta</option>
                 <option value="low">🟢 Düşük</option>
@@ -103,6 +106,22 @@
         <button class="view-tab" data-view="sprints">⚡ Sprints</button>
         <button class="view-tab" data-view="labels">🎨 Etiketler</button>
         <button class="view-tab" data-view="team">👥 Takım</button>
+    </div>
+
+    <!-- QUICK FILTERS & TEAM MEMBER BAR -->
+    <div class="quick-filters-bar" id="quickFiltersBar">
+        <div class="filter-chip-section">
+            <span class="filter-chip-label">👥 Kişi:</span>
+            <div class="filter-chips" id="memberFilterChips"></div>
+        </div>
+        <div class="filter-chip-section">
+            <span class="filter-chip-label">📁 Proje:</span>
+            <div class="filter-chips" id="projectFilterChips"></div>
+        </div>
+        <div class="filter-reset-wrap" id="filterResetWrap" style="display: none;">
+            <span class="active-filter-badge" id="activeFilterBadge">🎯 Filtre aktif</span>
+            <button type="button" class="btn-clear-filters" onclick="clearAllFilters()">✕ Filtreleri Temizle</button>
+        </div>
     </div>
 
     <!-- BOARD VIEW -->

@@ -126,14 +126,71 @@ function cardHTML(card, epics = [], readonly = false) {
   </div>`;
 }
 
+// ── Card Filter Helper ────────────────────────────────────
+function cardMatchesGlobalFilters(c, options = { checkSprint: true }) {
+  const q = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+  const fa = (document.getElementById('filterAssignee')?.value || '').toLowerCase().trim();
+  const fe = (document.getElementById('filterEpic')?.value || '').trim();
+  const fp = (document.getElementById('filterPriority')?.value || '').trim();
+  const fs = (document.getElementById('filterSprint')?.value || 'active').trim();
+  const allSprints = window.sprints || [];
+  const activeSprint = allSprints.find(s => s.active);
+
+  // 1. Sprint check (for board)
+  if (options.checkSprint && fs && fs !== 'all') {
+    if (fs === 'active') {
+      if (activeSprint && c.sprintId !== activeSprint.id) return false;
+    } else if (c.sprintId !== fs) {
+      return false;
+    }
+  }
+
+  // 2. Assignee / Kişi check
+  if (fa) {
+    if (fa === '__unassigned__') {
+      if (c.assignee) return false;
+    } else {
+      const cardAssignee = (c.assignee || '').trim().toLowerCase();
+      if (cardAssignee !== fa) return false;
+    }
+  }
+
+  // 3. Epic / Proje check
+  if (fe) {
+    if (fe === '__none__') {
+      if (c.epicId) return false;
+    } else {
+      if (c.epicId !== fe) return false;
+    }
+  }
+
+  // 4. Priority check
+  if (fp && c.priority !== fp) return false;
+
+  // 5. Search query
+  if (q) {
+    const t = (c.title || '').toLowerCase();
+    const d = (c.desc || '').toLowerCase();
+    const a = (c.assignee || '').toLowerCase();
+    const k = (c.key || '').toLowerCase();
+    if (!t.includes(q) && !d.includes(q) && !a.includes(q) && !k.includes(q)) return false;
+  }
+
+  return true;
+}
+window.cardMatchesGlobalFilters = cardMatchesGlobalFilters;
+
 // ── Board render ─────────────────────────────────────────
 function renderBoard(cards, epics = [], readonly = false) {
-  const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
-  const fa = (document.getElementById('filterAssignee')?.value || '').toLowerCase();
-  const fp = document.getElementById('filterPriority')?.value || '';
+  const fa = (document.getElementById('filterAssignee')?.value || '').toLowerCase().trim();
+  const fe = (document.getElementById('filterEpic')?.value || '').trim();
+  const fp = (document.getElementById('filterPriority')?.value || '').trim();
+  const q = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
   const fs = document.getElementById('filterSprint')?.value || 'active';
   const allSprints = window.sprints || [];
   const activeSprint = allSprints.find(s => s.active);
+
+  const hasFilter = !!(fa || fe || fp || q);
 
   ['todo', 'doing', 'done'].forEach(col => {
     const body = document.getElementById('col-' + col);
@@ -141,8 +198,8 @@ function renderBoard(cards, epics = [], readonly = false) {
     body.querySelectorAll('.card').forEach(el => el.remove());
     const emptyState = body.querySelector('.empty-state');
     
-    // Sütuna ve seçili sprinte göre kartları filtrele
-    const colCards = cards.filter(c => {
+    // Total cards in this sprint & column
+    const sprintColCards = cards.filter(c => {
       if (c.col !== col) return false;
       if (!fs || fs === 'all') return true;
       if (fs === 'active') {
@@ -152,27 +209,41 @@ function renderBoard(cards, epics = [], readonly = false) {
       return c.sprintId === fs;
     });
 
+    // Cards matching all filters (person, project, priority, search)
+    const visibleCards = sprintColCards.filter(c => cardMatchesGlobalFilters(c, { checkSprint: false }));
+
     const frag = document.createDocumentFragment();
     const tmp = document.createElement('div');
-    colCards.forEach(card => {
-      const hidden = (
-        (q && !card.title.toLowerCase().includes(q) && !(card.desc || '').toLowerCase().includes(q) && !(card.assignee || '').toLowerCase().includes(q) && !(card.key || '').toLowerCase().includes(q)) ||
-        (fa && (card.assignee || '').trim().toLowerCase() !== fa.trim()) ||
-        (fp && card.priority !== fp)
-      );
+    visibleCards.forEach(card => {
       tmp.innerHTML = cardHTML(card, epics, readonly);
       const el = tmp.firstElementChild;
-      if (el) {
-        if (hidden) el.classList.add('hidden');
-        frag.appendChild(el);
-      }
+      if (el) frag.appendChild(el);
     });
     body.appendChild(frag);
-    if (emptyState) emptyState.style.display = colCards.length === 0 ? 'flex' : 'none';
+
+    if (emptyState) {
+      emptyState.style.display = visibleCards.length === 0 ? 'flex' : 'none';
+      const txt = emptyState.querySelector('div:not(.empty-icon)');
+      if (txt) {
+        if (visibleCards.length === 0 && hasFilter) {
+          txt.textContent = 'Filtreye uygun görev yok';
+        } else {
+          txt.textContent = col === 'todo' ? 'Görev yok' : (col === 'doing' ? 'Devam eden yok' : 'Tamamlanan görevler burada');
+        }
+      }
+    }
+
     const cnt = document.querySelector(`[data-count="${col}"]`);
-    if (cnt) cnt.textContent = colCards.length;
+    if (cnt) {
+      if (hasFilter && visibleCards.length !== sprintColCards.length) {
+        cnt.innerHTML = `${visibleCards.length} <span style="font-size:11px;font-weight:400;opacity:0.65">/ ${sprintColCards.length}</span>`;
+      } else {
+        cnt.textContent = visibleCards.length;
+      }
+    }
   });
-  refreshAssigneeFilter(cards);
+
+  renderQuickFilterBar(cards, epics);
 }
 
 // ── List view render ─────────────────────────────────────
@@ -195,16 +266,25 @@ function renderListView(cards, epics = []) {
   const futureSprintIds = new Set(allSprints.slice(activeSprintIdx >= 0 ? activeSprintIdx : 0).map(s => s.id));
   const activeSprint = allSprints.find(s => s.active);
 
-  let filteredCards = cards;
+  let baseCards = cards;
   if (window._listFilter === 'current') {
-    filteredCards = cards.filter(c => !c.sprintId || futureSprintIds.has(c.sprintId));
+    baseCards = cards.filter(c => !c.sprintId || futureSprintIds.has(c.sprintId));
   } else if (window._listFilter === 'active') {
-    filteredCards = cards.filter(c => activeSprint && c.sprintId === activeSprint.id);
+    baseCards = cards.filter(c => activeSprint && c.sprintId === activeSprint.id);
   } else if (window._listFilter === 'past') {
-    filteredCards = cards.filter(c => pastSprintIds.has(c.sprintId));
+    baseCards = cards.filter(c => pastSprintIds.has(c.sprintId));
   } else if (window._listFilter === 'backlog') {
-    filteredCards = cards.filter(c => !c.sprintId);
+    baseCards = cards.filter(c => !c.sprintId);
   }
+
+  // Filter by person, project, priority, and search!
+  const filteredCards = baseCards.filter(c => cardMatchesGlobalFilters(c, { checkSprint: false }));
+
+  const fa = (document.getElementById('filterAssignee')?.value || '').trim();
+  const fe = (document.getElementById('filterEpic')?.value || '').trim();
+  const fp = (document.getElementById('filterPriority')?.value || '').trim();
+  const q = (document.getElementById('searchInput')?.value || '').trim();
+  const hasFilter = !!(fa || fe || fp || q);
 
   const controlsHTML = `
     <div class="list-view-controls">
@@ -215,7 +295,10 @@ function renderListView(cards, epics = []) {
         <button type="button" class="list-filter-btn ${window._listFilter === 'backlog' ? 'active' : ''}" onclick="setListFilter('backlog')">📁 Sprintsiz Backlog</button>
         <button type="button" class="list-filter-btn ${window._listFilter === 'all' ? 'active' : ''}" onclick="setListFilter('all')">🌐 Tüm Görevler (${cards.length})</button>
       </div>
-      <button type="button" class="btn btn-sm btn-primary" onclick="openCardDetail(null)" style="font-size:12px;">✚ Yeni Ticket Ekle</button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        ${hasFilter ? `<span style="font-size:12px;font-weight:600;color:var(--accent);">🎯 Filtrelendi: ${filteredCards.length} / ${baseCards.length}</span>` : `<span style="font-size:12px;color:var(--text-muted);">${filteredCards.length} görev</span>`}
+        <button type="button" class="btn btn-sm btn-primary" onclick="openCardDetail(null)" style="font-size:12px;">✚ Yeni Ticket Ekle</button>
+      </div>
     </div>
   `;
 
@@ -251,7 +334,7 @@ function renderListView(cards, epics = []) {
       <thead><tr>
         <th>Anahtar</th><th>Başlık & Sprint</th><th>Durum</th><th>Kişi</th><th>Öncelik</th><th>Bitiş</th><th>SP</th><th>Efor (H/T)</th><th>Alt Görev</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted)">Seçili filtrede görev yok</td></tr>'}</tbody>
+      <tbody>${rows || `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted)">${hasFilter ? 'Seçili filtreye uygun görev bulunamadı' : 'Görev yok'}</td></tr>`}</tbody>
     </table>
   </div>`;
 }
@@ -279,6 +362,14 @@ function renderBacklogView(cards, sprints, epics = []) {
   const container = document.getElementById('backlogView');
   if (!container) return;
 
+  const fa = (document.getElementById('filterAssignee')?.value || '').trim();
+  const fe = (document.getElementById('filterEpic')?.value || '').trim();
+  const fp = (document.getElementById('filterPriority')?.value || '').trim();
+  const q = (document.getElementById('searchInput')?.value || '').trim();
+  const hasFilter = !!(fa || fe || fp || q);
+
+  const filteredCards = cards.filter(c => cardMatchesGlobalFilters(c, { checkSprint: false }));
+
   function sprintGroup(sprint, sprintCards, isExtraActiveHighlight = false) {
     const isActive = sprint && sprint.active;
     const totalSP = sprintCards.reduce((acc, c) => acc + (c.storyPoints || 0), 0);
@@ -296,7 +387,7 @@ function renderBacklogView(cards, sprints, epics = []) {
           ${c.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="width:18px;height:18px;font-size:9px;background:${getAssigneeColor(c.assignee)}">${escHtml(initials(c.assignee))}</span></span>` : ''}
         </div>
       </div>`;
-    }).join('') || `<div class="backlog-empty">Bu sprint'te görev yok</div>`;
+    }).join('') || `<div class="backlog-empty">${hasFilter ? 'Seçili filtreye uygun görev yok' : 'Bu sprint\'te görev yok'}</div>`;
 
     const name = sprint ? sprint.name : 'Backlog (Sprint\'siz)';
     const dates = sprint?.startDate && sprint?.endDate ? `${sprint.startDate} → ${sprint.endDate}` : '';
@@ -339,15 +430,15 @@ function renderBacklogView(cards, sprints, epics = []) {
     futureSprints = sprints;
   }
 
-  const unassigned = cards.filter(c => !c.sprintId);
-  const pastCardsCount = pastSprints.reduce((acc, s) => acc + cards.filter(c => c.sprintId === s.id).length, 0);
+  const unassigned = filteredCards.filter(c => !c.sprintId);
+  const pastCardsCount = pastSprints.reduce((acc, s) => acc + filteredCards.filter(c => c.sprintId === s.id).length, 0);
 
   // Build Past Sprints Collapsible Bar
   let pastHTML = '';
   if (pastSprints.length > 0) {
     let pastListHTML = '';
     pastSprints.forEach(s => {
-      const sc = cards.filter(c => c.sprintId === s.id);
+      const sc = filteredCards.filter(c => c.sprintId === s.id);
       pastListHTML += sprintGroup(s, sc);
     });
 
@@ -360,6 +451,7 @@ function renderBacklogView(cards, sprints, epics = []) {
             <span style="background:rgba(100,116,139,0.2);color:var(--text-secondary);font-size:11px;padding:2px 8px;border-radius:12px;">${pastSprints.length} Hafta · ${pastCardsCount} Görev</span>
           </button>
           <div style="display:flex;align-items:center;gap:8px;">
+            ${hasFilter ? `<span style="background:rgba(99,102,241,0.15);color:var(--accent);font-size:11px;font-weight:600;padding:4px 10px;border-radius:12px;">🎯 Filtrelendi: ${filteredCards.length} / ${cards.length} Görev</span>` : ''}
             <span style="font-size:12px;color:var(--text-secondary);">📍 Şu anki Dönem: <strong>Eylül 2026</strong></span>
             <button type="button" class="btn btn-primary btn-sm" onclick="openCardDetail(null)" style="font-size:12px;padding:6px 12px;">✚ Yeni Ticket</button>
           </div>
@@ -374,7 +466,7 @@ function renderBacklogView(cards, sprints, epics = []) {
   // Active Sprint
   let activeHTML = '';
   if (activeSprint) {
-    const activeCards = cards.filter(c => c.sprintId === activeSprint.id);
+    const activeCards = filteredCards.filter(c => c.sprintId === activeSprint.id);
     activeHTML = sprintGroup(activeSprint, activeCards, true);
   }
 
@@ -384,7 +476,7 @@ function renderBacklogView(cards, sprints, epics = []) {
   // Future Sprints
   let futureHTML = '';
   futureSprints.forEach(s => {
-    const sc = cards.filter(c => c.sprintId === s.id);
+    const sc = filteredCards.filter(c => c.sprintId === s.id);
     futureHTML += sprintGroup(s, sc);
   });
 
@@ -540,15 +632,23 @@ function renderGantt(cards) {
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
+  const fa = (document.getElementById('filterAssignee')?.value || '').trim();
+  const fe = (document.getElementById('filterEpic')?.value || '').trim();
+  const fp = (document.getElementById('filterPriority')?.value || '').trim();
+  const q = (document.getElementById('searchInput')?.value || '').trim();
+  const hasFilter = !!(fa || fe || fp || q);
+
+  const filterMatchedCards = cards.filter(c => cardMatchesGlobalFilters(c, { checkSprint: false }));
+
   // Range determination
   let minD, maxD;
-  let rangeFilteredCards = cards;
+  let rangeFilteredCards = filterMatchedCards;
 
   if (window._ganttRange === 'current') {
     // Current Period: Aug 1, 2026 to Nov 30, 2026 (centered around Sep 17, 2026)
     minD = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     maxD = new Date(today.getFullYear(), today.getMonth() + 2, 28);
-    rangeFilteredCards = cards.filter(c => {
+    rangeFilteredCards = filterMatchedCards.filter(c => {
       if (!c.dueDate && !c.startDate) return false;
       const dStart = c.startDate ? new Date(c.startDate) : new Date(c.createdAt || today);
       const dEnd = c.dueDate ? new Date(c.dueDate) : dStart;
@@ -557,7 +657,7 @@ function renderGantt(cards) {
   } else if (window._ganttRange === '2026') {
     minD = new Date(2026, 0, 1);
     maxD = new Date(2026, 11, 31);
-    rangeFilteredCards = cards.filter(c => {
+    rangeFilteredCards = filterMatchedCards.filter(c => {
       if (!c.dueDate && !c.startDate) return false;
       const d = new Date(c.dueDate || c.startDate);
       return d.getFullYear() === 2026;
@@ -565,20 +665,20 @@ function renderGantt(cards) {
   } else if (window._ganttRange === '2027') {
     minD = new Date(2027, 0, 1);
     maxD = new Date(2027, 11, 31);
-    rangeFilteredCards = cards.filter(c => {
+    rangeFilteredCards = filterMatchedCards.filter(c => {
       if (!c.dueDate && !c.startDate) return false;
       const d = new Date(c.dueDate || c.startDate);
       return d.getFullYear() === 2027;
     });
   } else {
     // All
-    const withDates = cards.filter(c => c.dueDate);
+    const withDates = filterMatchedCards.filter(c => c.dueDate);
     const allDates = withDates.map(c => new Date(c.dueDate));
     minD = new Date(Math.min(...allDates, today));
     maxD = new Date(Math.max(...allDates, today));
     minD.setDate(minD.getDate() - 2);
     maxD.setDate(maxD.getDate() + 4);
-    rangeFilteredCards = cards;
+    rangeFilteredCards = filterMatchedCards;
   }
 
   const withDates = rangeFilteredCards.filter(c => c.dueDate);
@@ -586,34 +686,36 @@ function renderGantt(cards) {
   const pct = d => (Math.max(0, (new Date(d) - minD)) / ((maxD - minD) || 1)) * 100;
   const todayPct = pct(today);
 
-  // Build timeline headers
+  // Build timeline header days
   let timelineHeaders = '';
-  if (totalDays > 60) {
-    const months = [];
-    let curM = new Date(minD.getFullYear(), minD.getMonth(), 1);
-    const endM = new Date(maxD.getFullYear(), maxD.getMonth(), 1);
-    while (curM <= endM) {
-      months.push(new Date(curM));
-      curM.setMonth(curM.getMonth() + 1);
+  let curD = new Date(minD);
+  const totalSlots = window._ganttRange === 'all' ? 24 : (window._ganttRange === '2026' || window._ganttRange === '2027' ? 12 : 16);
+  
+  if (window._ganttRange === 'all' || window._ganttRange === '2026' || window._ganttRange === '2027') {
+    // Month-based columns for long ranges
+    const startYear = minD.getFullYear();
+    const totalMonths = (maxD.getFullYear() - minD.getFullYear()) * 12 + (maxD.getMonth() - minD.getMonth()) + 1;
+    const widthPct = 100 / Math.max(1, totalMonths);
+    for (let i = 0; i < totalMonths; i++) {
+      const monthDate = new Date(startYear, minD.getMonth() + i, 1);
+      const isCurMonth = monthDate.getFullYear() === today.getFullYear() && monthDate.getMonth() === today.getMonth();
+      timelineHeaders += `
+        <div class="gantt-day${isCurMonth ? ' today' : ''}" style="flex: 0 0 ${widthPct.toFixed(2)}%; min-width: 65px; text-align: center; padding: 10px 2px;">
+          <strong>${monthDate.toLocaleDateString('tr-TR', { month: 'short' })}</strong><br>
+          <span style="font-size:10px; opacity:0.75">${monthDate.getFullYear()}</span>
+        </div>
+      `;
     }
-    const totalMs = maxD.getTime() - minD.getTime() || 1;
-    timelineHeaders = months.map(m => {
-      const isCurMonth = m.getFullYear() === today.getFullYear() && m.getMonth() === today.getMonth();
-      const mStart = Math.max(minD.getTime(), new Date(m.getFullYear(), m.getMonth(), 1).getTime());
-      const mEnd = Math.min(maxD.getTime(), new Date(m.getFullYear(), m.getMonth() + 1, 0, 23, 59, 59).getTime());
-      const widthPct = Math.max(1, ((mEnd - mStart) / totalMs) * 100);
-      const label = m.toLocaleDateString('tr-TR', { month: 'short', year: '2-digit' });
-      return `<div class="gantt-day${isCurMonth ? ' today' : ''}" style="flex: 0 0 ${widthPct.toFixed(2)}%; min-width: 65px; text-align: center; padding: 10px 2px;">
-        <span style="font-weight:700; font-size:12px; ${isCurMonth ? 'color:#10b981;' : ''}">${label}</span>
-      </div>`;
-    }).join('');
   } else {
-    const days = [];
-    for (let d = new Date(minD); d <= maxD; d.setDate(d.getDate() + 1)) days.push(new Date(d));
-    timelineHeaders = days.map(d => {
-      const isToday = d.toDateString() === today.toDateString();
-      return `<div class="gantt-day${isToday ? ' today' : ''}" style="min-width:32px;">${d.getDate()}<br><span style="font-size:9px">${d.toLocaleDateString('tr-TR', { month: 'short' })}</span></div>`;
-    }).join('');
+    // 3-day steps for the ~4 month range
+    while (curD <= maxD) {
+      const isToday = curD.toDateString() === today.toDateString();
+      const d = new Date(curD);
+      timelineHeaders += `
+        <div class="gantt-day${isToday ? ' today' : ''}" style="min-width:32px;">${d.getDate()}<br><span style="font-size:9px">${d.toLocaleDateString('tr-TR', { month: 'short' })}</span></div>
+      `;
+      curD.setDate(curD.getDate() + 3);
+    }
   }
 
   const priColor = { high: 'var(--pri-high)', medium: 'var(--pri-med)', low: 'var(--pri-low)' };
@@ -624,25 +726,22 @@ function renderGantt(cards) {
       <div class="gantt-row-timeline"><div class="gantt-no-date">Tarih belirlenmemiş</div></div>
     </div>`;
 
-    const rawStart = c.startDate ? new Date(c.startDate) : new Date(c.createdAt || Date.now());
-    rawStart.setHours(0, 0, 0, 0);
-
-    const clampedStart = new Date(Math.max(rawStart, minD));
-    const clampedEnd = new Date(Math.min(new Date(c.dueDate), maxD));
-    const barStart = pct(clampedStart);
-    const barEnd = pct(clampedEnd);
-    const barW = Math.max(1.2, barEnd - barStart);
+    const dStart = c.startDate ? new Date(c.startDate) : new Date(c.createdAt || today);
+    const dEnd = new Date(c.dueDate);
+    const barStart = Math.max(0, Math.min(95, pct(dStart)));
+    const barEnd = Math.max(barStart + 3, Math.min(100, pct(dEnd)));
+    const barW = Math.max(3, barEnd - barStart);
 
     return `<div class="gantt-row">
       <div class="gantt-row-label" onclick="openCardDetail('${c.id}')" title="${escHtml(c.title)}">
-        <span class="card-key-badge" style="font-size:9px;margin-right:4px;">${c.key || ''}</span>
-        ${escHtml(c.title.slice(0, 26))}${c.title.length > 26 ? '…' : ''}
+        <span class="card-key-badge">${c.key || ''}</span>
+        ${c.assignee ? `<span class="assignee-avatar" style="width:16px;height:16px;font-size:8px;background:${getAssigneeColor(c.assignee)}">${escHtml(initials(c.assignee))}</span>` : ''}
+        <span>${escHtml(c.title.slice(0, 24))}${c.title.length > 24 ? '…' : ''}</span>
       </div>
       <div class="gantt-row-timeline" style="position:relative">
-        ${(todayPct >= 0 && todayPct <= 100) ? `<div style="position:absolute;top:0;bottom:0;left:${todayPct.toFixed(1)}%;width:2px;background:#ef4444;opacity:.6;z-index:1"></div>` : ''}
         <div class="gantt-bar" style="left:${barStart.toFixed(1)}%;width:${barW.toFixed(1)}%;background:${priColor[c.priority]};z-index:2"
-             onclick="openCardDetail('${c.id}')" title="${c.key}: ${c.title} &#10;Başlangıç: ${rawStart.toLocaleDateString('tr-TR')} &#10;Bitiş: ${c.dueDate}">
-          ${escHtml(c.title.slice(0, 18))}
+             title="${escHtml(c.title)} (${c.startDate || ''} → ${c.dueDate})">
+          <span>${escHtml(c.title.slice(0, 20))}</span>
         </div>
       </div>
     </div>`;
@@ -657,6 +756,7 @@ function renderGantt(cards) {
         <button type="button" class="gantt-btn ${window._ganttRange === 'all' ? 'active' : ''}" onclick="setGanttRange('all')">🌐 Tüm 2 Yıl (104 Hafta)</button>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
+        ${hasFilter ? `<span style="font-size:12px;font-weight:600;color:var(--accent);">🎯 Filtrelendi: ${rangeFilteredCards.length} / ${cards.length}</span>` : ''}
         <button type="button" class="btn btn-sm btn-secondary" onclick="scrollGanttToToday()" style="font-size:12px;">📍 Bugüne Git (17 Eyl 2026)</button>
         <button type="button" class="btn btn-sm btn-primary" onclick="openCardDetail(null)" style="font-size:12px;">✚ Yeni Ticket Ekle</button>
       </div>
@@ -895,15 +995,118 @@ window.exportToCSV = exportToCSV;
 
 // ── Filter assignee refresh ──────────────────────────────
 function refreshAssigneeFilter(cards) {
-  const sel = document.getElementById('filterAssignee');
-  if (!sel) return;
-  const cur = sel.value;
-  const names = window.users && window.users.length ? 
-    window.users.map(u => u.name) : 
-    [...new Set(cards.map(c => c.assignee).filter(Boolean))].sort();
-  sel.innerHTML = '<option value="">Tüm kişiler</option>' +
-    names.map(n => `<option value="${n.toLowerCase()}" ${cur.toLowerCase() === n.toLowerCase() ? 'selected' : ''}>${escHtml(n)}</option>`).join('');
+  if (typeof populateAssigneeSelects === 'function') {
+    populateAssigneeSelects();
+  }
+  if (typeof populateEpicFilter === 'function') {
+    populateEpicFilter();
+  }
 }
+window.refreshAssigneeFilter = refreshAssigneeFilter;
+
+// ── Quick Filters Bar render ──────────────────────────────
+function renderQuickFilterBar(cards = window.cards || [], epics = window.epics || []) {
+  const memberChipsEl = document.getElementById('memberFilterChips');
+  const projectChipsEl = document.getElementById('projectFilterChips');
+  const resetWrapEl = document.getElementById('filterResetWrap');
+  const activeBadgeEl = document.getElementById('activeFilterBadge');
+  if (!memberChipsEl && !projectChipsEl) return;
+
+  const fa = (document.getElementById('filterAssignee')?.value || '').trim().toLowerCase();
+  const fe = (document.getElementById('filterEpic')?.value || '').trim();
+  const fp = (document.getElementById('filterPriority')?.value || '').trim();
+  const q = (document.getElementById('searchInput')?.value || '').trim();
+
+  // Active filter state
+  const hasFilter = !!(fa || fe || fp || q);
+  if (resetWrapEl) {
+    resetWrapEl.style.display = hasFilter ? 'flex' : 'none';
+    if (activeBadgeEl && hasFilter) {
+      const parts = [];
+      if (fa) {
+        if (fa === '__unassigned__') parts.push('👤 Atanmamış');
+        else {
+          const userObj = (window.users || []).find(u => (u.name || '').toLowerCase() === fa);
+          parts.push(`👤 ${userObj ? userObj.name : fa}`);
+        }
+      }
+      if (fe) {
+        if (fe === '__none__') parts.push('📁 Projesiz');
+        else {
+          const epicObj = epics.find(e => e.id === fe);
+          parts.push(`🏷️ ${epicObj ? epicObj.name : 'Proje'}`);
+        }
+      }
+      if (fp) {
+        const priLabels = { high: '🔴 Yüksek', medium: '🟠 Orta', low: '🟢 Düşük' };
+        parts.push(`🎯 ${priLabels[fp] || fp}`);
+      }
+      if (q) parts.push(`🔍 "${q}"`);
+      activeBadgeEl.textContent = `🎯 Filtre: ${parts.join(' · ')}`;
+    }
+  }
+
+  // 1. Render Member Chips
+  if (memberChipsEl) {
+    const rawUsers = (window.users && window.users.length) ? 
+      window.users.map(u => u.name) : 
+      [...new Set(cards.map(c => c.assignee).filter(Boolean))].sort();
+    
+    let chipsHTML = `<button type="button" class="filter-chip ${!fa ? 'active' : ''}" onclick="setPersonFilter('')">
+      👥 Herkes <span class="chip-count">${cards.length}</span>
+    </button>`;
+
+    rawUsers.forEach(name => {
+      const count = cards.filter(c => (c.assignee || '').trim().toLowerCase() === name.trim().toLowerCase()).length;
+      const isSelected = fa === name.trim().toLowerCase();
+      const color = getAssigneeColor(name);
+      const init = initials(name);
+      chipsHTML += `<button type="button" class="filter-chip ${isSelected ? 'active' : ''}" onclick="setPersonFilter('${escHtml(name)}')" title="${escHtml(name)} kişisinin işlerini filtrele">
+        <span class="chip-avatar" style="background:${color}">${init}</span>
+        <span>${escHtml(name)}</span>
+        <span class="chip-count">${count}</span>
+      </button>`;
+    });
+
+    const unassignedCount = cards.filter(c => !c.assignee).length;
+    if (unassignedCount > 0) {
+      const isSelected = fa === '__unassigned__';
+      chipsHTML += `<button type="button" class="filter-chip ${isSelected ? 'active' : ''}" onclick="setPersonFilter('__unassigned__')">
+        <span>Atanmamış</span>
+        <span class="chip-count">${unassignedCount}</span>
+      </button>`;
+    }
+    memberChipsEl.innerHTML = chipsHTML;
+  }
+
+  // 2. Render Project (Epic) Chips
+  if (projectChipsEl) {
+    let projHTML = `<button type="button" class="filter-chip ${!fe ? 'active' : ''}" onclick="setProjectFilter('')">
+      📁 Tümü
+    </button>`;
+
+    epics.forEach(e => {
+      const count = cards.filter(c => c.epicId === e.id).length;
+      const isSelected = fe === e.id;
+      projHTML += `<button type="button" class="filter-chip ${isSelected ? 'active' : ''}" onclick="setProjectFilter('${e.id}')" title="${escHtml(e.name)} projesinin işlerini filtrele">
+        <span class="chip-dot" style="background:${e.color || 'var(--accent)'}"></span>
+        <span>${escHtml(e.name)}</span>
+        <span class="chip-count">${count}</span>
+      </button>`;
+    });
+
+    const unassignedEpicsCount = cards.filter(c => !c.epicId).length;
+    if (unassignedEpicsCount > 0) {
+      const isSelected = fe === '__none__';
+      projHTML += `<button type="button" class="filter-chip ${isSelected ? 'active' : ''}" onclick="setProjectFilter('__none__')">
+        <span>Projesiz</span>
+        <span class="chip-count">${unassignedEpicsCount}</span>
+      </button>`;
+    }
+    projectChipsEl.innerHTML = projHTML;
+  }
+}
+window.renderQuickFilterBar = renderQuickFilterBar;
 
 // ── Drag & Drop ──────────────────────────────────────────
 let dragId = null;

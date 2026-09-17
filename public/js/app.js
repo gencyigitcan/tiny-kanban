@@ -71,9 +71,10 @@ async function boot() {
         window.LABELS = labels;
         window.LABEL_MAP = Object.fromEntries(labels.map(l => [l.id, l]));
         
-        // Setup dropdown elements with registered users and sprints list
+        // Setup dropdown elements with registered users, epics, and sprints list
         populateAssigneeSelects();
         populateSprintFilter();
+        populateEpicFilter();
 
         // Render notifications in header
         renderNotifications();
@@ -118,6 +119,7 @@ function renderAll() {
     if (currentView === 'labels') renderLabelsView(cards, labels);
     if (currentView === 'team') renderTeamView(window.users || [], cards);
     updateSprintBadge();
+    if (typeof renderQuickFilterBar === 'function') renderQuickFilterBar(cards, epics);
 }
 
 function updateSprintBadge() {
@@ -396,6 +398,7 @@ document.querySelectorAll('.quick-add-input').forEach(input => {
 // ── Search & Filter ───────────────────────────────────────
 safeAddListener('searchInput', 'input', () => renderAll());
 safeAddListener('filterSprint', 'change', () => renderAll());
+safeAddListener('filterEpic', 'change', () => renderAll());
 safeAddListener('filterAssignee', 'change', () => renderAll());
 safeAddListener('filterPriority', 'change', () => renderAll());
 
@@ -612,10 +615,79 @@ function populateAssigneeSelects() {
     // Also update board assignee filter
     const filter = document.getElementById('filterAssignee');
     if (filter) {
-        filter.innerHTML = '<option value="">Tüm kişiler</option>' +
-            users.map(u => `<option value="${escHtml(u.name).toLowerCase()}">${escHtml(u.name)}</option>`).join('');
+        const cur = (filter.value || '').trim().toLowerCase();
+        const allCards = cards || window.cards || [];
+        const allUsers = users && users.length ? users.map(u => u.name) : [...new Set(allCards.map(c => c.assignee).filter(Boolean))].sort();
+        
+        let html = '<option value="">👤 Tüm Kişiler</option>';
+        allUsers.forEach(name => {
+            const count = allCards.filter(c => (c.assignee || '').trim().toLowerCase() === name.trim().toLowerCase()).length;
+            const val = name.trim().toLowerCase();
+            const isSelected = cur === val;
+            html += `<option value="${escHtml(val)}" ${isSelected ? 'selected' : ''}>👤 ${escHtml(name)} (${count})</option>`;
+        });
+        const unassignedCount = allCards.filter(c => !c.assignee).length;
+        if (unassignedCount > 0) {
+            html += `<option value="__unassigned__" ${cur === '__unassigned__' ? 'selected' : ''}>👤 Atanmamış Görevler (${unassignedCount})</option>`;
+        }
+        filter.innerHTML = html;
     }
 }
+window.populateAssigneeSelects = populateAssigneeSelects;
+
+function populateEpicFilter() {
+    const sel = document.getElementById('filterEpic');
+    if (!sel) return;
+    const currentVal = sel.value || '';
+    const allEpics = epics || window.epics || [];
+    const allCards = cards || window.cards || [];
+    
+    let html = '<option value="">📁 Tüm Projeler / Epics</option>';
+    allEpics.forEach(e => {
+        const count = allCards.filter(c => c.epicId === e.id).length;
+        const isSelected = currentVal === e.id;
+        html += `<option value="${e.id}" ${isSelected ? 'selected' : ''}>🏷️ ${escHtml(e.name)} (${count} görev)</option>`;
+    });
+    const unassignedCount = allCards.filter(c => !c.epicId).length;
+    if (unassignedCount > 0) {
+        html += `<option value="__none__" ${currentVal === '__none__' ? 'selected' : ''}>📁 Projesiz / Epicsiz (${unassignedCount})</option>`;
+    }
+    sel.innerHTML = html;
+}
+window.populateEpicFilter = populateEpicFilter;
+
+function clearAllFilters() {
+    const fa = document.getElementById('filterAssignee');
+    if (fa) fa.value = '';
+    const fe = document.getElementById('filterEpic');
+    if (fe) fe.value = '';
+    const fp = document.getElementById('filterPriority');
+    if (fp) fp.value = '';
+    const sq = document.getElementById('searchInput');
+    if (sq) sq.value = '';
+    renderAll();
+}
+window.clearAllFilters = clearAllFilters;
+
+function setPersonFilter(name) {
+    const sel = document.getElementById('filterAssignee');
+    if (!sel) return;
+    const current = (sel.value || '').trim().toLowerCase();
+    const target = (name || '').trim().toLowerCase();
+    sel.value = (current === target) ? '' : target;
+    renderAll();
+}
+window.setPersonFilter = setPersonFilter;
+
+function setProjectFilter(epicId) {
+    const sel = document.getElementById('filterEpic');
+    if (!sel) return;
+    const current = sel.value || '';
+    const target = epicId || '';
+    sel.value = (current === target) ? '' : target;
+    renderAll();
+}
+window.setProjectFilter = setProjectFilter;
 
 function populateSprintFilter() {
     const sel = document.getElementById('filterSprint');
