@@ -320,15 +320,34 @@
                         </div>
                     </div>
 
-                    <!-- Comments -->
-                    <div class="form-group" id="commentsSection" style="display:none">
-                        <label class="form-label">Yorumlar</label>
-                        <div class="comments-list" id="commentsList"></div>
-                        <div class="add-comment-row">
-                            <textarea class="add-comment-input" id="newComment" rows="2"
-                                placeholder="Yorum ekle…"></textarea>
-                            <button type="button" class="btn btn-secondary btn-sm" id="addCommentBtn"
-                                style="align-self:flex-end">Gönder</button>
+                    <!-- Comments & Activity Timeline -->
+                    <div class="form-group" id="commentsSection" style="display:none; margin-top:20px; border-top:1px solid var(--border); padding-top:16px;">
+                        <div class="card-subtabs-bar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <div class="card-subtabs-group" style="display:flex; gap:6px; background:var(--bg-secondary); padding:4px; border-radius:8px; border:1px solid var(--border);">
+                                <button type="button" class="card-subtab-btn active" id="tabCardCommentsBtn" onclick="switchCardSubTab('comments')">
+                                    💬 Yorumlar (<span id="cardCommentsCount">0</span>)
+                                </button>
+                                <button type="button" class="card-subtab-btn" id="tabCardActivityBtn" onclick="switchCardSubTab('activity')">
+                                    📜 Aktivite Geçmişi (<span id="cardActivityCount">0</span>)
+                                </button>
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm" id="btnRefreshCardActivity" style="display:none; font-size:11px; padding:3px 8px;" onclick="refreshCardActivity()">🔄 Yenile</button>
+                        </div>
+
+                        <!-- Sub-tab 1: Comments -->
+                        <div id="cardSubTabComments">
+                            <div class="comments-list" id="commentsList"></div>
+                            <div class="add-comment-row" style="margin-top:12px;">
+                                <textarea class="add-comment-input" id="newComment" rows="2"
+                                    placeholder="Yorum ekle…"></textarea>
+                                <button type="button" class="btn btn-primary btn-sm" id="addCommentBtn"
+                                    style="align-self:flex-end">Gönder</button>
+                            </div>
+                        </div>
+
+                        <!-- Sub-tab 2: Activity Timeline -->
+                        <div id="cardSubTabActivity" style="display:none;">
+                            <div class="card-activity-timeline" id="cardActivityList"></div>
                         </div>
                     </div>
 

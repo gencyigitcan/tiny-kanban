@@ -42,6 +42,91 @@ cardRouter.get('/:id', (req, res) => {
     res.json(card);
 });
 
+/** POST /api/cards/:id/view - Record user card read/inspection event */
+cardRouter.post('/:id/view', (req, res) => {
+    const db = readDb(req);
+    const card = db.cards.find(c => c.id === req.params.id);
+    if (!card) throw new NotFoundError('Card not found');
+
+    const userId = req.user?.id || 'guest';
+    const username = req.user?.username || 'misafir';
+    const name = req.user?.name || 'Misafir Kullanıcı';
+    const role = req.user?.role || 'user';
+
+    // Throttling: If same user viewed this card within last 2 minutes, avoid logging duplicate spam
+    const lastActivity = (card.activity || []).find(a => a.userId === userId && (a.action === 'CARD_VIEW' || a.action === 'VIEW'));
+    const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
+    let logged = false;
+    if (!lastActivity || lastActivity.createdAt < twoMinutesAgo) {
+        logActivity({
+            userId,
+            username,
+            name,
+            userRole: role,
+            action: 'CARD_VIEW',
+            entityType: 'card',
+            entityId: card.id,
+            details: `'${card.title}' (${card.key}) biletini açtı ve inceledi.`,
+            workspaceId: req.tenantId || 'personal',
+            environment: req.environment || getEnvironment(req)
+        }, req);
+        logged = true;
+    }
+
+    const freshDb = readDb(req);
+    const freshCard = freshDb.cards.find(c => c.id === req.params.id) || card;
+
+    res.json({ success: true, logged, throttled: !logged, activity: freshCard.activity || [] });
+});
+
+/** GET /api/cards/:id/activity - Get card activity history */
+cardRouter.get('/:id/activity', (req, res) => {
+    const db = readDb(req);
+    const card = db.cards.find(c => c.id === req.params.id);
+    if (!card) throw new NotFoundError('Card not found');
+    res.json({ activity: card.activity || [] });
+});
+
+/** POST /api/cards/:id/comments - Add comment directly with activity logging */
+cardRouter.post('/:id/comments', (req, res) => {
+    const db = readDb(req);
+    const card = db.cards.find(c => c.id === req.params.id);
+    if (!card) throw new NotFoundError('Card not found');
+
+    const text = String(req.body.text || '').trim();
+    if (!text) throw new AppError('Yorum metni boş olamaz', 400);
+
+    const authorName = req.user?.name || req.body.author || 'Misafir';
+    const authorId = req.user?.id || req.body.authorId || '';
+
+    const newComment = {
+        id: 'comm-' + uid(),
+        text,
+        createdAt: Date.now(),
+        author: authorName,
+        authorId
+    };
+
+    card.comments = card.comments || [];
+    card.comments.push(newComment);
+    writeDbSync(db, req);
+
+    logActivity({
+        userId: req.user?.id || 'guest',
+        username: req.user?.username || 'misafir',
+        name: authorName,
+        userRole: req.user?.role || 'user',
+        action: 'CARD_COMMENT',
+        entityType: 'card',
+        entityId: card.id,
+        details: `'${card.title}' (${card.key}) biletine yorum ekledi: "${text.length > 60 ? text.slice(0, 57) + '…' : text}"`,
+        workspaceId: req.tenantId || 'personal',
+        environment: req.environment || getEnvironment(req)
+    }, req);
+
+    res.status(201).json({ comment: newComment, comments: card.comments, activity: card.activity || [] });
+});
+
 /** POST /api/cards */
 cardRouter.post('/', validate(createCardSchema), (req, res) => {
     const body = req.body as Omit<Card, 'id' | 'key' | 'comments' | 'createdAt'>;
@@ -81,6 +166,7 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
         epicId: body.epicId ?? null,
         sprintId: body.sprintId ?? null,
         createdAt: Date.now(),
+        activity: []
     };
     db.cards.push(card);
     notifyAssignee(db, card.id, card.title, card.assignee, req.user);
@@ -121,10 +207,14 @@ cardRouter.put('/:id', validate(updateCardSchema), (req, res) => {
         }
     }
 
-    const oldAssignee = db.cards[idx].assignee;
-    const oldCol = db.cards[idx].col;
+    const target = db.cards[idx];
+    const oldAssignee = target.assignee;
+    const oldCol = target.col;
+    const oldPriority = target.priority;
+    const oldDue = target.dueDate;
+    const oldSpent = target.spentEffort;
     const newAssignee = req.body.assignee;
-    const title = req.body.title || db.cards[idx].title;
+    const title = req.body.title || target.title;
 
     const allowed: (keyof Card)[] = [
         'title', 'desc', 'assignee', 'priority', 'col',
@@ -144,18 +234,35 @@ cardRouter.put('/:id', validate(updateCardSchema), (req, res) => {
 
     writeDbSync(db, req);
 
-    const isMove = req.body.col && req.body.col !== oldCol;
+    let action: any = 'CARD_UPDATE';
+    let details = `'${db.cards[idx].title}' (${db.cards[idx].key}) kartı güncellendi.`;
+
+    if (req.body.col && req.body.col !== oldCol) {
+        action = 'CARD_MOVE';
+        details = `'${db.cards[idx].title}' (${db.cards[idx].key}) kartı '${oldCol}' kolonundan '${db.cards[idx].col}' kolonuna taşındı.`;
+    } else if (req.body.spentEffort !== undefined && req.body.spentEffort !== oldSpent) {
+        action = 'CARD_EFFORT';
+        details = `'${db.cards[idx].title}' (${db.cards[idx].key}) harcanan efor güncellendi: ${req.body.spentEffort} sa (önceki: ${oldSpent || 0} sa).`;
+    } else if (newAssignee !== undefined && newAssignee !== oldAssignee) {
+        action = 'CARD_UPDATE';
+        details = `'${db.cards[idx].title}' (${db.cards[idx].key}) ataması değiştirildi: ${oldAssignee || 'Atanmamış'} → ${newAssignee || 'Atanmamış'}.`;
+    } else if (req.body.dueDate !== undefined && req.body.dueDate !== oldDue) {
+        action = 'CARD_UPDATE';
+        details = `'${db.cards[idx].title}' (${db.cards[idx].key}) bitiş tarihi değiştirildi: ${req.body.dueDate || 'Kaldırıldı'}.`;
+    } else if (req.body.priority !== undefined && req.body.priority !== oldPriority) {
+        action = 'CARD_UPDATE';
+        details = `'${db.cards[idx].title}' (${db.cards[idx].key}) önceliği '${oldPriority}' → '${req.body.priority}' olarak değiştirildi.`;
+    }
+
     logActivity({
         userId: req.user?.id || 'unknown',
         username: req.user?.username || 'unknown',
         name: req.user?.name || 'Kullanıcı',
         userRole: req.user?.role || 'user',
-        action: isMove ? 'CARD_MOVE' : 'CARD_UPDATE',
+        action,
         entityType: 'card',
         entityId: db.cards[idx].id,
-        details: isMove
-            ? `'${db.cards[idx].title}' (${db.cards[idx].key}) kartı '${oldCol}' kolonundan '${db.cards[idx].col}' kolonuna taşındı.`
-            : `'${db.cards[idx].title}' (${db.cards[idx].key}) kartı güncellendi.`,
+        details,
         workspaceId: req.tenantId || 'personal',
         environment: req.environment || getEnvironment(req)
     }, req);

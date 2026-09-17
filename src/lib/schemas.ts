@@ -40,8 +40,22 @@ export const createCardSchema = z.object({
     sprintId: z.string().nullable().optional(),
 });
 
-export const updateCardSchema = createCardSchema.partial().extend({
+export const updateCardSchema = z.object({
+    title: z.string().min(1, 'Başlık boş olamaz').max(200).trim().optional(),
+    desc: z.string().max(2000).optional(),
+    assignee: z.string().max(100).optional(),
+    priority: priority.optional(),
+    col: column.optional(),
+    startDate: dateStr,
+    dueDate: dateStr,
+    labels: z.array(z.string().max(50)).max(10).optional(),
+    storyPoints: z.number().int().min(0).max(9999).nullable().optional(),
+    estimatedEffort: z.number().int().min(0).max(9999).nullable().optional(),
+    spentEffort: z.number().int().min(0).max(9999).nullable().optional(),
+    subtasks: z.array(subtaskSchema).max(100).optional(),
     comments: z.array(commentSchema).max(500).optional(),
+    epicId: z.string().nullable().optional(),
+    sprintId: z.string().nullable().optional(),
 });
 
 // ── Epics ────────────────────────────────────────────────────

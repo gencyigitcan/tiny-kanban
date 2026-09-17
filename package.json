@@ -10,7 +10,8 @@
     "lint": "tsc --noEmit",
     "test": "tsx tests/integration.ts",
     "test:security": "tsx tests/security_100_checks.ts",
-    "test:isolation": "tsx tests/test_tenant_isolation.ts"
+    "test:isolation": "tsx tests/test_tenant_isolation.ts",
+    "test:activity": "tsx tests/test_activity_logging.ts"
   },
   "dependencies": {
     "cors": "^2.8.6",

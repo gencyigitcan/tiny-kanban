@@ -723,16 +723,56 @@ export function logActivity(
     const personalDb = readDb({ tenantId: 'personal', environment: env });
     personalDb.logs = personalDb.logs || [];
 
+    const now = Date.now();
     const newLog: ActivityLog = {
         id: 'log-' + uid(),
         ...entry,
-        createdAt: Date.now()
+        createdAt: now
     };
 
     personalDb.logs.unshift(newLog);
-    // Retain maximum of 1000 latest logs
-    if (personalDb.logs.length > 1000) {
-        personalDb.logs.length = 1000;
+    // Retain maximum of 2000 latest logs
+    if (personalDb.logs.length > 2000) {
+        personalDb.logs.length = 2000;
+    }
+
+    const currentTenant = (reqOrScope as any)?.tenantId || (reqOrScope as any)?.headers?.['x-tenant-id'] || entry.workspaceId || 'personal';
+
+    // If this is a card action, also attach to the card's local activity history
+    if (entry.entityType === 'card' && entry.entityId) {
+        try {
+            const actItem = {
+                id: 'act-' + uid(),
+                userId: entry.userId,
+                username: entry.username,
+                name: entry.name,
+                action: entry.action,
+                details: entry.details,
+                createdAt: now
+            };
+
+            // If currentTenant is personal, update directly in personalDb
+            if (currentTenant === 'personal' || !currentTenant) {
+                const card = personalDb.cards.find(c => c.id === entry.entityId);
+                if (card) {
+                    card.activity = card.activity || [];
+                    card.activity.unshift(actItem);
+                    if (card.activity.length > 100) card.activity.length = 100;
+                }
+            } else {
+                // Otherwise update in the active tenant DB
+                const tenantDb = readDb({ tenantId: currentTenant, environment: env });
+                const card = tenantDb.cards.find(c => c.id === entry.entityId);
+                if (card) {
+                    card.activity = card.activity || [];
+                    card.activity.unshift(actItem);
+                    if (card.activity.length > 100) card.activity.length = 100;
+                    writeDbSync(tenantDb, { tenantId: currentTenant, environment: env });
+                }
+            }
+        } catch (e) {
+            console.error('Failed to attach card activity:', e);
+        }
     }
 
     writeDbSync(personalDb, { tenantId: 'personal', environment: env });

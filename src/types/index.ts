@@ -38,6 +38,17 @@ export interface Card {
     epicId: string | null;
     sprintId: string | null;
     createdAt: number;
+    activity?: CardActivity[];
+}
+
+export interface CardActivity {
+    id: string;
+    userId: string;
+    username: string;
+    name: string;
+    action: ActivityAction | string;
+    details: string;
+    createdAt: number;
 }
 
 export interface Epic {
@@ -134,6 +145,11 @@ export type ActivityAction =
     | 'CARD_UPDATE'
     | 'CARD_DELETE'
     | 'CARD_MOVE'
+    | 'CARD_VIEW'
+    | 'CARD_COMMENT'
+    | 'CARD_EFFORT'
+    | 'SUBTASK_TOGGLE'
+    | 'SUBTASK_ADD'
     | 'WORKSPACE_SWITCH'
     | 'WORKSPACE_CREATE';
 

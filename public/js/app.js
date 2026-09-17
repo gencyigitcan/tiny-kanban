@@ -118,6 +118,7 @@ function renderAll() {
     if (currentView === 'sprints') renderSprintsView(cards, sprints);
     if (currentView === 'labels') renderLabelsView(cards, labels);
     if (currentView === 'team') renderTeamView(window.users || [], cards);
+    if (currentView === 'audit') renderAuditView();
     updateSprintBadge();
     if (typeof renderQuickFilterBar === 'function') renderQuickFilterBar(cards, epics);
 }
@@ -176,6 +177,7 @@ async function onDrop(e) {
 // ── Card Detail Modal ─────────────────────────────────────
 let _editSubtasks = [];
 let _editComments = [];
+let _editActivity = [];
 
 function openCardDetail(id, defaultCol) {
     const isNew = !id;
@@ -228,17 +230,45 @@ function openCardDetail(id, defaultCol) {
         `<div class="label-chip${selectedLabels.has(l.id) ? ' selected' : ''}" style="background:${l.bg};color:${l.color}" data-lid="${l.id}" onclick="toggleLabel(this)">${escHtml(l.name)}</div>`
     ).join('');
 
-    // Subtasks & Comments
+    // Subtasks, Comments & Activity
     _editSubtasks = JSON.parse(JSON.stringify(card?.subtasks || []));
     _editComments = JSON.parse(JSON.stringify(card?.comments || []));
+    _editActivity = JSON.parse(JSON.stringify(card?.activity || []));
     renderSubtasksList();
     renderCommentsList();
-    document.getElementById('commentsSection').style.display = id ? 'block' : 'none';
+    renderCardActivityList(_editActivity);
+
+    const commentsSec = document.getElementById('commentsSection');
+    if (commentsSec) commentsSec.style.display = id ? 'block' : 'none';
+
+    const cardCommentsCount = document.getElementById('cardCommentsCount');
+    if (cardCommentsCount) cardCommentsCount.textContent = _editComments.length;
+
+    const cardActivityCount = document.getElementById('cardActivityCount');
+    if (cardActivityCount) cardActivityCount.textContent = _editActivity.length;
+
+    switchCardSubTab('comments');
+
     document.getElementById('deleteCardBtn').style.display = id ? 'inline-flex' : 'none';
     document.getElementById('newSubtask').value = '';
     document.getElementById('newComment').value = '';
     openModal('cardModal');
     document.getElementById('cardTitle').focus();
+
+    // Trigger card inspection log and update activity timeline asynchronously
+    if (id) {
+        API.recordCardView(id).then(() => {
+            return API.getCardActivity(id);
+        }).then(res => {
+            if (res && res.activity) {
+                _editActivity = res.activity;
+                if (card) card.activity = res.activity;
+                const actCount = document.getElementById('cardActivityCount');
+                if (actCount) actCount.textContent = res.activity.length;
+                renderCardActivityList(res.activity);
+            }
+        }).catch(() => {});
+    }
 }
 window.openCardDetail = openCardDetail;
 
@@ -256,7 +286,13 @@ function renderSubtasksList() {
 }
 
 function renderCommentsList() {
-    document.getElementById('commentsList').innerHTML = _editComments.map(c => {
+    const list = document.getElementById('commentsList');
+    if (!list) return;
+    if (_editComments.length === 0) {
+        list.innerHTML = `<div style="padding: 14px 10px; text-align: center; color: var(--text-muted); font-size: 12px;">Henüz yorum yapılmadı. İlk yorumu aşağıdan ekleyebilirsiniz.</div>`;
+        return;
+    }
+    list.innerHTML = _editComments.map(c => {
         const authorName = c.author || 'Misafir';
         const init = initials(authorName);
         const hue = [...authorName].reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360;
@@ -276,6 +312,109 @@ function renderCommentsList() {
     }).join('');
 }
 
+function switchCardSubTab(tab) {
+    const commentsBtn = document.getElementById('tabCardCommentsBtn');
+    const activityBtn = document.getElementById('tabCardActivityBtn');
+    const commentsContent = document.getElementById('cardSubTabComments');
+    const activityContent = document.getElementById('cardSubTabActivity');
+    const refreshBtn = document.getElementById('btnRefreshCardActivity');
+
+    if (tab === 'activity') {
+        if (commentsBtn) commentsBtn.classList.remove('active');
+        if (activityBtn) activityBtn.classList.add('active');
+        if (commentsContent) commentsContent.style.display = 'none';
+        if (activityContent) activityContent.style.display = 'block';
+        if (refreshBtn) refreshBtn.style.display = 'inline-flex';
+        refreshCardActivity();
+    } else {
+        if (commentsBtn) commentsBtn.classList.add('active');
+        if (activityBtn) activityBtn.classList.remove('active');
+        if (commentsContent) commentsContent.style.display = 'block';
+        if (activityContent) activityContent.style.display = 'none';
+        if (refreshBtn) refreshBtn.style.display = 'none';
+    }
+}
+window.switchCardSubTab = switchCardSubTab;
+
+async function refreshCardActivity() {
+    const id = document.getElementById('editCardId')?.value;
+    if (!id) return;
+    try {
+        const res = await API.getCardActivity(id);
+        if (res && res.activity) {
+            _editActivity = res.activity;
+            const card = cards.find(c => c.id === id);
+            if (card) card.activity = res.activity;
+            const actCount = document.getElementById('cardActivityCount');
+            if (actCount) actCount.textContent = res.activity.length;
+            renderCardActivityList(res.activity);
+        }
+    } catch (e) {
+        console.warn('Could not refresh card activity:', e);
+    }
+}
+window.refreshCardActivity = refreshCardActivity;
+
+function renderCardActivityList(activities) {
+    const container = document.getElementById('cardActivityList');
+    if (!container) return;
+
+    if (!activities || activities.length === 0) {
+        container.innerHTML = `
+            <div style="padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 12px; background: var(--bg-secondary); border-radius: 8px; border: 1px dashed var(--border);">
+                🔍 Bu görev üzerinde henüz aktivite kaydedilmedi.
+            </div>`;
+        return;
+    }
+
+    const actionMeta = {
+        'CARD_VIEW': { label: 'İnceledi (Okudu)', icon: '👁️', color: '#0ea5e9', bg: 'rgba(14, 165, 233, 0.12)' },
+        'CARD_COMMENT': { label: 'Yorum Yaptı', icon: '💬', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.12)' },
+        'CARD_MOVE': { label: 'Durum Değiştirdi', icon: '🔄', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.12)' },
+        'CARD_UPDATE': { label: 'Güncelledi', icon: '✏️', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)' },
+        'CARD_EFFORT': { label: 'Efor Girdi', icon: '⏱️', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' },
+        'CARD_CREATE': { label: 'Oluşturdu', icon: '➕', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' },
+        'SUBTASK_TOGGLE': { label: 'Alt Görev', icon: '☑️', color: '#14b8a6', bg: 'rgba(20, 184, 166, 0.12)' },
+        'SUBTASK_ADD': { label: 'Alt Görev Eklendi', icon: '📝', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.12)' }
+    };
+
+    const sorted = [...activities].sort((a, b) => b.createdAt - a.createdAt);
+
+    container.innerHTML = sorted.map(act => {
+        const meta = actionMeta[act.action] || { label: act.action, icon: '📌', color: '#64748b', bg: 'rgba(100, 116, 139, 0.12)' };
+        const authorName = act.name || act.username || 'Kullanıcı';
+        const init = initials(authorName);
+        const hue = [...authorName].reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360;
+        const avatarBg = `hsl(${hue}, 60%, 45%)`;
+        const timeStr = new Date(act.createdAt).toLocaleString('tr-TR', {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+
+        return `
+            <div class="card-activity-item">
+                <div class="card-activity-dot" style="background: ${meta.color};"></div>
+                <div class="card-activity-avatar" style="background: ${avatarBg};">
+                    ${escHtml(init)}
+                </div>
+                <div class="card-activity-body">
+                    <div class="card-activity-header">
+                        <span class="card-activity-user">
+                            ${escHtml(authorName)}
+                            <span style="font-weight: normal; font-size: 11px; color: var(--text-muted);">(@${escHtml(act.username)})</span>
+                        </span>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span class="card-activity-badge" style="color: ${meta.color}; background: ${meta.bg}; border: 1px solid ${meta.color}40;">
+                                ${meta.icon} ${meta.label}
+                            </span>
+                            <span class="card-activity-time">${timeStr}</span>
+                        </div>
+                    </div>
+                    <div class="card-activity-details">${escHtml(act.details)}</div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
 safeAddListener('addSubtaskBtn', 'click', () => {
     const inp = document.getElementById('newSubtask');
     if (!inp) return;
@@ -290,20 +429,51 @@ safeAddListener('newSubtask', 'keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); const btn = document.getElementById('addSubtaskBtn'); if (btn) btn.click(); }
 });
 
-safeAddListener('addCommentBtn', 'click', () => {
+safeAddListener('addCommentBtn', 'click', async () => {
     const inp = document.getElementById('newComment');
     if (!inp) return;
     const text = inp.value.trim();
     if (!text) return;
-    _editComments.push({
+    const id = document.getElementById('editCardId')?.value;
+
+    const newCmt = {
         id: Date.now().toString(36),
         text,
         createdAt: Date.now(),
         author: currentUser ? currentUser.name : 'Misafir',
         authorId: currentUser ? currentUser.id : ''
-    });
+    };
+    _editComments.push(newCmt);
     renderCommentsList();
+    const cmtCount = document.getElementById('cardCommentsCount');
+    if (cmtCount) cmtCount.textContent = _editComments.length;
     inp.value = '';
+
+    if (id) {
+        try {
+            await API.addCardComment(id, text);
+            // Refresh activity timeline and badge
+            const res = await API.getCardActivity(id);
+            if (res && res.activity) {
+                _editActivity = res.activity;
+                const card = cards.find(c => c.id === id);
+                if (card) card.activity = res.activity;
+                const actCount = document.getElementById('cardActivityCount');
+                if (actCount) actCount.textContent = res.activity.length;
+                renderCardActivityList(res.activity);
+            }
+        } catch (e) {
+            console.warn('Failed to post comment to server:', e);
+        }
+    }
+});
+
+safeAddListener('newComment', 'keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        const btn = document.getElementById('addCommentBtn');
+        if (btn) btn.click();
+    }
 });
 
 safeAddListener('cardSaveBtn', 'click', async () => {
@@ -595,12 +765,14 @@ function updateUserHeader() {
     }
 
     const manageUsersBtn = document.getElementById('manageUsersBtn');
+    const canManage = currentUser.role === 'superadmin' || currentUser.role === 'admin';
     if (manageUsersBtn) {
-        if (currentUser.role === 'superadmin' || currentUser.role === 'admin') {
-            manageUsersBtn.style.display = 'inline-flex';
-        } else {
-            manageUsersBtn.style.display = 'none';
-        }
+        manageUsersBtn.style.display = canManage ? 'inline-flex' : 'none';
+    }
+
+    const tabNavAudit = document.getElementById('tabNavAudit');
+    if (tabNavAudit) {
+        tabNavAudit.style.display = canManage ? 'inline-block' : 'none';
     }
 
     renderWorkspaceSwitcher();
@@ -948,10 +1120,14 @@ safeAddListener('createWorkspacePromptBtn', 'click', () => {
 // ── User & Team Management Controller ─────────────────────
 async function loadAdminData() {
     try {
-        const isSuperAdmin = currentUser?.role === 'superadmin';
+        const canViewLogs = currentUser?.role === 'superadmin' || currentUser?.role === 'admin';
         const tabLogs = document.getElementById('tabLogs');
         if (tabLogs) {
-            tabLogs.style.display = isSuperAdmin ? 'inline-block' : 'none';
+            tabLogs.style.display = canViewLogs ? 'inline-block' : 'none';
+        }
+        const tabNavAudit = document.getElementById('tabNavAudit');
+        if (tabNavAudit) {
+            tabNavAudit.style.display = canViewLogs ? 'inline-block' : 'none';
         }
 
         const [adminUsersRes, wsData, pendingUsers] = await Promise.all([
@@ -1090,57 +1266,123 @@ async function loadAdminData() {
     }
 }
 
-async function renderAuditLogs() {
-    const logsContainer = document.getElementById('adminLogsList');
-    if (!logsContainer) return;
-    logsContainer.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-muted);">Loglar yükleniyor…</div>';
+let _auditLogFilterDebounce = null;
+
+async function fetchAndRenderLogs(containerId, countBadgeId, searchId, userSelectId, actionSelectId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const searchInput = searchId ? document.getElementById(searchId) : null;
+    const userSelect = userSelectId ? document.getElementById(userSelectId) : null;
+    const actionSelect = actionSelectId ? document.getElementById(actionSelectId) : null;
+    const countBadge = countBadgeId ? document.getElementById(countBadgeId) : null;
+
+    const searchVal = searchInput ? searchInput.value.trim() : '';
+    const userVal = userSelect ? userSelect.value : '';
+    const actionVal = actionSelect ? actionSelect.value : '';
+
+    container.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px;">Aktivite kayıtları getiriliyor…</div>';
+    if (countBadge) countBadge.textContent = 'Filtreleniyor…';
+
     try {
-        const res = await API.getAuditLogs();
+        // Populate user select dropdown if it only has the default option
+        if (userSelect && userSelect.options.length <= 1) {
+            try {
+                const uRes = await API.getDetailedUsers().catch(() => ({ users: [] }));
+                const allUsers = uRes.users || [];
+                if (allUsers.length > 0) {
+                    userSelect.innerHTML = '<option value="">Tüm Kullanıcılar</option>' + allUsers.map(u =>
+                        `<option value="${escHtml(u.username)}">${escHtml(u.name)} (@${escHtml(u.username)})</option>`
+                    ).join('');
+                    if (userVal) userSelect.value = userVal;
+                }
+            } catch {}
+        }
+
+        const res = await API.getAuditLogs({
+            user: userVal,
+            action: actionVal,
+            q: searchVal
+        });
         const logs = res.logs || [];
+
+        if (countBadge) {
+            countBadge.textContent = `Toplam ${logs.length} aktivite kaydı listeleniyor`;
+        }
+
         if (logs.length === 0) {
-            logsContainer.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px;">Henüz aktivite kaydı bulunmuyor.</div>';
+            container.innerHTML = '<div style="padding: 32px 16px; text-align: center; color: var(--text-muted); font-size: 13px; background: var(--bg-secondary); border-radius: 8px; border: 1px dashed var(--border);">🔍 Seçilen kriterlere uygun aktivite kaydı bulunamadı.</div>';
             return;
         }
 
-        logsContainer.innerHTML = logs.map(l => {
-            const timeStr = new Date(l.createdAt).toLocaleString('tr-TR');
-            const actionBadgeColor = {
-                'LOGIN': '#3b82f6',
-                'LOGOUT': '#6b7280',
-                'REGISTER_REQUEST': '#eab308',
-                'USER_APPROVED': '#10b981',
-                'USER_REJECTED': '#ef4444',
-                'USER_CREATED': '#6366f1',
-                'USER_DELETED': '#dc2626',
-                'CARD_CREATE': '#10b981',
-                'CARD_UPDATE': '#3b82f6',
-                'CARD_DELETE': '#ef4444',
-                'CARD_MOVE': '#8b5cf6',
-                'WORKSPACE_CREATE': '#ec4899',
-                'WORKSPACE_SWITCH': '#64748b'
-            }[l.action] || '#6366f1';
+        const actionMeta = {
+            'LOGIN': { label: 'Giriş Yapıldı', color: '#3b82f6', icon: '🔑', bg: 'rgba(59, 130, 246, 0.12)' },
+            'LOGOUT': { label: 'Çıkış Yapıldı', color: '#6b7280', icon: '🚪', bg: 'rgba(107, 114, 128, 0.12)' },
+            'REGISTER_REQUEST': { label: 'Kayıt Talebi', color: '#eab308', icon: '⏳', bg: 'rgba(234, 179, 8, 0.12)' },
+            'USER_APPROVED': { label: 'Kullanıcı Onaylandı', color: '#10b981', icon: '✅', bg: 'rgba(16, 185, 129, 0.12)' },
+            'USER_REJECTED': { label: 'Kullanıcı Reddedildi', color: '#ef4444', icon: '❌', bg: 'rgba(239, 68, 68, 0.12)' },
+            'USER_CREATED': { label: 'Kullanıcı Oluşturuldu', color: '#6366f1', icon: '👤', bg: 'rgba(99, 102, 241, 0.12)' },
+            'USER_DELETED': { label: 'Kullanıcı Silindi', color: '#dc2626', icon: '🗑️', bg: 'rgba(220, 38, 38, 0.12)' },
+            'CARD_CREATE': { label: 'Kart Oluşturuldu', color: '#10b981', icon: '➕', bg: 'rgba(16, 185, 129, 0.12)' },
+            'CARD_VIEW': { label: 'Kart İnceleme (Okuma)', color: '#0ea5e9', icon: '👁️', bg: 'rgba(14, 165, 233, 0.12)' },
+            'CARD_COMMENT': { label: 'Yorum Eklendi', color: '#8b5cf6', icon: '💬', bg: 'rgba(139, 92, 246, 0.12)' },
+            'CARD_MOVE': { label: 'Durum / Kolon Değişimi', color: '#6366f1', icon: '🔄', bg: 'rgba(99, 102, 241, 0.12)' },
+            'CARD_UPDATE': { label: 'Kart Güncelleme', color: '#3b82f6', icon: '✏️', bg: 'rgba(59, 130, 246, 0.12)' },
+            'CARD_EFFORT': { label: 'Efor Girişi', color: '#f59e0b', icon: '⏱️', bg: 'rgba(245, 158, 11, 0.12)' },
+            'CARD_DELETE': { label: 'Kart Silindi', color: '#ef4444', icon: '🗑️', bg: 'rgba(239, 68, 68, 0.12)' },
+            'WORKSPACE_CREATE': { label: 'Pano/Takım Oluşturuldu', color: '#ec4899', icon: '📁', bg: 'rgba(236, 72, 153, 0.12)' },
+            'WORKSPACE_SWITCH': { label: 'Pano Değişimi', color: '#64748b', icon: '🔀', bg: 'rgba(100, 116, 139, 0.12)' }
+        };
+
+        container.innerHTML = logs.map(l => {
+            const timeStr = new Date(l.createdAt).toLocaleString('tr-TR', {
+                day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+            const meta = actionMeta[l.action] || { label: l.action, color: '#6366f1', icon: '📌', bg: 'rgba(99, 102, 241, 0.12)' };
+            const authorName = l.name || l.username || 'Kullanıcı';
+            const init = initials(authorName);
+            const hue = [...authorName].reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360;
+            const avatarBg = `hsl(${hue}, 60%, 45%)`;
 
             return `
-                <div style="display: flex; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 12px; align-items: flex-start;">
-                    <span style="background: ${actionBadgeColor}; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; margin-top: 1px;">
-                        ${escHtml(l.action)}
-                    </span>
-                    <div style="flex: 1;">
-                        <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                            <span style="font-weight: 600; color: var(--text-primary);">${escHtml(l.name)} <span style="font-weight: normal; color: var(--text-muted);">(@${escHtml(l.username)}) [${escHtml(l.userRole)}]</span></span>
-                            <span style="font-size: 11px; color: var(--text-muted);">${escHtml(timeStr)}</span>
+                <div style="display: flex; gap: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 13px; align-items: flex-start; transition: var(--transition); box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                    <div style="width: 34px; height: 34px; border-radius: 50%; background: ${avatarBg}; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 12px; flex-shrink: 0; margin-top: 1px;">
+                        ${escHtml(init)}
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 4px;">
+                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                <span style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${escHtml(authorName)}</span>
+                                <span style="font-size: 12px; color: var(--text-muted);">(@${escHtml(l.username || '')})</span>
+                                <span style="font-size: 10px; background: rgba(99, 102, 241, 0.1); color: var(--accent); padding: 1px 6px; border-radius: 4px; font-weight: 600;">${escHtml(l.userRole || 'user')}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="color: ${meta.color}; background: ${meta.bg}; border: 1px solid ${meta.color}40; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; white-space: nowrap;">
+                                    ${meta.icon} ${meta.label}
+                                </span>
+                                <span style="font-size: 11px; color: var(--text-muted); white-space: nowrap;">${escHtml(timeStr)}</span>
+                            </div>
                         </div>
-                        <div style="color: var(--text-secondary); margin-top: 3px; font-size: 12px; line-height: 1.4;">
-                            ${escHtml(l.details)}
+                        <div style="color: var(--text-secondary); font-size: 13px; line-height: 1.45; word-break: break-word;">
+                            ${escHtml(l.details || '')}
                         </div>
                     </div>
                 </div>
             `;
         }).join('');
     } catch (err) {
-        logsContainer.innerHTML = `<div style="padding: 16px; color: var(--danger);">${escHtml(err.message || 'Loglar yüklenemedi')}</div>`;
+        container.innerHTML = `<div style="padding: 16px; color: var(--danger); font-size: 13px;">${escHtml(err.message || 'Loglar yüklenemedi')}</div>`;
     }
 }
+
+async function renderAuditLogs() {
+    await fetchAndRenderLogs('adminLogsList', 'logResultsCount', 'logFilterSearch', 'logFilterUser', 'logFilterAction');
+}
+
+async function renderAuditView() {
+    await fetchAndRenderLogs('viewAuditLogsList', 'viewAuditResultsCount', 'viewAuditFilterSearch', 'viewAuditFilterUser', 'viewAuditFilterAction');
+}
+window.renderAuditView = renderAuditView;
 
 window.approvePendingUser = async function(userId) {
     try {
@@ -1211,6 +1453,51 @@ safeAddListener('tabLogs', 'click', () => {
 
 safeAddListener('btnRefreshLogs', 'click', () => {
     renderAuditLogs();
+});
+
+safeAddListener('logFilterUser', 'change', () => {
+    renderAuditLogs();
+});
+
+safeAddListener('logFilterAction', 'change', () => {
+    renderAuditLogs();
+});
+
+safeAddListener('logFilterSearch', 'input', () => {
+    clearTimeout(_auditLogFilterDebounce);
+    _auditLogFilterDebounce = setTimeout(() => { renderAuditLogs(); }, 300);
+});
+
+safeAddListener('btnClearLogFilters', 'click', () => {
+    const s = document.getElementById('logFilterSearch'); if (s) s.value = '';
+    const u = document.getElementById('logFilterUser'); if (u) u.value = '';
+    const a = document.getElementById('logFilterAction'); if (a) a.value = '';
+    renderAuditLogs();
+});
+
+// Full-screen View-Audit Listeners
+safeAddListener('btnRefreshAuditView', 'click', () => {
+    renderAuditView();
+});
+
+safeAddListener('viewAuditFilterUser', 'change', () => {
+    renderAuditView();
+});
+
+safeAddListener('viewAuditFilterAction', 'change', () => {
+    renderAuditView();
+});
+
+safeAddListener('viewAuditFilterSearch', 'input', () => {
+    clearTimeout(_auditLogFilterDebounce);
+    _auditLogFilterDebounce = setTimeout(() => { renderAuditView(); }, 300);
+});
+
+safeAddListener('btnClearAuditViewFilters', 'click', () => {
+    const s = document.getElementById('viewAuditFilterSearch'); if (s) s.value = '';
+    const u = document.getElementById('viewAuditFilterUser'); if (u) u.value = '';
+    const a = document.getElementById('viewAuditFilterAction'); if (a) a.value = '';
+    renderAuditView();
 });
 
 safeAddListener('tabTeamsList', 'click', () => {

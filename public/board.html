@@ -106,6 +106,7 @@
         <button class="view-tab" data-view="sprints">⚡ Sprints</button>
         <button class="view-tab" data-view="labels">🎨 Etiketler</button>
         <button class="view-tab" data-view="team">👥 Takım</button>
+        <button class="view-tab" data-view="audit" id="tabNavAudit" style="display:none;">📜 Aktivite Takibi</button>
     </div>
 
     <!-- QUICK FILTERS & TEAM MEMBER BAR -->
@@ -286,6 +287,62 @@
         <div id="teamView"></div>
     </div>
 
+    <!-- AUDIT & ACTIVITY TRACKING VIEW (FULL-SCREEN MENU VIEW) -->
+    <div class="view-container" id="view-audit">
+        <div class="audit-view-wrapper" style="max-width: 1200px; margin: 0 auto; padding: 20px 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+                <div>
+                    <h2 style="font-size: 22px; font-weight: 700; color: var(--text-primary); margin: 0 0 6px 0;">📊 Ekip & Sistem Aktivite Takip Merkezi</h2>
+                    <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">Kullanıcıların kart inceleme, yorum yapma, durum değiştirme, efor girişi ve sistem işlemlerinin canlı denetim günlüğü.</p>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="btnRefreshAuditView" type="button" style="display: inline-flex; align-items: center; gap: 6px;">
+                    🔄 Yenile
+                </button>
+            </div>
+
+            <!-- Filter Controls -->
+            <div class="audit-filter-bar" style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; background: var(--surface); padding: 14px 16px; border-radius: 10px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); align-items: flex-end;">
+                <div style="flex: 1; min-width: 220px;">
+                    <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Arama</label>
+                    <input class="form-input" type="text" id="viewAuditFilterSearch" placeholder="🔍 Başlık, detay, kullanıcı veya işlem…" style="font-size: 13px; padding: 7px 12px; width: 100%;">
+                </div>
+                <div style="min-width: 180px;">
+                    <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Kullanıcı / Ekip Üyesi</label>
+                    <select class="form-select" id="viewAuditFilterUser" style="font-size: 13px; padding: 7px 12px; width: 100%;">
+                        <option value="">Tüm Kullanıcılar</option>
+                    </select>
+                </div>
+                <div style="min-width: 180px;">
+                    <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Hareket Türü</label>
+                    <select class="form-select" id="viewAuditFilterAction" style="font-size: 13px; padding: 7px 12px; width: 100%;">
+                        <option value="">Tüm Hareketler</option>
+                        <option value="CARD_VIEW">👁️ Kart İnceleme (Okuma)</option>
+                        <option value="CARD_COMMENT">💬 Yorum Ekleme</option>
+                        <option value="CARD_MOVE">🔄 Durum / Kolon Değişimi</option>
+                        <option value="CARD_UPDATE">✏️ Kart Güncelleme</option>
+                        <option value="CARD_EFFORT">⏱️ Efor Girişi</option>
+                        <option value="CARD_CREATE">➕ Kart Oluşturma</option>
+                        <option value="CARD_DELETE">🗑️ Kart Silme</option>
+                        <option value="LOGIN">🔑 Giriş Yapma</option>
+                        <option value="USER_APPROVED">✅ Kullanıcı Onaylama</option>
+                        <option value="WORKSPACE_CREATE">📁 Pano Oluşturma</option>
+                    </select>
+                </div>
+                <div>
+                    <button class="btn btn-secondary btn-sm" id="btnClearAuditViewFilters" type="button" style="height: 38px; padding: 0 14px;">
+                        Temizle
+                    </button>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 12px; color: var(--text-muted);">
+                <span id="viewAuditResultsCount">Aktiviteler yükleniyor…</span>
+            </div>
+
+            <div class="logs-container" id="viewAuditLogsList" style="display: flex; flex-direction: column; gap: 10px;"></div>
+        </div>
+    </div>
+
     <!-- ============================================================
      CARD DETAIL MODAL
      ============================================================ -->
@@ -386,15 +443,34 @@
                         </div>
                     </div>
 
-                    <!-- Comments -->
-                    <div class="form-group" id="commentsSection" style="display:none">
-                        <label class="form-label">Yorumlar</label>
-                        <div class="comments-list" id="commentsList"></div>
-                        <div class="add-comment-row">
-                            <textarea class="add-comment-input" id="newComment" rows="2"
-                                placeholder="Yorum ekle…"></textarea>
-                            <button type="button" class="btn btn-secondary btn-sm" id="addCommentBtn"
-                                style="align-self:flex-end">Gönder</button>
+                    <!-- Comments & Activity Timeline -->
+                    <div class="form-group" id="commentsSection" style="display:none; margin-top:20px; border-top:1px solid var(--border); padding-top:16px;">
+                        <div class="card-subtabs-bar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <div class="card-subtabs-group" style="display:flex; gap:6px; background:var(--bg-secondary); padding:4px; border-radius:8px; border:1px solid var(--border);">
+                                <button type="button" class="card-subtab-btn active" id="tabCardCommentsBtn" onclick="switchCardSubTab('comments')">
+                                    💬 Yorumlar (<span id="cardCommentsCount">0</span>)
+                                </button>
+                                <button type="button" class="card-subtab-btn" id="tabCardActivityBtn" onclick="switchCardSubTab('activity')">
+                                    📜 Aktivite Geçmişi (<span id="cardActivityCount">0</span>)
+                                </button>
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm" id="btnRefreshCardActivity" style="display:none; font-size:11px; padding:3px 8px;" onclick="refreshCardActivity()">🔄 Yenile</button>
+                        </div>
+
+                        <!-- Sub-tab 1: Comments -->
+                        <div id="cardSubTabComments">
+                            <div class="comments-list" id="commentsList"></div>
+                            <div class="add-comment-row" style="margin-top:12px;">
+                                <textarea class="add-comment-input" id="newComment" rows="2"
+                                    placeholder="Yorum ekle…"></textarea>
+                                <button type="button" class="btn btn-primary btn-sm" id="addCommentBtn"
+                                    style="align-self:flex-end">Gönder</button>
+                            </div>
+                        </div>
+
+                        <!-- Sub-tab 2: Activity Timeline -->
+                        <div id="cardSubTabActivity" style="display:none;">
+                            <div class="card-activity-timeline" id="cardActivityList"></div>
                         </div>
                     </div>
 
@@ -494,7 +570,7 @@
                 <div class="auth-tabs" style="margin-bottom: 16px; flex-wrap: wrap; gap: 6px;">
                     <button class="auth-tab active" id="tabUsersList">Kullanıcılar</button>
                     <button class="auth-tab" id="tabPendingUsers">⏳ Onay Bekleyenler <span id="pendingUsersBadge" style="display:none; background:#ef4444; color:#fff; border-radius:10px; padding:1px 6px; font-size:10px; margin-left:4px;">0</span></button>
-                    <button class="auth-tab" id="tabLogs" style="display: none;">📜 Aktivite Günlüğü</button>
+                    <button class="auth-tab" id="tabLogs" style="display: none;">📜 Aktivite & İzleme</button>
                     <button class="auth-tab" id="tabTeamsList">Takımlar / Panolar</button>
                     <button class="auth-tab" id="tabAddUser">✚ Yeni Kullanıcı Ekle</button>
                 </div>
@@ -512,12 +588,49 @@
                     <div class="manager-list" id="adminPendingUsersList"></div>
                 </div>
 
-                <!-- Tab 3: Activity / Audit Logs (Super Admin Only) -->
+                <!-- Tab 3: Activity / Audit Logs (Super Admin & Project Managers) -->
                 <div class="user-panel" id="panelLogs" style="display: none;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <span style="font-size: 13px; color: var(--text-secondary);">Tüm kullanıcıların giriş, kart oluşturma, taşıma, güncelleme ve silme logları.</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 600; color: var(--text-primary);">📊 Ekip & Sistem Aktivite Takip Merkezi</div>
+                            <span style="font-size: 12px; color: var(--text-secondary);">Ekip üyelerinin kart inceleme, yorum, durum değişimi, efor ve sistem hareketleri.</span>
+                        </div>
                         <button class="btn btn-secondary btn-sm" id="btnRefreshLogs" type="button">🔄 Yenile</button>
                     </div>
+
+                    <!-- Filter Bar for Audit Logs -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; background: var(--bg-secondary); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                        <div style="flex: 1; min-width: 160px;">
+                            <input class="form-input" type="text" id="logFilterSearch" placeholder="🔍 Arama (kart başlığı, detay, işlem)…" style="font-size: 12px; padding: 6px 10px;">
+                        </div>
+                        <div style="min-width: 140px;">
+                            <select class="form-select" id="logFilterUser" style="font-size: 12px; padding: 6px 10px;">
+                                <option value="">Tüm Kullanıcılar</option>
+                            </select>
+                        </div>
+                        <div style="min-width: 140px;">
+                            <select class="form-select" id="logFilterAction" style="font-size: 12px; padding: 6px 10px;">
+                                <option value="">Tüm Hareketler</option>
+                                <option value="CARD_VIEW">👁️ Kart İnceleme</option>
+                                <option value="CARD_COMMENT">💬 Yorum Ekleme</option>
+                                <option value="CARD_MOVE">🔄 Durum / Kolon Değişimi</option>
+                                <option value="CARD_UPDATE">✏️ Kart Güncelleme</option>
+                                <option value="CARD_EFFORT">⏱️ Efor Girişi</option>
+                                <option value="CARD_CREATE">➕ Kart Oluşturma</option>
+                                <option value="CARD_DELETE">🗑️ Kart Silme</option>
+                                <option value="LOGIN">🔑 Giriş Yapma</option>
+                                <option value="USER_APPROVED">✅ Kullanıcı Onaylama</option>
+                                <option value="WORKSPACE_CREATE">📁 Takım/Pano Oluşturma</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" id="btnClearLogFilters" type="button" style="font-size: 12px;">Temizle</button>
+                    </div>
+
+                    <!-- Statistics / Count summary badge -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:11px; color:var(--text-muted);">
+                        <span id="logResultsCount">Kayıtlar listeleniyor…</span>
+                    </div>
+
                     <div class="logs-container" id="adminLogsList" style="max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
                 </div>
 

@@ -351,12 +351,36 @@ adminRouter.post('/users/:id/reject', asyncHandler(async (req, res) => {
 
 // ── GET /api/admin/logs ──────────────────────────────────────
 adminRouter.get('/logs', asyncHandler(async (req, res) => {
-    if (req.user?.role !== 'superadmin') {
-        throw new AppError('Aktivite günlüğünü görüntüleme yetkisi sadece Super Admin kullanıcıya aittir', 403);
+    if (req.user?.role !== 'superadmin' && req.user?.role !== 'admin') {
+        throw new AppError('Aktivite günlüğünü görüntüleme yetkisi sadece yönetici ve Super Admin kullanıcılara aittir', 403);
     }
     const env = req.environment || getEnvironment(req);
     const personalDb = readDb({ tenantId: 'personal', environment: env });
-    const logs = (personalDb.logs || []).slice().reverse();
+    let logs = (personalDb.logs || []).slice().reverse();
+
+    // Query parameters filtering: user, action, cardKey, q
+    const { user, action, cardKey, q } = req.query as { user?: string; action?: string; cardKey?: string; q?: string };
+    if (user && user !== 'all') {
+        const uLower = user.toLowerCase();
+        logs = logs.filter(l => (l.username && l.username.toLowerCase() === uLower) || (l.name && l.name.toLowerCase().includes(uLower)) || l.userId === user);
+    }
+    if (action && action !== 'all') {
+        logs = logs.filter(l => l.action === action);
+    }
+    if (cardKey) {
+        const ckLower = cardKey.toLowerCase();
+        logs = logs.filter(l => (l.details && l.details.toLowerCase().includes(ckLower)) || l.entityId === cardKey);
+    }
+    if (q) {
+        const qLower = q.toLowerCase();
+        logs = logs.filter(l =>
+            (l.details && l.details.toLowerCase().includes(qLower)) ||
+            (l.username && l.username.toLowerCase().includes(qLower)) ||
+            (l.name && l.name.toLowerCase().includes(qLower)) ||
+            (l.action && l.action.toLowerCase().includes(qLower))
+        );
+    }
+
     res.json({ logs });
 }));
 

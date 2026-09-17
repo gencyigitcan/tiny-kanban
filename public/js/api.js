@@ -70,6 +70,27 @@ const API = {
     async deleteCard(id) {
         return await request(`/api/cards/${id}`, { method: 'DELETE' });
     },
+    async recordCardView(id) {
+        try {
+            return await request(`/api/cards/${id}/view`, { method: 'POST' });
+        } catch (e) {
+            return null;
+        }
+    },
+    async getCardActivity(id) {
+        try {
+            return await request(`/api/cards/${id}/activity`);
+        } catch (e) {
+            return { activity: [] };
+        }
+    },
+    async addCardComment(id, text) {
+        return await request(`/api/cards/${id}/comments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+    },
 
     // ── Epics ────────────────────────────────────────────────
     async getEpics() {
@@ -205,8 +226,14 @@ const API = {
     async getDetailedUsers() {
         return await request('/api/admin/users/detailed');
     },
-    async getAuditLogs() {
-        return await request('/api/admin/logs');
+    async getAuditLogs(params = {}) {
+        const qs = new URLSearchParams();
+        if (params.user) qs.set('user', params.user);
+        if (params.action) qs.set('action', params.action);
+        if (params.cardKey) qs.set('cardKey', params.cardKey);
+        if (params.q) qs.set('q', params.q);
+        const query = qs.toString() ? `?${qs.toString()}` : '';
+        return await request(`/api/admin/logs${query}`);
     },
     async getUsers() {
         return await request('/api/users');
