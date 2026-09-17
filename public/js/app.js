@@ -1914,5 +1914,22 @@ document.querySelectorAll('.view-tab').forEach(btn => {
     });
 });
 
+// Sidebar Toggle Handler
+const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+const appSidebar = document.getElementById('appSidebar');
+if (sidebarToggleBtn && appSidebar) {
+    sidebarToggleBtn.addEventListener('click', () => {
+        appSidebar.classList.toggle('collapsed');
+        try {
+            localStorage.setItem('sidebar_collapsed', appSidebar.classList.contains('collapsed'));
+        } catch (_) {}
+    });
+    try {
+        if (localStorage.getItem('sidebar_collapsed') === 'true') {
+            appSidebar.classList.add('collapsed');
+        }
+    } catch (_) {}
+}
+
 // ── Boot Application ──────────────────────────────────────
 boot();

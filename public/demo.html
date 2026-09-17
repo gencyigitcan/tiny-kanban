@@ -17,84 +17,127 @@
 
 <body>
 
-    <!-- TOP NAV -->
-    <nav class="topnav">
-        <a class="topnav-link" href="/board">📋 My Board</a>
-        <div class="topnav-sep"></div>
-        <a class="topnav-link active" href="/demo">🎯 Demo</a>
-    </nav>
+    <div class="app-layout">
+        <!-- LEFT SIDEBAR NAVIGATION -->
+        <aside class="app-sidebar" id="appSidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <a href="/" class="sidebar-logo">D</a>
+                    <div class="sidebar-brand-text">
+                        <span class="sidebar-app-name">Demo Panosu</span>
+                        <span class="sidebar-version">Nova Takımı</span>
+                    </div>
+                </div>
 
-    <!-- HEADER -->
-    <header class="header">
-        <div class="header-brand">
-            <div class="header-logo">D</div>
-            <div style="display:flex; align-items:center; gap:6px;">
-                <span class="header-title">Demo Panosu · Nova Takımı</span>
-                <span class="team-badge" style="background:rgba(99,102,241,0.15); color:var(--accent); font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px;">10 Kişi</span>
+                <!-- PRIMARY ACTION: YENİ TICKET EKLE -->
+                <button class="sidebar-new-ticket-btn" id="addTaskBtn" onclick="openCardDetail(null)" type="button">
+                    <span>✚</span> <span class="label">Yeni Ticket Ekle</span>
+                </button>
             </div>
-            <span class="header-subtitle" id="sprintBadge">—</span>
-        </div>
-        <div class="header-search">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="searchInput" placeholder="Kart ara…" autocomplete="off">
-        </div>
-        <div class="header-filters">
-            <select class="filter-select" id="filterSprint" title="Sprint Filtresi">
-                <option value="active">⚡ Aktif Sprint (Sprint 37 · 14-20 Eyl 2026)</option>
-                <option value="all">🌐 Tüm Sprintler (104 Hafta · 2026-2027)</option>
-            </select>
-            <select class="filter-select" id="filterEpic" title="Proje / Epic Filtresi">
-                <option value="">📁 Tüm Projeler / Epics</option>
-            </select>
-            <select class="filter-select" id="filterAssignee" title="Kişi Filtresi">
-                <option value="">👤 Tüm Kişiler</option>
-            </select>
-            <select class="filter-select" id="filterPriority" title="Öncelik Filtresi">
-                <option value="">🎯 Tüm Öncelikler</option>
-                <option value="high">🔴 Yüksek</option>
-                <option value="medium">🟠 Orta</option>
-                <option value="low">🟢 Düşük</option>
-            </select>
-        </div>
-        <div class="header-actions">
-            <button class="btn btn-primary" id="addTaskBtn" onclick="openCardDetail(null)" style="font-weight:600; box-shadow:0 0 16px rgba(99,102,241,0.35);">✚ <span class="label">Yeni Ticket Ekle</span></button>
-            <button class="btn btn-secondary" id="manageEpicsBtn">🏷️ <span class="label">Epics</span></button>
-            <button class="btn btn-secondary" id="manageSprintsBtn">⚡ <span class="label">Sprints</span></button>
-            <button class="btn btn-secondary" id="manageLabelsBtn">🎨 <span class="label">Etiketler</span></button>
-            <button class="btn btn-secondary" id="manageUsersBtn">👥 <span class="label">Takım</span></button>
-            <button class="btn btn-danger" id="clearBtn">🗑 <span class="label">Temizle</span></button>
-        </div>
-    </header>
 
-    <!-- VIEW TABS -->
-    <div class="view-tabs font-sans">
-        <button class="view-tab active" data-view="board">📋 Board</button>
-        <button class="view-tab" data-view="list">☰ Liste</button>
-        <button class="view-tab" data-view="backlog">📦 Backlog</button>
-        <button class="view-tab" data-view="dashboard">📊 Dashboard</button>
-        <button class="view-tab" data-view="gantt">📅 Gantt</button>
-        <button class="view-tab" data-view="reports">📈 Raporlar</button>
-        <button class="view-tab" data-view="epics">🏷️ Epics</button>
-        <button class="view-tab" data-view="sprints">⚡ Sprints</button>
-        <button class="view-tab" data-view="labels">🎨 Etiketler</button>
-        <button class="view-tab" data-view="team">👥 Takım</button>
-    </div>
+            <!-- SIDEBAR NAVIGATION ITEMS -->
+            <nav class="sidebar-nav">
+                <div class="sidebar-section-title">GÖRÜNÜMLER</div>
+                <button class="view-tab active" data-view="board">
+                    <span class="nav-icon">📋</span> <span>Pano (Board)</span>
+                </button>
+                <button class="view-tab" data-view="list">
+                    <span class="nav-icon">☰</span> <span>Liste</span>
+                </button>
+                <button class="view-tab" data-view="backlog">
+                    <span class="nav-icon">📦</span> <span>Backlog</span>
+                </button>
+                <button class="view-tab" data-view="gantt">
+                    <span class="nav-icon">📅</span> <span>Gantt &amp; Takvim</span>
+                </button>
+                <button class="view-tab" data-view="dashboard">
+                    <span class="nav-icon">📊</span> <span>Dashboard</span>
+                </button>
+                <button class="view-tab" data-view="reports">
+                    <span class="nav-icon">📈</span> <span>Raporlar</span>
+                </button>
 
-    <!-- QUICK FILTERS & TEAM MEMBER BAR -->
-    <div class="quick-filters-bar" id="quickFiltersBar">
-        <div class="filter-chip-section">
-            <span class="filter-chip-label">👥 Kişi:</span>
-            <div class="filter-chips" id="memberFilterChips"></div>
-        </div>
-        <div class="filter-chip-section">
-            <span class="filter-chip-label">📁 Proje:</span>
-            <div class="filter-chips" id="projectFilterChips"></div>
-        </div>
-        <div class="filter-reset-wrap" id="filterResetWrap" style="display: none;">
-            <span class="active-filter-badge" id="activeFilterBadge">🎯 Filtre aktif</span>
-            <button type="button" class="btn-clear-filters" onclick="clearAllFilters()">✕ Filtreleri Temizle</button>
-        </div>
-    </div>
+                <div class="sidebar-section-title">YÖNETİM</div>
+                <button class="view-tab" data-view="epics" id="manageEpicsBtn">
+                    <span class="nav-icon">🏷️</span> <span>Epics</span>
+                </button>
+                <button class="view-tab" data-view="sprints" id="manageSprintsBtn">
+                    <span class="nav-icon">⚡</span> <span>Sprints</span>
+                </button>
+                <button class="view-tab" data-view="labels" id="manageLabelsBtn">
+                    <span class="nav-icon">🎨</span> <span>Etiketler</span>
+                </button>
+                <button class="view-tab" data-view="team" id="manageUsersBtn">
+                    <span class="nav-icon">👥</span> <span>Takım</span>
+                </button>
+            </nav>
+
+            <!-- SIDEBAR FOOTER (ENV SWITCH) -->
+            <div class="sidebar-footer">
+                <div class="sidebar-env-switch">
+                    <a href="/board" class="env-chip" title="Canlı Çalışma Alanı">📋 Canlı</a>
+                    <a href="/demo" class="env-chip active" title="Nova Demo Panosu">🎯 Demo</a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN APP CONTENT AREA -->
+        <div class="app-main">
+            <!-- SLIM TOPBAR WITH SEARCH, SPRINT & FILTERS -->
+            <header class="main-topbar">
+                <div class="topbar-left">
+                    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" type="button" title="Menüyü Daralt/Genişlet">☰</button>
+                    <div class="header-search">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="searchInput" placeholder="Kart ara… (N ile yeni)" autocomplete="off">
+                    </div>
+                    <span class="header-subtitle" id="sprintBadge">—</span>
+                </div>
+
+                <div class="topbar-right">
+                    <div class="header-filters">
+                        <select class="filter-select" id="filterSprint" title="Sprint Filtresi">
+                            <option value="active">⚡ Aktif Sprint</option>
+                            <option value="all">🌐 Tüm Sprintler</option>
+                        </select>
+                        <select class="filter-select" id="filterEpic" title="Proje / Epic Filtresi">
+                            <option value="">📁 Epics</option>
+                        </select>
+                        <select class="filter-select" id="filterAssignee" title="Kişi Filtresi">
+                            <option value="">👤 Kişiler</option>
+                        </select>
+                        <select class="filter-select" id="filterPriority" title="Öncelik Filtresi">
+                            <option value="">🎯 Öncelik</option>
+                            <option value="high">🔴 Yüksek</option>
+                            <option value="medium">🟠 Orta</option>
+                            <option value="low">🟢 Düşük</option>
+                        </select>
+                    </div>
+
+                    <div class="header-actions">
+                        <button class="btn btn-danger btn-sm" id="clearBtn" title="Panoyu Temizle">🗑</button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- QUICK FILTERS & TEAM MEMBER BAR -->
+            <div class="quick-filters-bar" id="quickFiltersBar">
+                <div class="filter-chip-section">
+                    <span class="filter-chip-label">👥 Kişi:</span>
+                    <div class="filter-chips" id="memberFilterChips"></div>
+                </div>
+                <div class="filter-chip-section">
+                    <span class="filter-chip-label">📁 Proje:</span>
+                    <div class="filter-chips" id="projectFilterChips"></div>
+                </div>
+                <div class="filter-reset-wrap" id="filterResetWrap" style="display: none;">
+                    <span class="active-filter-badge" id="activeFilterBadge">🎯 Filtre aktif</span>
+                    <button type="button" class="btn-clear-filters" onclick="clearAllFilters()">✕ Temizle</button>
+                </div>
+            </div>
+
+            <!-- APPS VIEW VIEWPORT CONTAINER -->
+            <div class="app-views-viewport">
 
     <!-- BOARD VIEW -->
     <div class="view-container active" id="view-board">
@@ -221,6 +264,9 @@
     <div class="view-container" id="view-team">
         <div id="teamView"></div>
     </div>
+    </div> <!-- /.app-views-viewport -->
+    </div> <!-- /.app-main -->
+    </div> <!-- /.app-layout -->
 
     <!-- ============================================================
      CARD DETAIL MODAL

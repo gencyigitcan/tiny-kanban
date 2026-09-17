@@ -59,7 +59,8 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   background: var(--bg);
   color: var(--text-primary);
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   line-height: 1.5;
 }
 
@@ -81,6 +82,302 @@ select {
 a {
   text-decoration: none;
   color: inherit;
+}
+
+/* ============================================================
+   APP LAYOUT & LEFT SIDEBAR NAVIGATION (NO HORIZONTAL SCROLL)
+   ============================================================ */
+.app-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.app-sidebar {
+  width: 240px;
+  min-width: 240px;
+  height: 100vh;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  transition: width 0.2s ease, min-width 0.2s ease;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.03);
+}
+
+.app-sidebar.collapsed {
+  width: 64px;
+  min-width: 64px;
+}
+
+.app-sidebar.collapsed .sidebar-app-name,
+.app-sidebar.collapsed .sidebar-version,
+.app-sidebar.collapsed .ws-name,
+.app-sidebar.collapsed .ws-arrow,
+.app-sidebar.collapsed .sidebar-section-title,
+.app-sidebar.collapsed .sidebar-nav .view-tab span:not(.nav-icon),
+.app-sidebar.collapsed .sidebar-new-ticket-btn span.label,
+.app-sidebar.collapsed .user-profile-info,
+.app-sidebar.collapsed .sidebar-env-switch {
+  display: none !important;
+}
+
+.app-sidebar.collapsed .sidebar-new-ticket-btn {
+  padding: 10px 0;
+  justify-content: center;
+}
+
+.app-sidebar.collapsed .sidebar-nav .view-tab {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.sidebar-header {
+  padding: 16px 14px 12px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-logo {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+  text-decoration: none;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.sidebar-brand-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar-app-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+
+.sidebar-version {
+  font-size: 10px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.sidebar-new-ticket-btn {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 3px 10px rgba(99, 102, 241, 0.3);
+  transition: var(--transition);
+  border: none;
+  cursor: pointer;
+}
+
+.sidebar-new-ticket-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 15px rgba(99, 102, 241, 0.45);
+}
+
+.sidebar-nav {
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.sidebar-section-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 10px 10px 4px 10px;
+}
+
+.app-sidebar .view-tab {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  border-bottom: none;
+  margin: 0;
+  text-align: left;
+  transition: var(--transition);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.app-sidebar .view-tab:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.app-sidebar .view-tab.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.nav-icon {
+  font-size: 15px;
+  width: 20px;
+  display: inline-flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-footer {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.sidebar-env-switch {
+  display: flex;
+  gap: 6px;
+  background: var(--surface);
+  padding: 3px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.env-chip {
+  flex: 1;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.env-chip:hover {
+  color: var(--text-primary);
+}
+
+.env-chip.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  background: var(--bg);
+}
+
+.main-topbar {
+  height: 52px;
+  min-height: 52px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  max-width: 520px;
+}
+
+.sidebar-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.sidebar-toggle-btn:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.app-views-viewport {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
 }
 
 /* ============================================================
@@ -387,23 +684,30 @@ a {
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* ============================================================
-   BOARD VIEW
+   BOARD VIEW (NO HORIZONTAL SCROLL)
    ============================================================ */
 .board-wrap {
-  padding: 24px;
+  padding: 16px 20px;
   display: flex;
-  gap: 20px;
-  min-height: calc(100vh - 148px);
-  overflow-x: auto;
+  gap: 16px;
+  flex: 1;
+  height: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: hidden;
 }
 
 .column {
   flex: 1;
-  min-width: 300px;
-  max-width: 380px;
+  min-width: 0;
+  max-width: none;
   display: flex;
   flex-direction: column;
   background: var(--surface);
@@ -411,6 +715,7 @@ a {
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
   overflow: hidden;
+  height: 100%;
   transition: var(--transition);
 }
 
