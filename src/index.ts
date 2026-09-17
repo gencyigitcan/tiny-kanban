@@ -143,16 +143,15 @@ export default {
         const url = new URL(request.url);
         // Serve static assets directly from Cloudflare Pages CDN
         if (!url.pathname.startsWith('/api/')) {
-            if (url.pathname === '/demo') {
-                return env.ASSETS.fetch(new Request(new URL('/demo.html', request.url), request));
+            if (url.pathname === '/login') {
+                return Response.redirect(new URL('/board', request.url).toString(), 302);
             }
-            if (url.pathname === '/board' || url.pathname === '/login') {
-                return env.ASSETS.fetch(new Request(new URL('/board.html', request.url), request));
+            try {
+                return await env.ASSETS.fetch(request);
+            } catch (err) {
+                console.error("ASSETS fetch failed:", err);
+                return new Response("Not Found", { status: 404 });
             }
-            if (url.pathname === '/register') {
-                return env.ASSETS.fetch(new Request(new URL('/register.html', request.url), request));
-            }
-            return env.ASSETS.fetch(request);
         }
 
         const envName = getEnvironment(request, env);

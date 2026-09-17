@@ -1,4 +1,1 @@
-/demo       /demo.html      200
-/board      /board.html     200
-/login      /board.html     200
-/register   /register.html  200
+/login       /board      302

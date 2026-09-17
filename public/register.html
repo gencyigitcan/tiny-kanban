@@ -205,7 +205,7 @@
                 Hesap bilgileriniz güvenle oluşturuldu ve <strong>Super Admin</strong> onayına iletildi.<br><br>
                 Sistem yöneticisi başvurunuzu onayladığı anda hesabınız aktifleşecek ve panonuza erişebileceksiniz.
             </p>
-            <a href="/board.html" class="btn-register-submit" style="display: inline-block; text-decoration: none; text-align: center;">Giriş Sayfasına Dön ➔</a>
+            <a href="/board" class="btn-register-submit" style="display: inline-block; text-decoration: none; text-align: center;">Giriş Sayfasına Dön ➔</a>
         </div>
 
         <!-- Form -->
@@ -240,7 +240,7 @@
             </div>
 
             <div class="register-footer">
-                Zaten bir hesabınız var mı? <a href="/board.html">Giriş Yap</a>
+                Zaten bir hesabınız var mı? <a href="/board">Giriş Yap</a>
             </div>
         </form>
     </div>
@@ -281,7 +281,7 @@
                     successDiv.style.display = 'block';
                 } else if (data.token) {
                     localStorage.setItem('tiny_kanban_token', data.token);
-                    window.location.href = '/board.html';
+                    window.location.href = '/board';
                 } else {
                     form.style.display = 'none';
                     successDiv.style.display = 'block';

@@ -690,7 +690,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 heroLoginMsg.style.display = 'block';
 
                 setTimeout(() => {
-                    window.location.href = '/board.html';
+                    window.location.href = '/board';
                 }, 400);
             } catch (err) {
                 heroLoginMsg.className = 'gateway-msg error';
