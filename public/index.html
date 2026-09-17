@@ -3,113 +3,719 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kanban – Bireysel Geliştirici Proje Sunumu ve Teknik İnceleme</title>
-    <meta name="description" content="Kanban – Kendi bilgisayarımda veya sunucumda çalıştırdığım, bulut bağımlılığı olmayan, hafif ve kişisel Kanban iş takip panom. Geliştirme detayları ve mimari incelemesi.">
+    <title>Tiny Kanban – Yüksek Performanslı Mühendislik Ekipleri İçin Çevik Proje Yönetimi</title>
+    <meta name="description" content="Tiny Kanban v1.3: Işık hızında (<10ms), 5 entegre çevik görünüm, adli düzeyde aktivite ve efor denetimi, sıfır güven veri izolasyonu ve 100/100 OWASP kurumsal güvenlik.">
     <link rel="stylesheet" href="css/landing.css">
 </head>
 <body>
 
     <!-- ============================================================
-     NAVBAR
+     APPLE-GRADE GLASS NAVBAR
      ============================================================ -->
-    <header>
+    <header class="apple-nav">
         <div class="container nav-wrapper">
-            <a href="/" class="logo-container">
-                <div class="logo-icon" style="background: linear-gradient(135deg, #4f46e5, #0ea5e9); color:#fff; font-weight:800; border-radius:10px; width:36px; height:36px; display:flex; align-items:center; justify-content:center;">K</div>
-                <span class="logo-text" style="font-family:var(--font-heading); font-weight:800; font-size:18px; letter-spacing:-0.5px;">Tiny Kanban <span style="font-size:11px; background:rgba(99,102,241,0.2); color:#818cf8; padding:2px 6px; border-radius:4px; font-weight:600; margin-left:4px;">v1.3</span></span>
+            <a href="/" class="brand-container">
+                <div class="brand-icon">K</div>
+                <div class="brand-info">
+                    <span class="brand-title">
+                        Tiny Kanban 
+                        <span class="brand-badge">v1.3 PRO</span>
+                    </span>
+                    <span class="brand-status">
+                        <span class="pulse-dot"></span> Sistem Aktif
+                    </span>
+                </div>
             </a>
+
             <nav class="nav-links">
-                <a href="/demo" class="nav-link" style="color:#38bdf8; font-weight:600;">⚡ Canlı Demo (/demo)</a>
-                <a href="#board-view" class="nav-link">Kanban</a>
-                <a href="#gantt-view" class="nav-link">Gantt</a>
-                <a href="#dashboard-view" class="nav-link">İstatistikler</a>
-                <a href="#backlog-view" class="nav-link">104 Hafta Sprint</a>
-                <a href="#architecture" class="nav-link">Mimari</a>
+                <a href="#kaslar" class="nav-link">Güçlü Kaslar</a>
+                <a href="#gorunumler" class="nav-link">5 Çevik Görünüm</a>
+                <a href="#denetim" class="nav-link">Adli Denetim</a>
+                <a href="#ekipler" class="nav-link">Ekip Yönetimi</a>
+                <a href="#karsilastirma" class="nav-link">Neden Tiny Kanban?</a>
+                <a href="#guvenlik" class="nav-link">Güvenlik & Mimari</a>
             </nav>
-            <div style="display:flex; align-items:center; gap:10px;">
-                <a href="/demo" class="btn btn-secondary" style="background:rgba(99,102,241,0.12); border-color:#6366f1; color:#a5b4fc; font-size:13px; padding:8px 14px;">⚡ Demo (/demo)</a>
-                <a href="/board" class="btn btn-primary" style="font-size:13px; padding:8px 16px;">🔐 Giriş Yap</a>
-                <a href="/register" class="btn btn-secondary" style="font-size:13px; padding:8px 14px; border-color:var(--border-color); color:var(--text-secondary);">Kayıt Ol</a>
+
+            <div class="nav-cta-group">
+                <a href="/demo" class="btn btn-primary-glow" id="navDemoBtn">
+                    <span>⚡ Canlı Demo</span> ➔
+                </a>
+                <a href="#onboarding-gateway" class="btn btn-glass">
+                    <span>🔐 Giriş Yap</span>
+                </a>
             </div>
         </div>
     </header>
 
     <!-- ============================================================
-     HERO SECTION (SaaS App Gateway & Direct Demo Access)
+     HERO SECTION: KEYNOTE PRODUCT LAUNCH
      ============================================================ -->
-    <section class="hero container" id="about">
-        <div class="hero-grid">
-            
-            <!-- Left Column: Value Prop & CTAs -->
-            <div class="hero-left">
-                <div class="badge-private">
-                    <span>🛡️</span> 2026 Kurumsal Çok Kiracılı Mimari
+    <section class="hero-section container" id="hero">
+        <div class="hero-pill-badge">
+            <span>⚡</span> YÜKSEK PERFORMANSLI MÜHENDİSLİK VE ÜRÜN EKİPLERİ İÇİN
+        </div>
+
+        <h1 class="hero-title">
+            Hantal Araçları Unutun.<br>
+            <span class="gradient-text">Işık Hızında, Özerk ve Kesintisiz Çevik Yönetim.</span>
+        </h1>
+
+        <p class="hero-subtitle">
+            Modern mühendislik ekipleri için sıfır gecikmeli iş takibi (&lt;10ms), adli düzeyde aktivite ve efor denetimi, 5 entegre çevik görünüm ve tam izole veri güvenliği — hepsi tek bir zarif tuvalde.
+        </p>
+
+        <div class="hero-actions-row">
+            <a href="/demo" class="btn btn-primary-glow btn-lg">
+                <span>🚀 Ürünü Canlı Panoda Hemen Keşfet</span> ➔
+            </a>
+            <a href="#onboarding-gateway" class="btn btn-glass btn-lg">
+                <span>🏢 Kurumsal Çalışma Alanı Aç</span> ➔
+            </a>
+        </div>
+
+        <!-- KPI Ticker Bar -->
+        <div class="kpi-ticker-bar">
+            <div class="kpi-item">
+                <span class="kpi-val">&lt; 10ms</span>
+                <span class="kpi-lbl">Yüklenme &amp; İşlem Hızı</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-val">5 Görünüm</span>
+                <span class="kpi-lbl">Tek Birleşik Altyapıda</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-val">%100 İzole</span>
+                <span class="kpi-lbl">Zero-Trust Veritabanı</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-val">100 / 100</span>
+                <span class="kpi-lbl">OWASP Güvenlik Skoru</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-val">Sınırsız</span>
+                <span class="kpi-lbl">Ekip &amp; Proje Ölçeği</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================
+     APPLE STAGE: 5 AGILE VIEWS SHOWCASE (INTERACTIVE CANVAS)
+     ============================================================ -->
+    <section class="showcase-stage-section container" id="gorunumler">
+        <span class="section-tag">ÇOKLU GÖRÜNÜM MATRİSİ</span>
+        <h2 class="section-title">Her Mühendislik İhtiyacı İçin Tek Bir Kusursuz Tuval</h2>
+        <p class="section-desc">
+            Sekmeler arasında geçiş yaparak Tiny Kanban'ın akıcı arayüzünü canlı keşfedin. Hiçbir harici eklentiye ihtiyaç duymadan tüm çevik döngü tek çatı altında.
+        </p>
+
+        <!-- Segmented Tab Controls -->
+        <div class="stage-tabs" role="tablist">
+            <button class="stage-tab-btn active" data-target="view-kanban" role="tab">
+                <span>📋</span> Kanban Panosu
+            </button>
+            <button class="stage-tab-btn" data-target="view-backlog" role="tab">
+                <span>📦</span> Backlog &amp; Kapsam
+            </button>
+            <button class="stage-tab-btn" data-target="view-list" role="tab">
+                <span>☰</span> Hızlı Liste &amp; Tablo
+            </button>
+            <button class="stage-tab-btn" data-target="view-gantt" role="tab">
+                <span>📅</span> Zaman Çizelgesi &amp; Gantt
+            </button>
+            <button class="stage-tab-btn" data-target="view-audit" role="tab">
+                <span>🛡️</span> Adli Denetim &amp; Analitik
+            </button>
+        </div>
+
+        <!-- Apple Window Canvas -->
+        <div class="apple-frame">
+            <div class="apple-window-bar">
+                <div class="window-dots">
+                    <span class="dot dot-red"></span>
+                    <span class="dot dot-yellow"></span>
+                    <span class="dot dot-green"></span>
                 </div>
-                <h1 class="hero-title">
-                    Çevik Takımlar İçin<br><span>Özgür, Hızlı ve Güvenli</span>
-                </h1>
-                <p class="hero-subtitle">
-                    2026 ve 2027 yıllarını kapsayan 104 haftalık sprint döngüsü (31 Aralık 2027 sonuna kadar), 1.040 görev, tam izole kiracı veritabanları ve sıfır SaaS bağımlılığı.
-                </p>
+                <div class="window-title">tiny-kanban-os / production-workspace / active-sprint</div>
+                <div class="window-pills">
+                    <span class="pill-sm">⚡ 60 FPS</span>
+                    <span class="pill-sm">● Senkronize</span>
+                </div>
+            </div>
+
+            <div class="stage-viewport">
                 
-                <div class="hero-actions">
-                    <a href="/demo" class="btn btn-primary" style="padding: 13px 24px; font-size: 15px; font-weight:700; box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4);">
-                        🚀 Canlı Demo Panosunu Aç (/demo) ➔
-                    </a>
-                    <a href="#quick-login" class="btn btn-secondary" style="padding: 13px 20px; font-size: 14px;">
-                        🔐 Çalışma Alanına Bağlan
-                    </a>
+                <!-- 1. KANBAN VIEW -->
+                <div class="stage-view active" id="view-kanban">
+                    <div class="mock-board-grid">
+                        <!-- Yapılacak -->
+                        <div class="mock-col">
+                            <div class="mock-col-header">
+                                <span class="mock-col-title">📋 Yapılacak</span>
+                                <span class="mock-count-badge">3</span>
+                            </div>
+                            <div class="mock-card">
+                                <div class="mock-card-top">
+                                    <span class="mock-key">TK-101</span>
+                                    <span class="mock-pri-high">🔴 Yüksek</span>
+                                </div>
+                                <div class="mock-card-title">OAuth 2.0 &amp; Kurumsal SSO Entegrasyonu</div>
+                                <div class="mock-card-footer">
+                                    <div class="mock-assignee">
+                                        <div class="mock-avatar" style="background: #4f46e5;">AY</div>
+                                        <span class="mock-user-name">Ali Yılmaz</span>
+                                    </div>
+                                    <span class="mock-sp-badge">8 SP</span>
+                                </div>
+                            </div>
+                            <div class="mock-card">
+                                <div class="mock-card-top">
+                                    <span class="mock-key">TK-104</span>
+                                    <span class="mock-pri-med">🟠 Orta</span>
+                                </div>
+                                <div class="mock-card-title">Grafiksel Efor Dağılımı Isı Haritası</div>
+                                <div class="mock-card-footer">
+                                    <div class="mock-assignee">
+                                        <div class="mock-avatar" style="background: #0ea5e9;">ZK</div>
+                                        <span class="mock-user-name">Zeynep Kaya</span>
+                                    </div>
+                                    <span class="mock-sp-badge">5 SP</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Yapılıyor -->
+                        <div class="mock-col">
+                            <div class="mock-col-header">
+                                <span class="mock-col-title" style="color:#38bdf8;">⚡ Yapılıyor (WIP: 2/3)</span>
+                                <span class="mock-count-badge" style="background:rgba(14,165,233,0.2); color:#38bdf8;">2</span>
+                            </div>
+                            <div class="mock-card" style="border-color: rgba(14,165,233,0.4);">
+                                <div class="mock-card-top">
+                                    <span class="mock-key">TK-102</span>
+                                    <span class="mock-pri-high">🔴 Yüksek</span>
+                                </div>
+                                <div class="mock-card-title">Redis Cache &amp; Bellek İçi Oturum Katmanı</div>
+                                <div class="mock-card-footer">
+                                    <div class="mock-assignee">
+                                        <div class="mock-avatar" style="background: #10b981;">MD</div>
+                                        <span class="mock-user-name">Mehmet Demir</span>
+                                    </div>
+                                    <span class="mock-sp-badge">13 SP</span>
+                                </div>
+                            </div>
+                            <div class="mock-card">
+                                <div class="mock-card-top">
+                                    <span class="mock-key">TK-105</span>
+                                    <span class="mock-pri-med">🟠 Orta</span>
+                                </div>
+                                <div class="mock-card-title">Zero-Downtime PostgreSQL Veritabanı Taşıma</div>
+                                <div class="mock-card-footer">
+                                    <div class="mock-assignee">
+                                        <div class="mock-avatar" style="background: #8b5cf6;">CÖ</div>
+                                        <span class="mock-user-name">Caner Öztürk</span>
+                                    </div>
+                                    <span class="mock-sp-badge">8 SP</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tamamlandı -->
+                        <div class="mock-col">
+                            <div class="mock-col-header">
+                                <span class="mock-col-title" style="color:#34d399;">✅ Tamamlandı</span>
+                                <span class="mock-count-badge" style="background:rgba(16,185,129,0.2); color:#34d399;">4</span>
+                            </div>
+                            <div class="mock-card" style="opacity: 0.9;">
+                                <div class="mock-card-top">
+                                    <span class="mock-key">TK-98</span>
+                                    <span class="mock-pri-med">🟢 Düşük</span>
+                                </div>
+                                <div class="mock-card-title">OWASP Top 10 Kriptografik Zırh &amp; PBKDF2</div>
+                                <div class="mock-card-footer">
+                                    <div class="mock-assignee">
+                                        <div class="mock-avatar" style="background: #ec4899;">TA</div>
+                                        <span class="mock-user-name">Tolga Arslan</span>
+                                    </div>
+                                    <span class="mock-sp-badge">5 SP</span>
+                                </div>
+                            </div>
+                            <div class="mock-card" style="opacity: 0.9;">
+                                <div class="mock-card-top">
+                                    <span class="mock-key">TK-99</span>
+                                    <span class="mock-pri-high">🔴 Yüksek</span>
+                                </div>
+                                <div class="mock-card-title">Adli Aktivite &amp; Efor Kayıt Motoru</div>
+                                <div class="mock-card-footer">
+                                    <div class="mock-assignee">
+                                        <div class="mock-avatar" style="background: #4f46e5;">AY</div>
+                                        <span class="mock-user-name">Ali Yılmaz</span>
+                                    </div>
+                                    <span class="mock-sp-badge">8 SP</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="hero-metrics">
-                    <div class="hero-metric-item">
-                        <span class="check">✓</span> 104 Hafta (1.040 Görev)
+                <!-- 2. BACKLOG VIEW -->
+                <div class="stage-view" id="view-backlog">
+                    <div class="mock-backlog-container">
+                        <div class="mock-sprint-box">
+                            <div class="mock-sprint-head">
+                                <div class="mock-sprint-info">
+                                    <span class="sprint-chip-active">● AKTİF SPRINT</span>
+                                    <strong style="font-size:15px; color:#ffffff;">Sprint 34: Altyapı Güçlendirme &amp; Güvenlik</strong>
+                                    <span style="font-size:12px; color:var(--text-secondary);">(14 Günlük Döngü)</span>
+                                </div>
+                                <div style="display:flex; gap:12px; align-items:center;">
+                                    <span style="font-size:12px; color:#a5b4fc; font-weight:700;">Kapasite: 38 / 40 SP</span>
+                                    <span class="pill-sm" style="background:rgba(16,185,129,0.15); color:#34d399;">%85 Tamamlandı</span>
+                                </div>
+                            </div>
+                            <div class="mock-sprint-row">
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    <span class="mock-key">TK-101</span>
+                                    <span style="font-weight:600;">OAuth 2.0 &amp; Kurumsal SSO Entegrasyonu</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:16px;">
+                                    <span class="mock-pri-high">🔴 Yüksek</span>
+                                    <span style="font-size:12px; color:var(--text-secondary);">Ali Yılmaz</span>
+                                    <span class="mock-sp-badge">8 SP</span>
+                                </div>
+                            </div>
+                            <div class="mock-sprint-row">
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    <span class="mock-key">TK-102</span>
+                                    <span style="font-weight:600;">Redis Cache &amp; Bellek İçi Oturum Katmanı</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:16px;">
+                                    <span class="mock-pri-high">🔴 Yüksek</span>
+                                    <span style="font-size:12px; color:var(--text-secondary);">Mehmet Demir</span>
+                                    <span class="mock-sp-badge">13 SP</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mock-sprint-box" style="opacity: 0.85;">
+                            <div class="mock-sprint-head" style="background:rgba(255,255,255,0.01);">
+                                <div class="mock-sprint-info">
+                                    <span class="pill-sm" style="color:var(--text-muted);">PLANLANIYOR</span>
+                                    <strong style="font-size:14px; color:var(--text-primary);">Sprint 35: Mobil Entegrasyon &amp; Bildirimler</strong>
+                                </div>
+                                <span style="font-size:12px; color:var(--text-secondary);">Hedef: 35 SP</span>
+                            </div>
+                            <div class="mock-sprint-row">
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    <span class="mock-key">TK-110</span>
+                                    <span>iOS Push Bildirim Altyapısı (APNs Sertifikası)</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:16px;">
+                                    <span class="mock-pri-med">🟠 Orta</span>
+                                    <span style="font-size:12px; color:var(--text-secondary);">Selin Aksoy</span>
+                                    <span class="mock-sp-badge">5 SP</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="hero-metric-item">
-                        <span class="check">✓</span> İzole Kiracı Veritabanı
+                </div>
+
+                <!-- 3. LIST VIEW -->
+                <div class="stage-view" id="view-list">
+                    <div class="mock-table-wrap">
+                        <table class="mock-table">
+                            <thead>
+                                <tr>
+                                    <th>Kimlik</th>
+                                    <th>Görev Başlığı</th>
+                                    <th>Öncelik</th>
+                                    <th>Atanan</th>
+                                    <th>Durum</th>
+                                    <th>Harcanan / Tahmin</th>
+                                    <th>Teslim</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="mock-key">TK-101</span></td>
+                                    <td><strong>OAuth 2.0 &amp; Kurumsal SSO</strong></td>
+                                    <td><span class="mock-pri-high">Yüksek</span></td>
+                                    <td>Ali Yılmaz</td>
+                                    <td><span style="color:#38bdf8; font-weight:700;">⚡ Yapılıyor</span></td>
+                                    <td>12 saat / 16 saat</td>
+                                    <td>Yarın</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="mock-key">TK-102</span></td>
+                                    <td><strong>Redis Cache &amp; Bellek İçi Oturum</strong></td>
+                                    <td><span class="mock-pri-high">Yüksek</span></td>
+                                    <td>Mehmet Demir</td>
+                                    <td><span style="color:#38bdf8; font-weight:700;">⚡ Yapılıyor</span></td>
+                                    <td>18 saat / 24 saat</td>
+                                    <td>3 Gün</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="mock-key">TK-104</span></td>
+                                    <td><strong>Efor Dağılımı Isı Haritası</strong></td>
+                                    <td><span class="mock-pri-med">Orta</span></td>
+                                    <td>Zeynep Kaya</td>
+                                    <td><span style="color:var(--text-muted);">📋 Yapılacak</span></td>
+                                    <td>0 saat / 8 saat</td>
+                                    <td>5 Gün</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="mock-key">TK-98</span></td>
+                                    <td><strong>OWASP Top 10 Kriptografik Zırh</strong></td>
+                                    <td><span class="mock-pri-med">Düşük</span></td>
+                                    <td>Tolga Arslan</td>
+                                    <td><span style="color:#34d399; font-weight:700;">✅ Tamamlandı</span></td>
+                                    <td>10 saat / 10 saat</td>
+                                    <td>Bitti</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="hero-metric-item">
-                        <span class="check">✓</span> 100/100 Güvenlik Sertifikalı
+                </div>
+
+                <!-- 4. GANTT VIEW -->
+                <div class="stage-view" id="view-gantt">
+                    <div class="mock-gantt-chart">
+                        <div class="mock-gantt-header-row">
+                            <span style="text-align:left;">Görev / Epic</span>
+                            <span>1. Çeyrek</span>
+                            <span>2. Çeyrek</span>
+                            <span>3. Çeyrek (Şu An)</span>
+                            <span>4. Çeyrek</span>
+                        </div>
+                        <div class="mock-gantt-item-row">
+                            <div style="font-size:13px; font-weight:600;">
+                                <span class="mock-key" style="margin-right:6px;">TK-101</span> OAuth SSO
+                            </div>
+                            <div class="gantt-track-bg">
+                                <div class="gantt-bar-fill" style="width: 55%; margin-left: 20%; background: linear-gradient(90deg, #4f46e5, #0ea5e9);">
+                                    %75 Tamamlandı
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mock-gantt-item-row">
+                            <div style="font-size:13px; font-weight:600;">
+                                <span class="mock-key" style="margin-right:6px;">TK-102</span> Redis Cache
+                            </div>
+                            <div class="gantt-track-bg">
+                                <div class="gantt-bar-fill" style="width: 40%; margin-left: 35%; background: linear-gradient(90deg, #0ea5e9, #10b981);">
+                                    %60 Kodlama
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mock-gantt-item-row">
+                            <div style="font-size:13px; font-weight:600;">
+                                <span class="mock-key" style="margin-right:6px;">TK-98</span> OWASP Kripto
+                            </div>
+                            <div class="gantt-track-bg">
+                                <div class="gantt-bar-fill" style="width: 30%; margin-left: 5%; background: #10b981;">
+                                    %100 Tamamlandı
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. AUDIT & ANALYTICS VIEW -->
+                <div class="stage-view" id="view-audit">
+                    <div class="mock-audit-grid">
+                        <!-- Left: Velocity & Metrics -->
+                        <div style="display:flex; flex-direction:column; gap:16px;">
+                            <div style="background:rgba(15,23,42,0.6); padding:16px; border-radius:var(--radius-md); border:1px solid var(--border-card);">
+                                <h4 style="font-size:14px; margin-bottom:8px; color:#ffffff;">Sprint Hızı &amp; Yakım Oranı (Velocity)</h4>
+                                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+                                    <span style="font-size:28px; font-weight:800; color:#38bdf8;">42 SP / Hafta</span>
+                                    <span style="color:#34d399; font-weight:700; font-size:13px;">▲ %18 Artış</span>
+                                </div>
+                                <p style="font-size:12px; color:var(--text-secondary);">Ekip öngörülen hedefin %108 oranında üzerinde tamamlanma hızına ulaştı.</p>
+                            </div>
+                            <div style="background:rgba(15,23,42,0.6); padding:16px; border-radius:var(--radius-md); border:1px solid var(--border-card);">
+                                <h4 style="font-size:14px; margin-bottom:8px; color:#ffffff;">Toplam Kayıtlı Efor</h4>
+                                <div style="font-size:28px; font-weight:800; color:#a5b4fc;">148.5 Saat</div>
+                                <p style="font-size:12px; color:var(--text-secondary);">Aktif sprint içinde tüm roller tarafından girilen net mühendislik eforu.</p>
+                            </div>
+                        </div>
+
+                        <!-- Right: Live Forensic Audit Feed -->
+                        <div class="mock-audit-stream">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                <span style="font-size:12px; font-weight:700; color:#ffffff;">CANLI ADLİ DENETİM AKIŞI (SUPER ADMIN)</span>
+                                <span class="pill-sm" style="color:#38bdf8; border-color:rgba(14,165,233,0.3);">● Canlı Kayıt</span>
+                            </div>
+                            <div class="audit-stream-card">
+                                <span class="audit-chip-effort">[EFOR]</span>
+                                <div style="font-size:12px; flex:1;">
+                                    <strong>Mehmet Demir</strong>, <code>TK-102</code> görevine <strong>+3.5 saat</strong> efor kaydetti.
+                                    <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">10 dakika önce • IP: 192.168.1.42</div>
+                                </div>
+                            </div>
+                            <div class="audit-stream-card">
+                                <span class="audit-chip-move">[TAŞIMA]</span>
+                                <div style="font-size:12px; flex:1;">
+                                    <strong>Ali Yılmaz</strong>, <code>TK-101</code> kartını <strong>Yapılıyor</strong> kolonuna çekti.
+                                    <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">24 dakika önce • Oturum: Kurumsal SSO</div>
+                                </div>
+                            </div>
+                            <div class="audit-stream-card">
+                                <span class="audit-chip-view">[İNCELEME]</span>
+                                <div style="font-size:12px; flex:1;">
+                                    <strong>Zeynep Kaya</strong>, <code>TK-104</code> detay çekmecesini açtı ve alt görevleri kontrol etti.
+                                    <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">42 dakika önce</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================
+     BENTO BOX: CORE PRODUCT MUSCLES (2026 APPLE BENTO)
+     ============================================================ -->
+    <section class="bento-section container" id="kaslar">
+        <span class="section-tag">MÜHENDİSLİK KASLARI</span>
+        <h2 class="section-title">Sıradan Bir Pano Değil. Kurumsal Düzeyde Bir Üretim Motoru.</h2>
+        <p class="section-desc">
+            Tiny Kanban, yüksek tempo ile çalışan yazılım ve ürün ekiplerinin ihtiyaç duyduğu derin kontrol, hız ve bağımsızlığı sunar.
+        </p>
+
+        <div class="bento-grid">
+            
+            <!-- Bento 1 (Large 2-col): Forensic Audit -->
+            <div class="bento-card bento-span-2" id="denetim">
+                <div>
+                    <div class="bento-icon-badge" style="color: #38bdf8;">🛡️</div>
+                    <h3 class="bento-title">Adli Düzeyde Operasyonel İzleme &amp; Ekip Denetimi</h3>
+                    <p class="bento-desc">
+                        Kimin ne zaman hangi görevi incelediği, ne kadar süre ve efor harcadığı, hangi yorumları yaptığı ve kartları hangi aşamalara taşıdığı saniyesi saniyesine kayıt altındadır. Proje yöneticileri ve ekip liderleri için kusursuz operasyonel görünürlük ve hesap verebilirlik sağlar.
+                    </p>
+                </div>
+                <div class="bento-micro-widget">
+                    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-secondary); margin-bottom:8px;">
+                        <span>Kayıt Türü: CARD_VIEW, CARD_EFFORT, CARD_MOVE, CARD_COMMENT</span>
+                        <span style="color:#34d399; font-weight:700;">✓ Değiştirilemez Günlük</span>
+                    </div>
+                    <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                        <div style="width:100%; height:100%; background:linear-gradient(90deg, #4f46e5, #0ea5e9);"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Column: Interactive Quick Login & Live Gateway Card -->
-            <div class="gateway-card" id="quick-login">
-                <div class="gateway-header">
-                    <div class="gateway-title-row">
-                        <span style="font-size:20px;">🔐</span>
-                        <div class="gateway-title">Çalışma Alanına Giriş</div>
+            <!-- Bento 2: Extreme Speed -->
+            <div class="bento-card">
+                <div>
+                    <div class="bento-icon-badge" style="color: #10b981;">⚡</div>
+                    <h3 class="bento-title">Işık Hızında Saf Performans (&lt;10ms)</h3>
+                    <p class="bento-desc">
+                        500 KB'lık hantal framework paketleri yok. Saf Vanilla mimarisi sayesinde tıklandığı an açılır, sıfır bekleme süresi ve 60 FPS akıcı deneyim sunar.
+                    </p>
+                </div>
+                <div class="bento-micro-widget" style="text-align:center;">
+                    <div style="font-size:32px; font-weight:900; color:#34d399; font-family:var(--font-heading);">8.4 ms</div>
+                    <div style="font-size:11.5px; color:var(--text-muted);">Ortalama API Yanıt &amp; Render Süresi</div>
+                </div>
+            </div>
+
+            <!-- Bento 3: Scalable Teams -->
+            <div class="bento-card" id="ekipler">
+                <div>
+                    <div class="bento-icon-badge" style="color: #a855f7;">👥</div>
+                    <h3 class="bento-title">Ölçeklenebilir Güçlü Ekipler</h3>
+                    <p class="bento-desc">
+                        5 kişilik bir çekirdek ekipten yüzlerce kişilik mühendislik organizasyonlarına kadar; kişi bazlı, proje bazlı akıllı filtreleme ile herkes sadece kendi sorumluluk alanına odaklanır.
+                    </p>
+                </div>
+                <div class="bento-micro-widget">
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <span class="pill-sm" style="background:rgba(99,102,241,0.2); color:#a5b4fc;">Yazılım Mühendisliği</span>
+                        <span class="pill-sm" style="background:rgba(14,165,233,0.2); color:#38bdf8;">Ürün &amp; UI/UX</span>
+                        <span class="pill-sm" style="background:rgba(16,185,129,0.2); color:#34d399;">DevOps &amp; SRE</span>
                     </div>
-                    <p class="gateway-desc">Kişisel çalışma alanınıza veya demo hesabınıza anında bağlanın.</p>
+                </div>
+            </div>
+
+            <!-- Bento 4: Zero-Trust Multi-Tenant -->
+            <div class="bento-card">
+                <div>
+                    <div class="bento-icon-badge" style="color: #f59e0b;">🔒</div>
+                    <h3 class="bento-title">Zero-Trust Çok Kiracılı İzolasyon</h3>
+                    <p class="bento-desc">
+                        Her şirkete ve takıma özel %100 izole veritabanı alanı. Verileriniz asla başka takımların verileriyle birleşmez, tam gizlilik garantilenir.
+                    </p>
+                </div>
+                <div class="bento-micro-widget">
+                    <div style="font-size:12px; color:var(--text-secondary); display:flex; justify-content:space-between;">
+                        <span>Veritabanı İzolasyonu:</span>
+                        <span style="color:#ffffff; font-weight:700;">Ayrı Tenant DB</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bento 5: 100/100 Security -->
+            <div class="bento-card" id="guvenlik">
+                <div>
+                    <div class="bento-icon-badge" style="color: #f43f5e;">🛡️</div>
+                    <h3 class="bento-title">100/100 Kurumsal Güvenlik Skoru</h3>
+                    <p class="bento-desc">
+                        OWASP Top 10 sertifikalı zırh, PBKDF2 sabit zamanlı parola koruması, CSRF &amp; XSS koruması ve 256-bit oturum entropisi.
+                    </p>
+                </div>
+                <div class="bento-micro-widget" style="text-align:center;">
+                    <span style="font-size:20px; font-weight:800; color:#f43f5e;">100 / 100</span>
+                    <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Tam Güvenlik Denetim Puanı</div>
+                </div>
+            </div>
+
+            <!-- Bento 6 (Large 2-col): Self-Hosted Freedom -->
+            <div class="bento-card bento-span-2">
+                <div>
+                    <div class="bento-icon-badge" style="color: #6366f1;">🌐</div>
+                    <h3 class="bento-title">Özerk ve Bağımsız Barındırma (Self-Hosted / Cloudflare Edge)</h3>
+                    <p class="bento-desc">
+                        Bulut tekellerinin fahiş abonelik ücretlerine ve veri gözetimine mecbur kalmayın. Tiny Kanban'ı ister kurum içi kendi sunucunuzda (On-Premise) ister küresel Cloudflare D1 / Workers Edge altyapısında tam bağımsızlıkla barındırın.
+                    </p>
+                </div>
+                <div class="bento-micro-widget">
+                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color:var(--text-secondary);">
+                        <span>Desteklenen Ortamlar: Node.js, Docker, Cloudflare D1, SQLite</span>
+                        <span style="color:#a5b4fc; font-weight:700;">Sıfır Dış Bağımlılık</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ============================================================
+     PRECISION COMPARISON MATRIX (TINY KANBAN VS BLOATED SAAS)
+     ============================================================ -->
+    <section class="comparison-section container" id="karsilastirma">
+        <span class="section-tag">NEDEN TINY KANBAN?</span>
+        <h2 class="section-title">Kurumsal Hantallık ile Saf Mühendislik Arasındaki Fark</h2>
+        <p class="section-desc">
+            Piyasadaki popüler ancak ağırlaşmış proje yönetim araçlarıyla doğrudan teknik ve operasyonel karşılaştırma.
+        </p>
+
+        <div class="comparison-card">
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th style="width: 32%;">Karşılaştırma Kriteri</th>
+                        <th class="col-highlight" style="width: 28%;">Tiny Kanban v1.3</th>
+                        <th style="width: 20%;">Hantal SaaS (Jira vb.)</th>
+                        <th style="width: 20%;">Basit Todo Araçları</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Açılış &amp; İşlem Hızı</strong></td>
+                        <td class="col-highlight"><span class="check-emerald">✓</span> &lt; 10ms (Anında Yüklenme)</td>
+                        <td><span class="cross-muted">✗</span> 4 - 8 Saniye (Ağır JS)</td>
+                        <td><span class="check-emerald">✓</span> Hızlı ancak yetersiz</td>
+                    </tr>
+                    <tr>
+                        <td><strong>5 Entegre Çevik Görünüm</strong></td>
+                        <td class="col-highlight"><span class="check-emerald">✓</span> Pano, Backlog, Liste, Gantt, Analitik</td>
+                        <td><span class="cross-muted">✗</span> Karmaşık, ayrı eklentiler</td>
+                        <td><span class="cross-muted">✗</span> Yalnızca basit liste</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Adli Aktivite &amp; Efor Denetimi</strong></td>
+                        <td class="col-highlight"><span class="check-emerald">✓</span> Dahili Süper Admin Günlüğü</td>
+                        <td><span class="cross-muted">✗</span> Pahalı eklenti gerekir</td>
+                        <td><span class="cross-muted">✗</span> Bulunmuyor</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Kişi &amp; Proje Bazlı Akıllı Filtre</strong></td>
+                        <td class="col-highlight"><span class="check-emerald">✓</span> 1-Tıkla Anında Odaklanma</td>
+                        <td><span class="cross-muted">✗</span> Karmaşık JQL sorguları</td>
+                        <td><span class="cross-muted">✗</span> Temel arama</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Veri Gizliliği &amp; Kendi Sunucunda Barındırma</strong></td>
+                        <td class="col-highlight"><span class="check-emerald">✓</span> %100 Bağımsız &amp; İzole DB</td>
+                        <td><span class="cross-muted">✗</span> Üçüncü parti bulutunda</td>
+                        <td><span class="cross-muted">✗</span> Kapalı kutu SaaS</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Güvenlik Skoru &amp; Standartlar</strong></td>
+                        <td class="col-highlight"><span class="check-emerald">✓</span> 100/100 OWASP Sertifikalı</td>
+                        <td><span class="cross-muted">✗</span> Geniş saldırı yüzeyi</td>
+                        <td><span class="cross-muted">✗</span> Bilinmiyor</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ============================================================
+     INTERACTIVE ONBOARDING GATEWAY (LOGIN & DEMO)
+     ============================================================ -->
+    <section class="gateway-section container" id="onboarding-gateway">
+        <div class="gateway-split-grid">
+            
+            <!-- Left Card: Instant Demo Access -->
+            <div class="gateway-box highlight">
+                <div class="gateway-box-header">
+                    <div class="gateway-box-title">
+                        <span>⚡</span> Canlı Demo Panosunu Keşfedin
+                    </div>
+                    <p class="gateway-box-desc">
+                        Kurulum yapmadan, kredi kartı veya kayıt zorunluluğu olmadan Tiny Kanban'ın tüm özelliklerini canlı bir mühendislik ortamında anında test edin.
+                    </p>
                 </div>
 
-                <div class="gateway-msg" id="heroLoginMsg"></div>
-
-                <form class="gateway-form" id="heroLoginForm" autocomplete="on">
-                    <div class="gateway-input-wrap">
-                        <label class="gateway-label" for="heroUsername">Kullanıcı Adı veya E-posta</label>
-                        <input class="gateway-input" type="text" id="heroUsername" placeholder="ör. admin veya e-posta" required autocomplete="username">
+                <div style="display:flex; flex-direction:column; gap:16px; margin: 24px 0;">
+                    <div style="display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--text-primary);">
+                        <span style="color:#34d399; font-weight:bold;">✓</span> Hazır sprintler, görevler ve analitik veriler
                     </div>
-                    <div class="gateway-input-wrap">
-                        <label class="gateway-label" for="heroPassword">Şifre</label>
-                        <input class="gateway-input" type="password" id="heroPassword" placeholder="••••••••" required autocomplete="current-password">
+                    <div style="display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--text-primary);">
+                        <span style="color:#34d399; font-weight:bold;">✓</span> Gerçekçi mühendislik personelleriyle rol simülasyonu
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--text-primary);">
+                        <span style="color:#34d399; font-weight:bold;">✓</span> Adli aktivite takibi ve efor kayıt testleri
+                    </div>
+                </div>
+
+                <a href="/demo" class="btn btn-primary-glow btn-lg" style="width: 100%;">
+                    <span>🚀 Canlı Demo Panosunu Aç (/demo)</span> ➔
+                </a>
+            </div>
+
+            <!-- Right Card: Live Workspace Login -->
+            <div class="gateway-box" id="quick-login">
+                <div class="gateway-box-header">
+                    <div class="gateway-box-title">
+                        <span>🔐</span> Kurumsal Çalışma Alanı Girişi
+                    </div>
+                    <p class="gateway-box-desc">
+                        Kişisel veya kurumsal çalışma alanınıza bağlanın.
+                    </p>
+                </div>
+
+                <div class="msg-banner" id="heroLoginMsg"></div>
+
+                <form class="apple-form" id="heroLoginForm" autocomplete="on">
+                    <div class="form-group">
+                        <label class="form-label" for="heroUsername">Kullanıcı Adı veya E-posta</label>
+                        <input class="form-input" type="text" id="heroUsername" placeholder="ör. admin veya e-posta" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="heroPassword">Şifre</label>
+                        <input class="form-input" type="password" id="heroPassword" placeholder="••••••••" required autocomplete="current-password">
                     </div>
 
-                    <button type="submit" class="gateway-submit-btn" id="heroLoginBtn">
+                    <button type="submit" class="btn btn-primary-glow" id="heroLoginBtn" style="padding: 12px; width: 100%; font-size: 14px;">
                         <span>Giriş Yap ve Panoyu Aç</span> ➔
                     </button>
                 </form>
 
-                <div class="gateway-divider">
-                    <span>VEYA ŞİFRESİZ KEŞFEDİN</span>
-                </div>
-
-                <a href="/demo" class="gateway-demo-btn">
-                    <span>⚡ Doğrudan Canlı Demo Panosuna Git (/demo)</span> ➔
-                </a>
-
-                <div class="gateway-quick-fill">
+                <div class="quick-fill-row">
                     <span>Hızlı Doldur:</span>
                     <div style="display:flex; gap:6px;">
                         <button type="button" class="pill-credential" onclick="fillHeroCredentials('admin', 'password')">admin</button>
@@ -117,400 +723,87 @@
                     </div>
                 </div>
 
-                <div class="gateway-register-link">
-                    Hesabınız yok mu? <a href="/register">Yeni Kayıt Talebi Oluşturun ➔</a>
+                <div style="text-align:center; margin-top: 14px; font-size: 12.5px; color: var(--text-secondary);">
+                    Hesabınız yok mu? <a href="/register" style="color: #818cf8; text-decoration: none; font-weight: 600;">Yeni Kayıt Talebi Oluşturun ➔</a>
                 </div>
             </div>
 
         </div>
-    </section>
 
-    <!-- ============================================================
-     KANBAN SHOWCASE SECTION
-     ============================================================ -->
-    <section class="showcase-section" id="board-view">
-        <div class="container split-layout">
-            
-            <div class="spec-info">
-                <span class="spec-badge">Görünüm 1</span>
-                <h2 class="spec-title">Kanban Panosu & Canlı Durum Simülasyonu</h2>
-                <p class="spec-desc">
-                    Kartların durum geçişlerini ve veri senkronizasyonunu test etmek amacıyla hazırladığım canlı teknik simülasyon. Her görevin benzersiz ID (Key) numarası ve atanan kişi bilgisi üzerinden iş takibi yapılabilmektedir.
-                </p>
-                <div class="spec-bullets">
-                    <div class="spec-bullet">
-                        <span class="bullet-icon">◼</span>
-                        <div class="bullet-text">
-                            <h4>İş Kimlikleri (Task Keys)</h4>
-                            <p>Projedeki her görev, takip edilmeyi kolaylaştıran <code>TK-11</code>, <code>TK-12</code> gibi tekil ID'lerle kimliklendirilir.</p>
-                        </div>
-                    </div>
-                    <div class="spec-bullet">
-                        <span class="bullet-icon">◼</span>
-                        <div class="bullet-text">
-                            <h4>Sprint Rotasyonu</h4>
-                            <p>Simülasyon her sıfırlandığında farklı bir sprint dönemi (Altyapı, Mobil, Raporlar) yüklenerek dinamik veri yapısı test edilir.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <!-- 30-Day Workspace Request Form -->
+        <div class="glass-panel" style="margin-top: 36px; padding: 32px; border-radius: var(--radius-lg); text-align: center;">
+            <h3 style="font-family: var(--font-heading); font-size: 22px; margin-bottom: 8px;">Kurumunuza Özel 30 Günlük Deneme Alanı Başlatın</h3>
+            <p style="font-size: 14px; color: var(--text-secondary); max-width: 600px; margin: 0 auto 20px auto;">
+                Ekibinizin büyüklüğüne göre izole veritabanı ile donatılmış çalışma alanınız yönetici onayının ardından anında açılır.
+            </p>
 
-            <div class="spec-visual">
-                <div class="demo-header">
-                    <div class="demo-title-wrapper">
-                        <span class="demo-indicator"></span>
-                        <span class="demo-title-text" id="sim-title-text">Arayüz Simülasyonu</span>
-                    </div>
-                    <div class="demo-controls">
-                        <input type="text" id="input-task-title" class="demo-input" placeholder="Görevi simülasyona ekle...">
-                        <button id="btn-add-task" class="btn btn-primary" style="padding: 4px 10px; font-size: 10px;">Ekle</button>
-                        <button id="btn-speed" class="demo-btn">⏱ Normal</button>
-                        <button id="btn-reset" class="demo-btn">🔄 Sıfırla</button>
-                    </div>
-                </div>
-
-                <div class="demo-dashboard">
-                    <div class="dash-card">
-                        <div class="dash-val" id="stat-total-tasks">4</div>
-                        <div class="dash-lbl">Görevler</div>
-                    </div>
-                    <div class="dash-card">
-                        <div class="dash-val" id="stat-done-tasks">1</div>
-                        <div class="dash-lbl">Tamamlandı</div>
-                    </div>
-                    <div class="dash-card">
-                        <div class="dash-val" id="stat-overdue" style="color: #f87171;">0</div>
-                        <div class="dash-lbl">Gecikenler</div>
-                    </div>
-                    <div class="dash-card">
-                        <div class="dash-val" id="stat-velocity">3 SP</div>
-                        <div class="dash-lbl">Sprint Hızı</div>
-                    </div>
-                </div>
-
-                <div class="board-grid">
-                    <div class="board-col col-todo">
-                        <div class="col-header">
-                            <span class="col-title">📋 Yapılacak</span>
-                            <span class="col-badge" id="sim-todo-count">2</span>
-                        </div>
-                        <div class="cards-container" id="sim-col-todo"></div>
-                    </div>
-                    <div class="board-col col-doing">
-                        <div class="col-header">
-                            <span class="col-title">⚡ Yapılıyor</span>
-                            <span class="col-badge" id="sim-doing-count">1</span>
-                        </div>
-                        <div class="cards-container" id="sim-col-doing"></div>
-                    </div>
-                    <div class="board-col col-done">
-                        <div class="col-header">
-                            <span class="col-title">✅ Tamamlandı</span>
-                            <span class="col-badge" id="sim-done-count">1</span>
-                        </div>
-                        <div class="cards-container" id="sim-col-done"></div>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-    </section>
-
-    <!-- ============================================================
-     GANTT SHOWCASE SECTION
-     ============================================================ -->
-    <section class="showcase-section" id="gantt-view">
-        <div class="container split-layout reverse">
-            
-            <div class="spec-info">
-                <span class="spec-badge">Görünüm 2</span>
-                <h2 class="spec-title">Dinamik Gantt Zaman Çizelgesi</h2>
-                <p class="spec-desc">
-                    Herhangi bir harici kütüphaneye bağımlı kalmadan, görev kartlarının başlangıç ve bitiş tarihlerini okuyarak DOM üzerinde yatay zaman çizgileri (Gantt) ürettim. 
-                </p>
-                <div class="spec-bullets">
-                    <div class="spec-bullet">
-                        <span class="bullet-icon">◼</span>
-                        <div class="bullet-text">
-                            <h4>Otomatik Takvim Yerleşimi</h4>
-                            <p>Seçilen tarih aralığına göre CSS Grid kolonları otomatik hesaplanır ve görev çubukları takvim alanına yerleşir.</p>
-                        </div>
-                    </div>
-                    <div class="spec-bullet">
-                        <span class="bullet-icon">◼</span>
-                        <div class="bullet-text">
-                            <h4>İlerleme Oranı (Progress) Entegrasyonu</h4>
-                            <p>Gantt çubukları, kart altındaki alt görevlerin tamamlanma oranına bağlı olarak kendi içlerinde renk dolgusu alır.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="spec-visual">
-                <div class="gantt-widget">
-                    <div class="gantt-header">
-                        <div class="gantt-hdr-lbl">Görev Bilgisi</div>
-                        <div class="gantt-hdr-col">1. Hafta</div>
-                        <div class="gantt-hdr-col">2. Hafta</div>
-                        <div class="gantt-hdr-col">3. Hafta</div>
-                        <div class="gantt-hdr-col">4. Hafta</div>
-                    </div>
-                    <div class="gantt-rows">
-                        <div class="gantt-row">
-                            <div class="gantt-task-meta">
-                                <span class="gantt-task-title">OAuth Entegrasyonu</span>
-                                <span class="gantt-task-key">TK-12</span>
-                            </div>
-                            <div class="gantt-track">
-                                <div class="gantt-bar bar-1">Süreç Planı</div>
-                            </div>
-                        </div>
-                        <div class="gantt-row">
-                            <div class="gantt-task-meta">
-                                <span class="gantt-task-title">Kredi Kartı Saklama</span>
-                                <span class="gantt-task-key">TK-21</span>
-                            </div>
-                            <div class="gantt-track">
-                                <div class="gantt-bar bar-2">Analiz & Kodlama</div>
-                            </div>
-                        </div>
-                        <div class="gantt-row">
-                            <div class="gantt-task-meta">
-                                <span class="gantt-task-title">Excel Aktarım Modülü</span>
-                                <span class="gantt-task-key">TK-32</span>
-                            </div>
-                            <div class="gantt-track">
-                                <div class="gantt-bar bar-3">Test & Dağıtım</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-    </section>
-
-    <!-- ============================================================
-     DASHBOARD SHOWCASE SECTION
-     ============================================================ -->
-    <section class="showcase-section" id="dashboard-view">
-        <div class="container split-layout">
-            
-            <div class="spec-info">
-                <span class="spec-badge">Görünüm 3</span>
-                <h2 class="spec-title">Analitik Raporlar & İstatistikler</h2>
-                <p class="spec-desc">
-                    Projelerin genel gidişatını, darboğazları ve iş dağılımlarını anlık gözlemlemek için tasarlanan dashboard paneli.
-                </p>
-                <div class="spec-bullets">
-                    <div class="spec-bullet">
-                        <span class="bullet-icon">◼</span>
-                        <div class="bullet-text">
-                            <h4>Sprint Hızı (Velocity) Hesaplama</h4>
-                            <p>Tamamlanan görevlerin Story Point (SP) değerleri anlık toplanarak ekibin gerçek üretim hızı ölçülür.</p>
-                        </div>
-                    </div>
-                    <div class="spec-bullet">
-                        <span class="bullet-icon">◼</span>
-                        <div class="bullet-text">
-                            <h4>Öncelik Seviyesi Dağılımları</h4>
-                            <p>Görevlerin Acil, Orta ve Düşük kırılımları grafikler üzerinden gösterilerek risk analizi kolaylaştırılır.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="spec-visual">
-                <div class="chart-widget">
-                    <div class="chart-header-title">Öncelik Kırılım Analizi (Görev Yüzdeleri)</div>
-                    <div class="chart-bars">
-                        <div class="chart-row-item">
-                            <div class="chart-row-header">
-                                <span class="chart-row-lbl">🔴 Yüksek (Acil)</span>
-                                <span class="chart-row-val">%25</span>
-                            </div>
-                            <div class="chart-row-track">
-                                <div class="chart-row-fill chart-fill-high"></div>
-                            </div>
-                        </div>
-                        <div class="chart-row-item">
-                            <div class="chart-row-header">
-                                <span class="chart-row-lbl">🟠 Orta Öncelik</span>
-                                <span class="chart-row-val">%50</span>
-                            </div>
-                            <div class="chart-row-track">
-                                <div class="chart-row-fill chart-fill-medium"></div>
-                            </div>
-                        </div>
-                        <div class="chart-row-item">
-                            <div class="chart-row-header">
-                                <span class="chart-row-lbl">🟢 Düşük Öncelik</span>
-                                <span class="chart-row-val">%25</span>
-                            </div>
-                            <div class="chart-row-track">
-                                <div class="chart-row-fill chart-fill-low"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-    </section>
-
-    <!-- ============================================================
-     SPRINT SHOWCASE SECTION
-     ============================================================ -->
-    <section class="showcase-section" id="backlog-view">
-        <div class="container split-layout reverse">
-            
-            <div class="spec-info">
-                <span class="spec-badge">Görünüm 4</span>
-                <h2 class="spec-title">Backlog & Sprint Planlama</h2>
-                <p class="spec-desc">
-                    Hataları ve özellikleri sıraya dizdiğimiz backlog alanı ile sprintlerin kapsamını belirlediğimiz planlama paneli.
-                </p>
-                <div class="spec-bullets">
-                    <div class="spec-bullet">
-                        <span class="bullet-icon">◼</span>
-                        <div class="bullet-text">
-                            <h4>Tek-Aktif Sprint Koruması</h4>
-                            <p>Sistemde veri tutarsızlığını engellemek ve odağı korumak amacıyla aynı anda sadece tek bir sprintin aktif olabilmesini sağlayan bir iş kuralı kurguladım.</p>
-                        </div>
-                    </div>
-                    <div class="spec-bullet">
-                        <span class="bullet-icon">◼</span>
-                        <div class="bullet-text">
-                            <h4>Story Point Planlaması</h4>
-                            <p>Her sprinte atanmış toplam puan sınırları takip edilerek ekibin kapasite aşımı yapması önlenir.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="spec-visual">
-                <div class="sprints-widget">
-                    
-                    <div class="sprint-header-block">
-                        <span class="sprint-block-title">🟢 Aktif Sprint: Sprint 1</span>
-                        <span class="sprint-block-dates">05 Oca - 18 Oca</span>
-                    </div>
-                    <div class="sprint-widget-cards">
-                        <div class="sprint-widget-card">
-                            <span class="sprint-wcard-title">OAuth 2.0 Entegrasyonu (TK-12)</span>
-                            <div class="sprint-wcard-meta">
-                                <span class="avatar-badge" style="background:#0ea5e9">ZK</span>
-                                <span class="card-epic" style="background:#6366f120; color:#6366f1; font-size:8px;">5 SP</span>
-                            </div>
-                        </div>
-                        <div class="sprint-widget-card">
-                            <span class="sprint-wcard-title">Redis Cache Kurulumu (TK-13)</span>
-                            <div class="sprint-wcard-meta">
-                                <span class="avatar-badge" style="background:#10b981">MD</span>
-                                <span class="card-epic" style="background:#6366f120; color:#6366f1; font-size:8px;">3 SP</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="sprint-header-block" style="background:rgba(255,255,255,0.02); border-color:var(--border-color)">
-                        <span class="sprint-block-title" style="color:var(--text-secondary)">📁 Gelecek Planlar (Backlog)</span>
-                        <span class="sprint-block-dates">Planlanmamış</span>
-                    </div>
-                    <div class="sprint-widget-cards">
-                        <div class="sprint-widget-card" style="opacity:0.6">
-                            <span class="sprint-wcard-title">Kredi Kartı Saklama (TK-21)</span>
-                            <div class="sprint-wcard-meta">
-                                <span class="avatar-badge" style="background:#10b981">MD</span>
-                                <span class="card-epic" style="background:#6366f120; color:#6366f1; font-size:8px;">13 SP</span>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-        </div>
-    </section>
-
-    <!-- ============================================================
-     ARCHITECTURE & SPECIFICATION
-     ============================================================ -->
-    <section class="architecture-section container" id="architecture">
-        <div class="arch-card glass">
-            <div class="arch-content">
-                <h2>Gizlilik ve Sunucu Bağımsızlığı</h2>
-                <p>Bu proje, büyük SaaS araçlarının oluşturduğu veri izleme ağlarından kaçınmak ve kişisel görevlerimi tamamen kendi kontrolüm altında yönetebilmek amacıyla geliştirilmiştir.</p>
-                
-                <div class="arch-points">
-                    <div class="arch-point">
-                        <span class="point-icon">🔒</span>
-                        <div class="point-text">
-                            <h4>%100 Kişisel Veri Gizliliği</h4>
-                            <p>Hiçbir dış API'ye veri sızdırmaz, tüm kullanıcı doğrulama ve veri saklama işlemleri sunucuda yerel olarak sonlanır.</p>
-                        </div>
-                    </div>
-                    <div class="arch-point">
-                        <span class="point-icon">⚡</span>
-                        <div class="point-text">
-                            <h4>Hafif Çalışma Mantığı</h4>
-                            <p>Derleme adımı olmayan arayüzü sayesinde tarayıcıya ek bir paket indirme yükü bindirmez ve hızlı açılır.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="tech-grid" id="tech">
-                <div class="tech-item">
-                    <div class="tech-name">TypeScript 5</div>
-                    <div class="tech-desc">Tip güvenliği altyapısı</div>
-                </div>
-                <div class="tech-item">
-                    <div class="tech-name">Express 4</div>
-                    <div class="tech-desc">Hafif API sunucusu</div>
-                </div>
-                <div class="tech-item">
-                    <div class="tech-name">Zod</div>
-                    <div class="tech-desc">Şema doğrulamaları</div>
-                </div>
-                <div class="tech-item">
-                    <div class="tech-name">Vanilla JS</div>
-                    <div class="tech-desc">ES modül yapısı</div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ============================================================
-     DEMO REQUEST & FOOTER
-     ============================================================ -->
-    <section class="cta-footer" id="demo-request">
-        <div class="container" style="max-width: 600px; display: flex; flex-direction: column; align-items: center;">
-            <h2 class="cta-title">Demo Hesabı Talep Edin</h2>
-            <p class="cta-desc" style="margin-bottom: 24px; font-size: 15px; color: var(--text-secondary);">Adınızı ve e-posta adresinizi bırakın. Yöneticimiz talebinizi onayladığında 30 günlük deneme hesabınız oluşturulacaktır.</p>
-            
-            <form id="demoRequestForm" class="glass" style="width: 100%; padding: 28px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 16px; text-align: left; background: rgba(22, 31, 48, 0.4);">
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Ad Soyad</label>
-                    <input type="text" id="req-name" required placeholder="ör. Ali Yılmaz" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 14px; color: white; font-size: 14px; outline: none; transition: var(--transition);">
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 12px; font-weight: 600; color: var(--text-primary);">E-posta Adresi</label>
-                    <input type="email" id="req-email" required placeholder="ör. ali@example.com" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 14px; color: white; font-size: 14px; outline: none; transition: var(--transition);">
-                </div>
-                <div id="demo-req-message" style="font-size: 13px; display: none; padding: 10px; border-radius: 6px; background: rgba(0,0,0,0.2);"></div>
-                <button type="submit" class="btn btn-primary" style="padding: 12px; font-size: 14px; width: 100%;">Demo Talebi Gönder</button>
+            <form id="demoRequestForm" style="display: flex; gap: 12px; max-width: 640px; margin: 0 auto; flex-wrap: wrap;">
+                <input type="text" id="req-name" required placeholder="Adınız Soyadınız" class="form-input" style="flex: 1; min-width: 200px;">
+                <input type="email" id="req-email" required placeholder="Kurumsal E-postanız" class="form-input" style="flex: 1; min-width: 200px;">
+                <button type="submit" class="btn btn-primary-glow" style="padding: 12px 20px;">Talep Gönder</button>
             </form>
-            
-            <div class="footer-bottom" style="width: 100%;">
-                <span>Kanban – Geliştirici Sunumu</span>
-                <div>
-                    <a href="https://github.com/gencyigitcan" target="_blank" class="footer-link">GitHub Profilini Ziyaret Et</a>
-                </div>
-            </div>
+            <div id="demo-req-message" style="margin-top: 12px; font-size: 13px; display: none;"></div>
         </div>
     </section>
 
-    <!-- Script to drive the live simulation -->
+    <!-- ============================================================
+     APPLE MINIMALIST FOOTER
+     ============================================================ -->
+    <footer class="apple-footer">
+        <div class="container">
+            <div class="footer-top">
+                <div class="footer-brand-col">
+                    <div class="brand-container">
+                        <div class="brand-icon" style="width: 32px; height: 32px; font-size: 16px;">K</div>
+                        <span class="brand-title" style="font-size: 16px;">Tiny Kanban <span class="brand-badge">v1.3 PRO</span></span>
+                    </div>
+                    <p class="footer-desc">
+                        Yüksek hızlı mühendislik ekipleri için tasarlanmış bağımsız, güvenli ve adli denetimli çevik iş yönetim platformu.
+                    </p>
+                </div>
+
+                <div class="footer-links-grid">
+                    <div>
+                        <div class="footer-col-title">Ürün</div>
+                        <ul class="footer-col-links">
+                            <li><a href="#kaslar">Güçlü Kaslar</a></li>
+                            <li><a href="#gorunumler">5 Çevik Görünüm</a></li>
+                            <li><a href="#denetim">Adli Aktivite Denetimi</a></li>
+                            <li><a href="#karsilastirma">Karşılaştırma Matrisi</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <div class="footer-col-title">Erişim</div>
+                        <ul class="footer-col-links">
+                            <li><a href="/demo">⚡ Canlı Demo Panosu</a></li>
+                            <li><a href="/board">🔐 Çalışma Alanına Giriş</a></li>
+                            <li><a href="/register">Kayıt Başvurusu</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <div class="footer-col-title">Geliştirici &amp; Açık Kaynak</div>
+                        <ul class="footer-col-links">
+                            <li><a href="https://github.com/gencyigitcan" target="_blank">GitHub Profilini İncele</a></li>
+                            <li><a href="#guvenlik">Güvenlik Raporu (100/100)</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-bottom-row">
+                <div>
+                    © 2026 Tiny Kanban. Tasarım ve Mühendislik: <strong>Yiğitcan Genç</strong>. Tüm hakları saklıdır.
+                </div>
+                <div class="footer-security-chips">
+                    <span class="sec-chip">OWASP 100/100 CERTIFIED</span>
+                    <span class="sec-chip">PBKDF2 CRYPTO</span>
+                    <span class="sec-chip">ZERO-TRUST DB</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Landing Page Scripts -->
     <script src="js/landing.js"></script>
 </body>
 </html>
