@@ -182,7 +182,7 @@ export const DEFAULT_LABELS = [
 ];
 
 // ── Ensure Personal DB Integrity (Default Personal Cards Preservation) ──
-export function ensurePersonalDbIntegrity(db: DbSchema, env?: Environment): boolean {
+export function ensurePersonalDbIntegrity(db: DbSchema, _env?: Environment): boolean {
     let changed = false;
     if (!Array.isArray(db.cards)) {
         db.cards = [];
