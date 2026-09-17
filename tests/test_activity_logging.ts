@@ -2,7 +2,11 @@
 //  Test: Activity Logging & Audit Trail Verification
 // ============================================================
 import { app } from '../src/index.js';
+import { readDb, writeDbSync } from '../src/lib/db.js';
 import type { Server } from 'http';
+
+process.env.APP_ENV = 'test';
+process.env.NODE_ENV = 'test';
 
 let server: Server;
 let BASE_URL: string;
@@ -28,6 +32,12 @@ async function api(path: string, options: any = {}) {
 async function runTests() {
     console.log('🚀 Running Activity Logging & Audit Trail Verification Tests...\n');
 
+    // Reset test environment superadmin state
+    const personalDbInit = readDb({ tenantId: 'personal', environment: 'test' });
+    personalDbInit.users = personalDbInit.users.filter(u => u.role !== 'superadmin' && u.id !== 'usr-superadmin');
+    personalDbInit.sessions = [];
+    writeDbSync(personalDbInit, { tenantId: 'personal', environment: 'test' });
+
     server = await new Promise((resolve) => {
         const s = app.listen(0, () => resolve(s));
     });
@@ -41,8 +51,8 @@ async function runTests() {
         const superRes = await api('/api/auth/register', {
             method: 'POST',
             body: JSON.stringify({
-                username: 'yigitcangenc@gmail.com',
-                name: 'Yiğitcan Genç',
+                username: 'superadmin_act@company.com',
+                name: 'Super Admin',
                 password: 'superpassword123'
             })
         });
@@ -196,7 +206,7 @@ async function runTests() {
         try {
             const { readDb, writeDbSync } = await import('../src/lib/db.js');
             const personalDb = readDb({ tenantId: 'personal', environment: 'test' });
-            personalDb.users = personalDb.users.filter(u => u.username !== 'yigitcangenc@gmail.com' && u.username !== 'gencyigitcan');
+            personalDb.users = personalDb.users.filter(u => u.username !== 'superadmin_act@company.com');
             writeDbSync(personalDb, { tenantId: 'personal', environment: 'test' });
         } catch {}
         server.close();

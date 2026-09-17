@@ -56,8 +56,29 @@ function cardHTML(card, epics = [], readonly = false) {
   const subtasks = card.subtasks || [];
   const doneSubtasks = subtasks.filter(s => s.done).length;
   const subtaskPct = subtasks.length ? Math.round((doneSubtasks / subtasks.length) * 100) : 0;
-  const priLabel = { high: 'Yüksek', medium: 'Orta', low: 'Düşük' };
   const labels = (card.labels || []).map(id => window.LABEL_MAP[id]).filter(Boolean);
+
+  // Issue Type Icon & Title (Jira standard: 📕 Bug, 📘 Story, 📗 Task)
+  let issueTypeIcon = '📗';
+  let issueTypeTitle = 'Görev (Task)';
+  const labelNames = (card.labels || []).map(id => (window.LABEL_MAP[id]?.name || id).toLowerCase());
+  if (labelNames.some(l => l.includes('bug') || l.includes('hata'))) {
+    issueTypeIcon = '📕';
+    issueTypeTitle = 'Hata (Bug)';
+  } else if (labelNames.some(l => l.includes('feature') || l.includes('özellik') || l.includes('hikaye'))) {
+    issueTypeIcon = '📘';
+    issueTypeTitle = 'Hikaye (Story)';
+  } else if (labelNames.some(l => l.includes('design') || l.includes('tasarım'))) {
+    issueTypeIcon = '🎨';
+    issueTypeTitle = 'Tasarım';
+  }
+
+  // Priority icon & label
+  const priIcons = {
+    high: '<span class="jira-priority-icon" style="color:#e11d48;font-weight:700;" title="Yüksek Öncelik">▲</span>',
+    medium: '<span class="jira-priority-icon" style="color:#d97706;font-weight:700;" title="Orta Öncelik">━</span>',
+    low: '<span class="jira-priority-icon" style="color:#059669;font-weight:700;" title="Düşük Öncelik">▼</span>'
+  };
 
   const actionsHTML = readonly ? '' : `
     <div class="card-actions">
@@ -95,7 +116,7 @@ function cardHTML(card, epics = [], readonly = false) {
        ${readonly ? '' : `draggable="true" ondragstart="onDragStart(event)" ondragend="onDragEnd(event)"`}
        onclick="openCardDetail('${card.id}')">
     <div class="card-priority-bar"></div>
-    ${epic ? `<div class="card-epic"><span class="epic-pill" style="background:${epic.color}20;color:${epic.color}">${escHtml(epic.name)}</span></div>` : ''}
+    ${epic ? `<div class="card-epic"><span class="epic-pill" style="background:${epic.color}20;color:${epic.color};border:1px solid ${epic.color}40;">${escHtml(epic.name)}</span></div>` : ''}
     <div class="card-top">
       <p class="card-title">${escHtml(card.title)}</p>
       ${actionsHTML}
@@ -113,20 +134,24 @@ function cardHTML(card, epics = [], readonly = false) {
 
     <div class="card-footer">
       <div class="card-footer-left">
-        ${card.key ? `<span class="card-key-badge">${card.key}</span>` : ''}
-        ${card.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="background:${getAssigneeColor(card.assignee)}">${escHtml(initials(card.assignee))}</span>${escHtml(card.assignee)}</span>` : '<span></span>'}
+        <span class="jira-type-icon" title="${issueTypeTitle}">${issueTypeIcon}</span>
+        ${card.key ? `<span class="jira-card-key">${card.key}</span>` : ''}
+        ${card.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="background:${getAssigneeColor(card.assignee)}" title="${escHtml(card.assignee)}">${escHtml(initials(card.assignee))}</span>${escHtml(card.assignee)}</span>` : '<span class="card-assignee unassigned" style="color:var(--text-muted);font-size:11px;">👤 Atanmamış</span>'}
         ${dueBadge(card.dueDate)}
       </div>
       <div class="card-footer-right">
         ${effortBadge}
-        ${card.storyPoints != null ? `<span class="sp-badge">${card.storyPoints}</span>` : ''}
-        <span class="card-priority-tag">${priLabel[card.priority] || card.priority}</span>
+        ${card.storyPoints != null ? `<span class="sp-badge" title="Story Points">${card.storyPoints}</span>` : ''}
+        ${priIcons[card.priority] || ''}
       </div>
     </div>
   </div>`;
 }
 
 // ── Card Filter Helper ────────────────────────────────────
+window._quickFilterOnlyMine = false;
+window._quickFilterRecent = false;
+
 function cardMatchesGlobalFilters(c, options = { checkSprint: true }) {
   const q = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
   const fa = (document.getElementById('filterAssignee')?.value || '').toLowerCase().trim();
@@ -135,6 +160,20 @@ function cardMatchesGlobalFilters(c, options = { checkSprint: true }) {
   const fs = (document.getElementById('filterSprint')?.value || 'active').trim();
   const allSprints = window.sprints || [];
   const activeSprint = allSprints.find(s => s.active);
+
+  // 0. Quick filter toggles (Jira standard)
+  if (window._quickFilterOnlyMine) {
+    const meName = (window.currentUser?.name || '').toLowerCase().trim();
+    const meUser = (window.currentUser?.username || '').toLowerCase().trim();
+    const cAss = (c.assignee || '').toLowerCase().trim();
+    if (!cAss || (cAss !== meName && cAss !== meUser)) return false;
+  }
+
+  if (window._quickFilterRecent) {
+    const twoDaysAgo = Date.now() - (48 * 3600 * 1000);
+    const cTime = c.updatedAt || c.createdAt || 0;
+    if (cTime < twoDaysAgo) return false;
+  }
 
   // 1. Sprint check (for board)
   if (options.checkSprint && fs && fs !== 'all') {
@@ -1017,12 +1056,14 @@ function renderQuickFilterBar(cards = window.cards || [], epics = window.epics |
   const fp = (document.getElementById('filterPriority')?.value || '').trim();
   const q = (document.getElementById('searchInput')?.value || '').trim();
 
-  // Active filter state
-  const hasFilter = !!(fa || fe || fp || q);
+  // Active filter state (including Jira quick filters)
+  const hasFilter = !!(fa || fe || fp || q || window._quickFilterOnlyMine || window._quickFilterRecent);
   if (resetWrapEl) {
     resetWrapEl.style.display = hasFilter ? 'flex' : 'none';
     if (activeBadgeEl && hasFilter) {
       const parts = [];
+      if (window._quickFilterOnlyMine) parts.push('👤 Yalnızca benim işlerim');
+      if (window._quickFilterRecent) parts.push('🕒 Son güncellenenler');
       if (fa) {
         if (fa === '__unassigned__') parts.push('👤 Atanmamış');
         else {
@@ -1042,18 +1083,18 @@ function renderQuickFilterBar(cards = window.cards || [], epics = window.epics |
         parts.push(`🎯 ${priLabels[fp] || fp}`);
       }
       if (q) parts.push(`🔍 "${q}"`);
-      activeBadgeEl.textContent = `🎯 Filtre: ${parts.join(' · ')}`;
+      activeBadgeEl.textContent = `🎯 ${parts.join(' · ')}`;
     }
   }
 
-  // 1. Render Member Chips
+  // 1. Render Member Avatar Chips (Jira standard circular avatars)
   if (memberChipsEl) {
     const rawUsers = (window.users && window.users.length) ? 
       window.users.map(u => u.name) : 
       [...new Set(cards.map(c => c.assignee).filter(Boolean))].sort();
     
-    let chipsHTML = `<button type="button" class="filter-chip ${!fa ? 'active' : ''}" onclick="setPersonFilter('')">
-      👥 Herkes <span class="chip-count">${cards.length}</span>
+    let chipsHTML = `<button type="button" class="filter-chip ${!fa ? 'active' : ''}" onclick="setPersonFilter('')" title="Tüm kişiler">
+      👥 Herkes
     </button>`;
 
     rawUsers.forEach(name => {
@@ -1061,17 +1102,15 @@ function renderQuickFilterBar(cards = window.cards || [], epics = window.epics |
       const isSelected = fa === name.trim().toLowerCase();
       const color = getAssigneeColor(name);
       const init = initials(name);
-      chipsHTML += `<button type="button" class="filter-chip ${isSelected ? 'active' : ''}" onclick="setPersonFilter('${escHtml(name)}')" title="${escHtml(name)} kişisinin işlerini filtrele">
-        <span class="chip-avatar" style="background:${color}">${init}</span>
-        <span>${escHtml(name)}</span>
-        <span class="chip-count">${count}</span>
+      chipsHTML += `<button type="button" class="jira-avatar-chip ${isSelected ? 'active' : ''}" style="background:${color}" onclick="setPersonFilter('${escHtml(name)}')" title="${escHtml(name)} (${count} görev)">
+        ${escHtml(init)}
       </button>`;
     });
 
     const unassignedCount = cards.filter(c => !c.assignee).length;
     if (unassignedCount > 0) {
       const isSelected = fa === '__unassigned__';
-      chipsHTML += `<button type="button" class="filter-chip ${isSelected ? 'active' : ''}" onclick="setPersonFilter('__unassigned__')">
+      chipsHTML += `<button type="button" class="filter-chip ${isSelected ? 'active' : ''}" onclick="setPersonFilter('__unassigned__')" title="Atanmamış görevler">
         <span>Atanmamış</span>
         <span class="chip-count">${unassignedCount}</span>
       </button>`;
@@ -1107,6 +1146,19 @@ function renderQuickFilterBar(cards = window.cards || [], epics = window.epics |
   }
 }
 window.renderQuickFilterBar = renderQuickFilterBar;
+
+function setPersonFilter(name) {
+  const el = document.getElementById('filterAssignee');
+  if (el) {
+    if (el.value.toLowerCase() === name.toLowerCase()) {
+      el.value = '';
+    } else {
+      el.value = name;
+    }
+  }
+  if (typeof renderAll === 'function') renderAll();
+}
+window.setPersonFilter = setPersonFilter;
 
 // ── Drag & Drop ──────────────────────────────────────────
 let dragId = null;

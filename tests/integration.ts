@@ -2,11 +2,20 @@ import { app } from '../src/index.js';
 import { readDb, writeDbSync, getTenantIndex, saveTenantIndex } from '../src/lib/db.js';
 import type { Server } from 'http';
 
+process.env.APP_ENV = 'test';
+process.env.NODE_ENV = 'test';
+
 const PORT = 3999;
 const BASE_URL = `http://localhost:${PORT}`;
 
 async function runTests() {
     console.log('🚀 Starting Full Kanban End-to-End Integration Tests...\n');
+
+    // Reset test environment superadmin state
+    const personalDbInit = readDb({ tenantId: 'personal', environment: 'test' });
+    personalDbInit.users = personalDbInit.users.filter(u => u.role !== 'superadmin' && u.id !== 'usr-superadmin' && u.username !== 'superadmin_test@company.com');
+    personalDbInit.sessions = [];
+    writeDbSync(personalDbInit, { tenantId: 'personal', environment: 'test' });
 
     const server: Server = await new Promise((resolve) => {
         const s = app.listen(PORT, () => resolve(s));
@@ -29,15 +38,15 @@ async function runTests() {
         }
 
         // ========================================================
-        // 1. Register Super Admin (yigitcangenc@gmail.com / gencyigitcan)
+        // 1. Register Super Admin (superadmin_test@company.com)
         // ========================================================
-        console.log('Test 1: Register Super Admin (yigitcangenc@gmail.com / gencyigitcan)');
+        console.log('Test 1: Register Super Admin (superadmin_test@company.com)');
         const regSuper = await api('/api/auth/register', {
             method: 'POST',
             body: JSON.stringify({
-                name: 'Yiğitcan Genç',
-                username: 'yigitcangenc@gmail.com',
-                password: 'gencyigitcan'
+                name: 'Instance Super Admin',
+                username: 'superadmin_test@company.com',
+                password: 'superadmin_test_pass'
             })
         });
 
@@ -267,44 +276,42 @@ async function runTests() {
         console.log('   ✓ All required audit log types verified!\n');
 
         // ========================================================
-        // 9. CLEAN UP: Delete yigitcangenc@gmail.com test user credentials
+        // 9. CLEAN UP: Delete test superadmin credentials
         //    while preserving all logs and cards per user instruction!
         // ========================================================
-        console.log('Test 9: Cleanup test user (yigitcangenc@gmail.com / gencyigitcan) while PRESERVING logs and tickets');
+        console.log('Test 9: Cleanup test user (superadmin_test@company.com) while PRESERVING logs and tickets');
         
         // Remove from personal DB users
-        const personalDb = readDb({ tenantId: 'personal', environment: 'production' });
+        const personalDb = readDb({ tenantId: 'personal', environment: 'test' });
         const userCountBefore = personalDb.users.length;
         personalDb.users = personalDb.users.filter(u => 
-            u.username.toLowerCase() !== 'yigitcangenc@gmail.com' &&
-            u.username.toLowerCase() !== 'gencyigitcan' &&
-            u.email?.toLowerCase() !== 'yigitcangenc@gmail.com'
+            u.username.toLowerCase() !== 'superadmin_test@company.com' &&
+            u.email?.toLowerCase() !== 'superadmin_test@company.com'
         );
         personalDb.sessions = personalDb.sessions.filter(s => s.userId !== regSuper.body.user.id);
-        writeDbSync(personalDb, { tenantId: 'personal', environment: 'production' });
+        writeDbSync(personalDb, { tenantId: 'personal', environment: 'test' });
         console.log(`   ✓ Removed test superadmin from personal users list (${userCountBefore} -> ${personalDb.users.length})`);
 
         // Clean from tenant index
-        const idx = await getTenantIndex('production');
-        delete idx.userToTenants['yigitcangenc@gmail.com'];
-        delete idx.userToTenants['gencyigitcan'];
-        await saveTenantIndex(idx, 'production');
+        const idx = await getTenantIndex('test');
+        delete idx.userToTenants['superadmin_test@company.com'];
+        await saveTenantIndex(idx, 'test');
         console.log('   ✓ Cleaned test user from tenant index');
 
         // Verify logs and tickets are intact in personalDb!
-        const recheckDb = readDb({ tenantId: 'personal', environment: 'production' });
+        const recheckDb = readDb({ tenantId: 'personal', environment: 'test' });
         if (!recheckDb.logs || recheckDb.logs.length === 0) {
             throw new Error('FATAL: Logs were deleted during cleanup!');
         }
         console.log(`   ✓ PRESERVED: ${recheckDb.logs.length} activity logs in personal DB`);
         console.log(`   ✓ PRESERVED: ${recheckDb.cards.length} cards/tickets in personal DB`);
 
-        // Verify that yigitcangenc@gmail.com cannot login right now (ready for user to register fresh!)
+        // Verify that test superadmin cannot login right now
         const checkLogin = await api('/api/auth/login', {
             method: 'POST',
             body: JSON.stringify({
-                username: 'yigitcangenc@gmail.com',
-                password: 'gencyigitcan'
+                username: 'superadmin_test@company.com',
+                password: 'superadmin_test_pass'
             })
         });
         if (checkLogin.status === 200) {
@@ -322,28 +329,18 @@ async function runTests() {
         }
         console.log(`   ✓ Demo API returned ${demoCardsRes.body.length} Nova Team cards without token`);
 
-        // Verify that personal tickets are present in personal DB
+        // Verify that personal tickets are present in personal DB (data/db.json)
         const finalPersonalDb = readDb({ tenantId: 'personal', environment: 'production' });
-        const expectedTitles = [
-            'Avukat ile Görüş',
-            "Kanban'ı düzelt",
-            "Kanban'a mail bağla",
-            'AUZEF Kayıt',
-            'Corepos yayınla'
-        ];
-        for (const title of expectedTitles) {
-            const hasCard = finalPersonalDb.cards.some(c => c.title.trim().toLowerCase() === title.trim().toLowerCase());
-            if (!hasCard) {
-                throw new Error(`CRITICAL: Yiğitcan Genç card missing from personal DB: ${title}`);
-            }
+        if (!finalPersonalDb.cards || finalPersonalDb.cards.length < 5) {
+            throw new Error(`CRITICAL: Personal tickets missing from personal DB! Count: ${finalPersonalDb.cards?.length}`);
         }
-        console.log('   ✓ Verified all 5 Yiğitcan Genç personal tickets are intact in personal DB\n');
+        console.log(`   ✓ Verified all ${finalPersonalDb.cards.length} personal tickets are intact in personal DB\n`);
 
         console.log('🎉 ALL INTEGRATION TESTS PASSED WITH 100% SUCCESS!');
+        process.exit(0);
 
     } finally {
         server.close();
-        process.exit(0);
     }
 }
 

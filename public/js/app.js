@@ -106,9 +106,49 @@ function switchView(viewName) {
     document.querySelectorAll('.view-container').forEach(c => {
         c.classList.toggle('active', c.id === 'view-' + viewName);
     });
+
+    const viewLabels = {
+        'board': 'Kanban Panosu',
+        'list': 'Liste',
+        'backlog': 'Backlog & Planlama',
+        'gantt': 'Zaman Çizelgesi & Gantt',
+        'dashboard': 'Dashboard & Metrikler',
+        'reports': 'Çevik Raporlar',
+        'my-tasks': 'Görevlerim',
+        'epics': 'Epics Yönetimi',
+        'sprints': 'Sprint Yönetimi',
+        'labels': 'Etiket Yönetimi',
+        'team': 'Takım & Yetkiler',
+        'audit': 'Aktivite Takibi'
+    };
+    const bc = document.getElementById('bcViewName');
+    if (bc) bc.textContent = viewLabels[viewName] || viewName;
+
+    // Close top navigation dropdowns on selection
+    ['workspaceDropdown', 'topNavViewsDropdown', 'topNavManageDropdown', 'jiraUserDropdown'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
     renderAll();
 }
 window.switchView = switchView;
+
+function toggleOnlyMineFilter() {
+    window._quickFilterOnlyMine = !window._quickFilterOnlyMine;
+    const btn = document.getElementById('filterOnlyMineBtn');
+    if (btn) btn.classList.toggle('active', window._quickFilterOnlyMine);
+    renderAll();
+}
+window.toggleOnlyMineFilter = toggleOnlyMineFilter;
+
+function toggleRecentFilter() {
+    window._quickFilterRecent = !window._quickFilterRecent;
+    const btn = document.getElementById('filterRecentBtn');
+    if (btn) btn.classList.toggle('active', window._quickFilterRecent);
+    renderAll();
+}
+window.toggleRecentFilter = toggleRecentFilter;
 
 function renderAll() {
     renderBoard(cards, epics);
@@ -763,10 +803,14 @@ function updateUserHeader() {
         const roleBadge = currentUser.role === 'superadmin' ? ' 👑 (Süper Admin)' : (currentUser.role === 'admin' ? ' 🛡️ (Admin)' : '');
         nameEl.textContent = currentUser.name + roleBadge;
     }
+    const roleEl = document.getElementById('userProfileRole');
+    if (roleEl) {
+        roleEl.textContent = currentUser.role === 'superadmin' ? '👑 Süper Admin' : (currentUser.role === 'admin' ? '🛡️ Admin' : '👤 Takım Üyesi');
+    }
     const badge = document.getElementById('userProfileBadge');
     if (badge) {
         badge.textContent = initials(currentUser.name);
-        badge.style.backgroundColor = currentUser.avatarColor || '#4f46e5';
+        badge.style.backgroundColor = currentUser.avatarColor || '#0052cc';
     }
 
     const manageUsersBtn = document.getElementById('manageUsersBtn');
@@ -778,6 +822,11 @@ function updateUserHeader() {
     const tabNavAudit = document.getElementById('tabNavAudit');
     if (tabNavAudit) {
         tabNavAudit.style.display = canManage ? 'inline-block' : 'none';
+    }
+
+    const sidebarAuditBtn = document.getElementById('sidebarAuditBtn');
+    if (sidebarAuditBtn) {
+        sidebarAuditBtn.style.display = canManage ? 'inline-flex' : 'none';
     }
 
     renderWorkspaceSwitcher();
@@ -834,6 +883,13 @@ function populateEpicFilter() {
 window.populateEpicFilter = populateEpicFilter;
 
 function clearAllFilters() {
+    window._quickFilterOnlyMine = false;
+    window._quickFilterRecent = false;
+    const mineBtn = document.getElementById('filterOnlyMineBtn');
+    if (mineBtn) mineBtn.classList.remove('active');
+    const recBtn = document.getElementById('filterRecentBtn');
+    if (recBtn) recBtn.classList.remove('active');
+
     const fa = document.getElementById('filterAssignee');
     if (fa) fa.value = '';
     const fe = document.getElementById('filterEpic');
@@ -1162,6 +1218,9 @@ async function renderWorkspaceSwitcher() {
         wsIcon.textContent = '📋';
     }
 
+    const bcProj = document.getElementById('bcProjectName');
+    if (bcProj) bcProj.textContent = wsName.textContent;
+
     wsList.innerHTML = workspaces.map(w => {
         const isActive = w.id === activeId;
         const icon = w.type === 'personal' ? '🛡️' : (w.type === 'user' ? '👤' : '🏢');
@@ -1197,22 +1256,62 @@ async function renderWorkspaceSwitcher() {
     });
 }
 
-// Toggle workspace switcher dropdown
+function closeAllJiraDropdowns() {
+    ['workspaceDropdown', 'topNavViewsDropdown', 'topNavManageDropdown', 'jiraUserDropdown', 'notifDropdown'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+}
+
+// Toggle Jira topnav dropdowns
 safeAddListener('workspaceSwitcherBtn', 'click', (e) => {
     e.stopPropagation();
     const dropdown = document.getElementById('workspaceDropdown');
-    if (dropdown) {
-        dropdown.style.display = dropdown.style.display === 'none' ? 'flex' : 'none';
-    }
+    const isHidden = !dropdown || dropdown.style.display === 'none';
+    closeAllJiraDropdowns();
+    if (dropdown && isHidden) dropdown.style.display = 'flex';
+});
+
+safeAddListener('topNavViewsBtn', 'click', (e) => {
+    e.stopPropagation();
+    const dropdown = document.getElementById('topNavViewsDropdown');
+    const isHidden = !dropdown || dropdown.style.display === 'none';
+    closeAllJiraDropdowns();
+    if (dropdown && isHidden) dropdown.style.display = 'flex';
+});
+
+safeAddListener('topNavManageBtn', 'click', (e) => {
+    e.stopPropagation();
+    const dropdown = document.getElementById('topNavManageDropdown');
+    const isHidden = !dropdown || dropdown.style.display === 'none';
+    closeAllJiraDropdowns();
+    if (dropdown && isHidden) dropdown.style.display = 'flex';
+});
+
+safeAddListener('userProfileBadge', 'click', (e) => {
+    e.stopPropagation();
+    const dropdown = document.getElementById('jiraUserDropdown');
+    const isHidden = !dropdown || dropdown.style.display === 'none';
+    closeAllJiraDropdowns();
+    if (dropdown && isHidden) dropdown.style.display = 'flex';
 });
 
 document.addEventListener('click', (e) => {
-    const dropdown = document.getElementById('workspaceDropdown');
-    const wsBtn = document.getElementById('workspaceSwitcherBtn');
-    if (dropdown && dropdown.style.display !== 'none') {
-        if (!dropdown.contains(e.target) && (!wsBtn || !wsBtn.contains(e.target))) {
-            dropdown.style.display = 'none';
-        }
+    const ids = ['workspaceDropdown', 'topNavViewsDropdown', 'topNavManageDropdown', 'jiraUserDropdown', 'notifDropdown'];
+    const triggers = ['workspaceSwitcherBtn', 'topNavViewsBtn', 'topNavManageBtn', 'userProfileBadge', 'notifBellBtn'];
+    
+    const clickedTrigger = triggers.some(tId => {
+        const t = document.getElementById(tId);
+        return t && t.contains(e.target);
+    });
+    if (clickedTrigger) return;
+
+    const clickedInside = ids.some(dId => {
+        const d = document.getElementById(dId);
+        return d && d.contains(e.target);
+    });
+    if (!clickedInside) {
+        closeAllJiraDropdowns();
     }
 });
 

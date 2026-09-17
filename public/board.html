@@ -12,45 +12,172 @@
 
 <body>
 
+    <!-- JIRA GLOBAL TOPBAR (FULL PAGE WIDTH) -->
+    <header class="jira-global-nav" id="jiraGlobalNav">
+        <div class="jira-nav-left">
+            <button class="jira-app-switcher" id="jiraAppSwitcher" title="Atlassian Menüsü" type="button">
+                <span>⠿</span>
+            </button>
+            <button class="jira-sidebar-toggle-btn" id="sidebarToggleBtn" type="button" title="Kenar Çubuğunu Aç/Kapat">
+                ☰
+            </button>
+            <a href="/" class="jira-brand" title="Tiny Kanban Ana Sayfa">
+                <div class="jira-logo-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                        <path d="M11.5 2.5L3 7V17L11.5 21.5L20 17V7L11.5 2.5Z" fill="#0052CC"/>
+                        <path d="M11.5 2.5L20 7V17L11.5 21.5V2.5Z" fill="#2684FF"/>
+                        <path d="M11.5 12L3 7L11.5 2.5L20 7L11.5 12Z" fill="#4C9AFF"/>
+                    </svg>
+                </div>
+                <span class="jira-brand-title">Tiny Kanban</span>
+            </a>
+
+            <!-- JIRA TOP DROPDOWN MENUS (DIRECT NAVBAR SCREEN SWITCHER) -->
+            <nav class="jira-top-menus">
+                <!-- 1. PROJELER DROPDOWN -->
+                <div class="jira-nav-dropdown-wrap" id="wrapProjectsMenu">
+                    <button class="jira-nav-menu-btn" id="workspaceSwitcherBtn" type="button">
+                        <span>Projeler</span> <span class="jira-arrow">▾</span>
+                    </button>
+                    <div class="jira-nav-dropdown" id="workspaceDropdown" style="display: none;">
+                        <div class="jira-dropdown-header">Çalışma Alanları</div>
+                        <div class="jira-dropdown-list" id="wsList"></div>
+                        <div class="jira-dropdown-divider"></div>
+                        <button class="jira-dropdown-item btn-link" id="createWorkspacePromptBtn" type="button">
+                            ✚ Yeni Takım / Çalışma Alanı Oluştur
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. GÖRÜNÜMLER DROPDOWN (Direct Screen Switcher from Navbar!) -->
+                <div class="jira-nav-dropdown-wrap" id="wrapViewsMenu">
+                    <button class="jira-nav-menu-btn" id="topNavViewsBtn" type="button">
+                        <span>Görünümler</span> <span class="jira-arrow">▾</span>
+                    </button>
+                    <div class="jira-nav-dropdown" id="topNavViewsDropdown" style="display: none;">
+                        <div class="jira-dropdown-header">Pano ve Listeler</div>
+                        <button class="jira-dropdown-item view-tab active" data-view="board" type="button">
+                            <span class="menu-icon">📋</span> <span>Pano (Kanban Board)</span>
+                        </button>
+                        <button class="jira-dropdown-item view-tab" data-view="list" type="button">
+                            <span class="menu-icon">☰</span> <span>Liste Görünümü</span>
+                        </button>
+                        <button class="jira-dropdown-item view-tab" data-view="backlog" type="button">
+                            <span class="menu-icon">📦</span> <span>Backlog &amp; Planlama</span>
+                        </button>
+                        <button class="jira-dropdown-item view-tab" data-view="gantt" type="button">
+                            <span class="menu-icon">📅</span> <span>Zaman Çizelgesi &amp; Gantt</span>
+                        </button>
+                        <button class="jira-dropdown-item view-tab" data-view="dashboard" type="button">
+                            <span class="menu-icon">📊</span> <span>Dashboard &amp; Metrikler</span>
+                        </button>
+                        <button class="jira-dropdown-item view-tab" data-view="reports" type="button">
+                            <span class="menu-icon">📈</span> <span>Çevik Raporlar &amp; Hız</span>
+                        </button>
+                        <button class="jira-dropdown-item view-tab" data-view="my-tasks" type="button">
+                            <span class="menu-icon">👤</span> <span>Yalnızca Görevlerim</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3. YÖNETİM DROPDOWN -->
+                <div class="jira-nav-dropdown-wrap" id="wrapManageMenu">
+                    <button class="jira-nav-menu-btn" id="topNavManageBtn" type="button">
+                        <span>Yönetim</span> <span class="jira-arrow">▾</span>
+                    </button>
+                    <div class="jira-nav-dropdown" id="topNavManageDropdown" style="display: none;">
+                        <div class="jira-dropdown-header">Proje ve Takım Yapılandırması</div>
+                        <button class="jira-dropdown-item view-tab" data-view="epics" id="manageEpicsBtn" type="button">
+                            <span class="menu-icon">🏷️</span> <span>Epics &amp; Hedefler</span>
+                        </button>
+                        <button class="jira-dropdown-item view-tab" data-view="sprints" id="manageSprintsBtn" type="button">
+                            <span class="menu-icon">⚡</span> <span>Sprint Yönetimi</span>
+                        </button>
+                        <button class="jira-dropdown-item view-tab" data-view="labels" id="manageLabelsBtn" type="button">
+                            <span class="menu-icon">🎨</span> <span>Etiketler (Labels)</span>
+                        </button>
+                        <button class="jira-dropdown-item view-tab" data-view="team" id="manageUsersBtn" type="button">
+                            <span class="menu-icon">👥</span> <span>Takım Üyeleri &amp; Roller</span>
+                        </button>
+                        <button class="jira-dropdown-item view-tab" data-view="audit" id="tabNavAudit" style="display:none;" type="button">
+                            <span class="menu-icon">📜</span> <span>Aktivite &amp; Denetim Kayıtları</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PRIMARY ACTION: JIRA + OLUŞTUR BUTTON -->
+                <button class="jira-create-btn" id="addTaskBtn" onclick="openCardDetail(null)" type="button" title="Yeni Ticket / Görev Ekle">
+                    ✚ Oluştur
+                </button>
+            </nav>
+        </div>
+
+        <div class="jira-nav-right">
+            <!-- JIRA SEARCH BAR -->
+            <div class="jira-search-wrap">
+                <span class="jira-search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="Ara (veya N ile yeni)..." autocomplete="off">
+            </div>
+
+            <!-- ENV BADGE -->
+            <div class="jira-env-switch">
+                <a href="/board" class="jira-env-chip active" id="envChipLive" title="Canlı Çalışma Alanı">📋 Canlı</a>
+                <a href="/demo" class="jira-env-chip" id="envChipDemo" title="Nova Demo Panosu">🎯 Demo</a>
+            </div>
+
+            <!-- NOTIFICATIONS BELL -->
+            <div class="notification-container">
+                <button class="jira-icon-btn" id="notifBellBtn" title="Bildirimler" type="button">
+                    🔔
+                    <span class="notif-badge" id="notifBadge" style="display: none;">0</span>
+                </button>
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-header">
+                        <span>Bildirimler</span>
+                        <button class="btn-link" id="notifReadAllBtn" type="button">Tümünü Oku</button>
+                    </div>
+                    <div class="notif-list" id="notifList">
+                        <div class="notif-empty">Yeni bildirim yok</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- USER AVATAR & DROPDOWN -->
+            <div class="jira-user-menu-wrap" id="headerUser">
+                <button class="jira-avatar-btn" id="userProfileBadge" title="Kullanıcı Profili" type="button">
+                    ??
+                </button>
+                <div class="jira-user-dropdown" id="jiraUserDropdown" style="display: none;">
+                    <div class="jira-user-info-box">
+                        <span class="jira-user-name" id="userProfileName">Misafir</span>
+                        <span class="jira-user-role" id="userProfileRole">Üye</span>
+                    </div>
+                    <div class="jira-dropdown-divider"></div>
+                    <button class="jira-dropdown-item btn-logout" id="logoutBtn" type="button">🚪 Oturumu Kapat</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- BELOW TOPBAR: SIDEBAR + CONTENT AREA -->
     <div class="app-layout">
         <!-- LEFT SIDEBAR NAVIGATION -->
         <aside class="app-sidebar" id="appSidebar">
             <div class="sidebar-header">
-                <div class="sidebar-brand">
-                    <a href="/" class="sidebar-logo">K</a>
-                    <div class="sidebar-brand-text">
-                        <span class="sidebar-app-name">Tiny Kanban</span>
-                        <span class="sidebar-version">v1.3</span>
+                <div class="sidebar-project-info">
+                    <span class="sidebar-project-icon" id="wsIcon">🛡️</span>
+                    <div class="sidebar-project-text">
+                        <span class="sidebar-project-name" id="wsName">Kişisel Pano</span>
+                        <span class="sidebar-project-sub">Yazılım Projesi</span>
                     </div>
                 </div>
-
-                <!-- WORKSPACE SWITCHER -->
-                <div class="workspace-switcher-container">
-                    <button class="workspace-switcher-btn" id="workspaceSwitcherBtn" type="button" title="Çalışma Alanı Değiştir">
-                        <span class="ws-icon" id="wsIcon">🛡️</span>
-                        <span class="ws-name" id="wsName">Kişisel Pano</span>
-                        <span class="ws-arrow">▾</span>
-                    </button>
-                    <div class="workspace-dropdown" id="workspaceDropdown" style="display: none;">
-                        <div class="ws-dropdown-header">Çalışma Alanlarım</div>
-                        <div class="ws-list" id="wsList"></div>
-                        <div class="ws-dropdown-footer">
-                            <button class="btn-link" id="createWorkspacePromptBtn" type="button">✚ Yeni Takım Oluştur</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- PRIMARY ACTION: YENİ TICKET EKLE -->
-                <button class="sidebar-new-ticket-btn" id="addTaskBtn" onclick="openCardDetail(null)" type="button">
-                    <span>✚</span> <span class="label">Yeni Ticket Ekle</span>
-                </button>
             </div>
 
             <!-- SIDEBAR NAVIGATION ITEMS -->
             <nav class="sidebar-nav">
-                <div class="sidebar-section-title">GÖRÜNÜMLER</div>
+                <div class="sidebar-section-title">PLANLAMA</div>
                 <button class="view-tab active" data-view="board">
-                    <span class="nav-icon">📋</span> <span>Pano (Board)</span>
+                    <span class="nav-icon">📋</span> <span>Kanban Panosu</span>
                 </button>
                 <button class="view-tab" data-view="list">
                     <span class="nav-icon">☰</span> <span>Liste</span>
@@ -59,8 +186,10 @@
                     <span class="nav-icon">📦</span> <span>Backlog</span>
                 </button>
                 <button class="view-tab" data-view="gantt">
-                    <span class="nav-icon">📅</span> <span>Gantt &amp; Takvim</span>
+                    <span class="nav-icon">📅</span> <span>Zaman Çizelgesi</span>
                 </button>
+
+                <div class="sidebar-section-title">LİSTE &amp; ANALİZ</div>
                 <button class="view-tab" data-view="dashboard">
                     <span class="nav-icon">📊</span> <span>Dashboard</span>
                 </button>
@@ -71,112 +200,112 @@
                     <span class="nav-icon">👤</span> <span>Görevlerim</span>
                 </button>
 
-                <div class="sidebar-section-title">YÖNETİM</div>
-                <button class="view-tab" data-view="epics" id="manageEpicsBtn">
+                <div class="sidebar-section-title">PROJE AYARLARI</div>
+                <button class="view-tab" data-view="epics" id="sidebarEpicsBtn">
                     <span class="nav-icon">🏷️</span> <span>Epics</span>
                 </button>
-                <button class="view-tab" data-view="sprints" id="manageSprintsBtn">
+                <button class="view-tab" data-view="sprints" id="sidebarSprintsBtn">
                     <span class="nav-icon">⚡</span> <span>Sprints</span>
                 </button>
-                <button class="view-tab" data-view="labels" id="manageLabelsBtn">
+                <button class="view-tab" data-view="labels" id="sidebarLabelsBtn">
                     <span class="nav-icon">🎨</span> <span>Etiketler</span>
                 </button>
-                <button class="view-tab" data-view="team" id="manageUsersBtn">
+                <button class="view-tab" data-view="team" id="sidebarTeamBtn">
                     <span class="nav-icon">👥</span> <span>Takım &amp; Yetkiler</span>
                 </button>
-                <button class="view-tab" data-view="audit" id="tabNavAudit" style="display:none;">
+                <button class="view-tab" data-view="audit" id="sidebarAuditBtn" style="display:none;">
                     <span class="nav-icon">📜</span> <span>Aktivite Takibi</span>
                 </button>
             </nav>
-
-            <!-- SIDEBAR FOOTER (USER & ENV) -->
-            <div class="sidebar-footer">
-                <div class="sidebar-env-switch">
-                    <a href="/board" class="env-chip active" title="Canlı Çalışma Alanı">📋 Canlı</a>
-                    <a href="/demo" class="env-chip" title="Nova Demo Panosu">🎯 Demo</a>
-                </div>
-
-                <div class="header-user" id="headerUser" style="display: none;">
-                    <div class="notification-container">
-                        <button class="btn-notification" id="notifBellBtn" title="Bildirimler" type="button">
-                            🔔
-                            <span class="notif-badge" id="notifBadge" style="display: none;">0</span>
-                        </button>
-                        <div class="notif-dropdown" id="notifDropdown">
-                            <div class="notif-header">
-                                <span>Bildirimler</span>
-                                <button class="btn-link" id="notifReadAllBtn" type="button">Tümünü Oku</button>
-                            </div>
-                            <div class="notif-list" id="notifList">
-                                <div class="notif-empty">Yeni bildirim yok</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="user-profile-badge" id="userProfileBadge">??</div>
-                    <div class="user-profile-info">
-                        <span class="user-profile-name" id="userProfileName">Misafir</span>
-                        <button class="btn-logout" id="logoutBtn">Çıkış</button>
-                    </div>
-                </div>
-            </div>
         </aside>
 
         <!-- MAIN APP CONTENT AREA -->
         <div class="app-main">
-            <!-- SLIM TOPBAR WITH SEARCH, SPRINT & FILTERS -->
-            <header class="main-topbar">
-                <div class="topbar-left">
-                    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" type="button" title="Menüyü Daralt/Genişlet">☰</button>
-                    <div class="header-search">
-                        <span class="search-icon">🔍</span>
-                        <input type="text" id="searchInput" placeholder="Kart ara… (N ile yeni)" autocomplete="off">
-                    </div>
-                    <span class="header-subtitle" id="sprintBadge">—</span>
-                </div>
-
-                <div class="topbar-right">
-                    <div class="header-filters">
-                        <select class="filter-select" id="filterSprint" title="Sprint Filtresi">
-                            <option value="active">🟢 Aktif Sprint</option>
-                            <option value="all">🌐 Tüm Sprintler</option>
-                        </select>
-                        <select class="filter-select" id="filterEpic" title="Proje / Epic Filtresi">
-                            <option value="">📁 Epics</option>
-                        </select>
-                        <select class="filter-select" id="filterAssignee" title="Kişi Filtresi">
-                            <option value="">👤 Kişiler</option>
-                        </select>
-                        <select class="filter-select" id="filterPriority" title="Öncelik Filtresi">
-                            <option value="">🎯 Öncelik</option>
-                            <option value="high">🔴 Yüksek</option>
-                            <option value="medium">🟠 Orta</option>
-                            <option value="low">🟢 Düşük</option>
-                        </select>
+            <!-- JIRA PROJECT SUBHEADER -->
+            <div class="jira-subnav-header">
+                <div class="jira-subnav-top">
+                    <!-- BREADCRUMBS -->
+                    <div class="jira-breadcrumbs">
+                        <span class="bc-part">Projeler</span>
+                        <span class="bc-sep">/</span>
+                        <span class="bc-part" id="bcProjectName">Kişisel Pano</span>
+                        <span class="bc-sep">/</span>
+                        <span class="bc-current" id="bcViewName">Kanban Panosu</span>
                     </div>
 
-                    <div class="header-actions">
+                    <div class="jira-subnav-actions">
+                        <span class="jira-sprint-badge" id="sprintBadge">—</span>
                         <button class="btn btn-danger btn-sm" id="clearBtn" title="Panoyu Temizle">🗑</button>
                     </div>
                 </div>
-            </header>
 
-            <!-- QUICK FILTERS & TEAM MEMBER BAR -->
-            <div class="quick-filters-bar" id="quickFiltersBar">
-                <div class="filter-chip-section">
-                    <span class="filter-chip-label">👥 Kişi:</span>
-                    <div class="filter-chips" id="memberFilterChips"></div>
-                </div>
-                <div class="filter-chip-section">
-                    <span class="filter-chip-label">📁 Proje:</span>
-                    <div class="filter-chips" id="projectFilterChips"></div>
-                </div>
-                <div class="filter-reset-wrap" id="filterResetWrap" style="display: none;">
-                    <span class="active-filter-badge" id="activeFilterBadge">🎯 Filtre aktif</span>
-                    <button type="button" class="btn-clear-filters" onclick="clearAllFilters()">✕ Temizle</button>
+                <!-- JIRA VIEW TABS BAR (Underline Tabs) -->
+                <div class="jira-view-tabs-bar">
+                    <button class="jira-view-tab view-tab active" data-view="board" type="button">
+                        📋 Pano
+                    </button>
+                    <button class="jira-view-tab view-tab" data-view="list" type="button">
+                        ☰ Liste
+                    </button>
+                    <button class="jira-view-tab view-tab" data-view="backlog" type="button">
+                        📦 Backlog
+                    </button>
+                    <button class="jira-view-tab view-tab" data-view="gantt" type="button">
+                        📅 Zaman Çizelgesi
+                    </button>
+                    <button class="jira-view-tab view-tab" data-view="dashboard" type="button">
+                        📊 Dashboard
+                    </button>
+                    <button class="jira-view-tab view-tab" data-view="reports" type="button">
+                        📈 Raporlar
+                    </button>
+                    <button class="jira-view-tab view-tab" data-view="my-tasks" type="button">
+                        👤 Görevlerim
+                    </button>
                 </div>
             </div>
 
-            <!-- APPS VIEW VIEWPORT CONTAINER -->
+            <!-- JIRA QUICK FILTERS & CONTROLS BAR -->
+            <div class="jira-quick-filters-bar" id="quickFiltersBar">
+                <div class="jira-quick-filters-left">
+                    <button type="button" class="jira-quick-pill" id="filterOnlyMineBtn" onclick="toggleOnlyMineFilter()">
+                        Yalnızca benim işlerim
+                    </button>
+                    <button type="button" class="jira-quick-pill" id="filterRecentBtn" onclick="toggleRecentFilter()">
+                        Son güncellenenler
+                    </button>
+
+                    <!-- ASSIGNEE AVATAR BUBBLE CHIPS -->
+                    <div class="jira-assignee-avatar-chips" id="memberFilterChips"></div>
+                    <div class="jira-project-chips" id="projectFilterChips" style="display:none;"></div>
+                </div>
+
+                <div class="jira-quick-filters-right">
+                    <select class="jira-filter-select" id="filterSprint" title="Sprint">
+                        <option value="active">🟢 Aktif Sprint</option>
+                        <option value="all">🌐 Tüm Sprintler</option>
+                    </select>
+                    <select class="jira-filter-select" id="filterEpic" title="Epic / Proje">
+                        <option value="">📁 Epics</option>
+                    </select>
+                    <select class="jira-filter-select" id="filterPriority" title="Öncelik">
+                        <option value="">🎯 Öncelik</option>
+                        <option value="high">🔴 Yüksek</option>
+                        <option value="medium">🟠 Orta</option>
+                        <option value="low">🟢 Düşük</option>
+                    </select>
+                    <select class="jira-filter-select" id="filterAssignee" title="Kişi" style="display: none;">
+                        <option value="">👤 Kişiler</option>
+                    </select>
+
+                    <div class="jira-clear-filters-wrap" id="filterResetWrap" style="display: none;">
+                        <span class="jira-active-filter-badge" id="activeFilterBadge">🎯 Filtre</span>
+                        <button type="button" class="jira-clear-link" onclick="clearAllFilters()">Filtreleri Temizle</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- APPS VIEW VIEWPORT CONTAINER (STRICT NO HORIZONTAL SCROLL) -->
             <div class="app-views-viewport">
 
     <!-- BOARD VIEW -->
@@ -187,12 +316,11 @@
                     <div class="col-header-top">
                         <div class="col-title-wrap">
                             <span class="col-dot"></span>
-                            <span class="col-title">Yapılacak</span>
-                            <button type="button" class="col-quick-plus-btn" onclick="openCardDetail(null, 'todo')" title="Yapılacak sütununa yeni ticket ekle">✚</button>
+                            <span class="col-title">YAPILACAK</span>
+                            <button type="button" class="col-quick-plus-btn" onclick="openCardDetail(null, 'todo')" title="Yeni ticket ekle">✚</button>
                         </div>
                         <span class="col-count" data-count="todo">0</span>
                     </div>
-                    <div class="wip-badge">Limit yok</div>
                 </div>
                 <div class="col-body" id="col-todo" data-col="todo" ondragover="onDragOver(event)"
                     ondrop="onDrop(event)" ondragleave="onDragLeave(event)">
@@ -212,18 +340,17 @@
                     <div class="col-header-top">
                         <div class="col-title-wrap">
                             <span class="col-dot"></span>
-                            <span class="col-title">Yapılıyor</span>
-                            <button type="button" class="col-quick-plus-btn" onclick="openCardDetail(null, 'doing')" title="Yapılıyor sütununa yeni ticket ekle">✚</button>
+                            <span class="col-title">İŞLEMDE</span>
+                            <button type="button" class="col-quick-plus-btn" onclick="openCardDetail(null, 'doing')" title="Yeni ticket ekle">✚</button>
                         </div>
                         <span class="col-count" data-count="doing">0</span>
                     </div>
-                    <div class="wip-badge">Limit yok</div>
                 </div>
                 <div class="col-body" id="col-doing" data-col="doing" ondragover="onDragOver(event)"
                     ondrop="onDrop(event)" ondragleave="onDragLeave(event)">
                     <div class="empty-state">
                         <div class="empty-icon">⚡</div>
-                        <div>Devam eden yok</div>
+                        <div>Devam eden görev yok</div>
                     </div>
                 </div>
                 <div class="col-footer-actions">
@@ -237,12 +364,11 @@
                     <div class="col-header-top">
                         <div class="col-title-wrap">
                             <span class="col-dot"></span>
-                            <span class="col-title">Tamamlandı</span>
-                            <button type="button" class="col-quick-plus-btn" onclick="openCardDetail(null, 'done')" title="Tamamlandı sütununa yeni ticket ekle">✚</button>
+                            <span class="col-title">TAMAMLANDI</span>
+                            <button type="button" class="col-quick-plus-btn" onclick="openCardDetail(null, 'done')" title="Yeni ticket ekle">✚</button>
                         </div>
                         <span class="col-count" data-count="done">0</span>
                     </div>
-                    <div class="wip-badge">Limit yok</div>
                 </div>
                 <div class="col-body" id="col-done" data-col="done" ondragover="onDragOver(event)"
                     ondrop="onDrop(event)" ondragleave="onDragLeave(event)">

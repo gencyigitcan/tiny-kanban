@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import writeFileAtomic from 'write-file-atomic';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { DbSchema, Workspace, TenantIndex, ActivityLog } from '../types/index.js';
-import { createDefaultDemoDb, YIGITCAN_USER_CARDS } from './demo_data.js';
+import { createDefaultDemoDb, DEFAULT_PERSONAL_CARDS } from './demo_data.js';
 import { alignDemoDbToCurrentDate } from './demo_timeline.js';
 
 export type Environment = 'production' | 'test' | 'development';
@@ -60,6 +60,14 @@ export function verifyPassword(password: string, stored: string): boolean {
 
 // ── Environment Detection ────────────────────────────────────
 export function getEnvironment(reqOrScope?: any, envBinding?: any): Environment {
+    // 0. Explicit caller override
+    if (reqOrScope && typeof reqOrScope === 'object' && reqOrScope.environment) {
+        const val = String(reqOrScope.environment).toLowerCase();
+        if (val === 'test' || val === 'preview') return 'test';
+        if (val === 'production') return 'production';
+        if (val === 'development') return 'development';
+    }
+
     // 1. Cloudflare Workers env variable
     if (envBinding?.APP_ENV) {
         const val = String(envBinding.APP_ENV).toLowerCase();
@@ -173,7 +181,7 @@ export const DEFAULT_LABELS = [
     { id: 'urgent', name: 'Acil', color: '#dc2626', bg: '#fff1f2', createdAt: Date.now() }
 ];
 
-// ── Ensure Personal DB Integrity (Yiğitcan Genç Cards Preservation) ──
+// ── Ensure Personal DB Integrity (Default Personal Cards Preservation) ──
 export function ensurePersonalDbIntegrity(db: DbSchema): boolean {
     let changed = false;
     if (!Array.isArray(db.cards)) {
@@ -197,8 +205,8 @@ export function ensurePersonalDbIntegrity(db: DbSchema): boolean {
         changed = true;
     }
 
-    // Ensure all 5 cards for Yiğitcan Genç exist
-    for (const uCard of YIGITCAN_USER_CARDS) {
+    // Ensure starter cards for personal workspace exist
+    for (const uCard of DEFAULT_PERSONAL_CARDS) {
         const exists = db.cards.some(c =>
             c.id === uCard.id ||
             (c.title && c.title.trim().toLowerCase() === uCard.title.trim().toLowerCase())
@@ -476,13 +484,25 @@ export async function getTenantIndex(env: Environment, d1Binding?: any): Promise
             { id: 'demo', name: 'Demo Panosu', type: 'team', ownerId: 'usr-1', createdAt: Date.now() }
         ],
         userToTenants: {
-            'gencyigitcan': ['personal'],
-            'yigitcangenc@gmail.com': ['personal'],
             'admin': ['demo'],
             'zeynep': ['demo'],
             'mehmet': ['demo']
         }
     };
+
+    try {
+        const personalDb = readDb({ tenantId: 'personal', environment: env });
+        if (personalDb && Array.isArray(personalDb.users)) {
+            for (const u of personalDb.users) {
+                if (u.username) {
+                    fallback.userToTenants[u.username.toLowerCase()] = Array.from(new Set(['personal', ...(u.workspaces || [])]));
+                }
+                if (u.email) {
+                    fallback.userToTenants[u.email.toLowerCase()] = Array.from(new Set(['personal', ...(u.workspaces || [])]));
+                }
+            }
+        }
+    } catch (_) {}
 
     if (store) {
         store.index = fallback;
@@ -590,15 +610,15 @@ export async function writeDb(data: DbSchema, scopeOrReq?: DbScope | { dbScope?:
 // ── File System Helpers ──────────────────────────────────────
 export function readTenantDbFileSync(tenantId: string, env: Environment): DbSchema {
     if (!isNodeRuntime()) {
-        if (env === 'test') return createDefaultTestDb();
         if (tenantId === 'demo') return createDefaultDemoDb();
+        if (env === 'test') return createDefaultTestDb();
         return structuredClone(EMPTY_DB);
     }
     const filePath = resolveFilePath(tenantId, env);
     try {
         if (!fs.existsSync(filePath)) {
-            if (env === 'test') return createDefaultTestDb();
             if (tenantId === 'demo') return createDefaultDemoDb();
+            if (env === 'test') return createDefaultTestDb();
             return structuredClone(EMPTY_DB);
         }
         const raw = fs.readFileSync(filePath, 'utf8');
@@ -670,13 +690,11 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                     changed = ensurePersonalDbIntegrity(db) || changed;
                 }
                 let superUser = db.users.find(u =>
-                    u.username.toLowerCase() === 'gencyigitcan' ||
-                    (u.email && u.email.toLowerCase() === 'yigitcangenc@gmail.com') ||
+                    u.role === 'superadmin' ||
                     u.id === 'usr-superadmin'
                 );
                 if (superUser) {
-                    if (superUser.email !== 'yigitcangenc@gmail.com' || superUser.status !== 'approved') {
-                        superUser.email = 'yigitcangenc@gmail.com';
+                    if (superUser.status !== 'approved') {
                         superUser.status = 'approved';
                         changed = true;
                     }

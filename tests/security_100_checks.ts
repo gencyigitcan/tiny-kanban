@@ -68,6 +68,15 @@ async function runSecuritySuite() {
         let pendingUserEmail = `pending_${runId}@cybercorp.io`;
         let createdCardId = '';
 
+        // Reset test environment superadmin state
+        const personalDbInit = readDb({ tenantId: 'personal', environment: 'test' });
+        personalDbInit.users = personalDbInit.users.filter(u => u.role !== 'superadmin' && u.id !== 'usr-superadmin');
+        personalDbInit.sessions = [];
+        writeDbSync(personalDbInit, { tenantId: 'personal', environment: 'test' });
+        const idxInit = await getTenantIndex('test');
+        delete idxInit.userToTenants['superadmin_sec@company.com'];
+        await saveTenantIndex(idxInit, 'test');
+
         // ====================================================================
         // DOMAIN 1: Authentication & Password Rigor (Checks 001 - 010)
         // ====================================================================
@@ -142,9 +151,9 @@ async function runSecuritySuite() {
             const res = await api('/api/auth/register', {
                 method: 'POST',
                 body: JSON.stringify({
-                    username: 'yigitcangenc@gmail.com',
-                    password: 'gencyigitcan_sec_test',
-                    name: 'Yiğitcan Genç'
+                    username: 'superadmin_sec@company.com',
+                    password: 'superadmin_sec_test',
+                    name: 'Super Admin'
                 })
             });
             if (res.status !== 201 || !res.body.token || res.body.user.role !== 'superadmin') {
@@ -1306,12 +1315,12 @@ async function runSecuritySuite() {
         console.log('\n🧹 Performing test data cleanup while preserving core tickets...');
         const personalDb = readDb({ tenantId: 'personal', environment: 'test' });
         // Clean test superadmin
-        personalDb.users = personalDb.users.filter(u => u.username !== 'yigitcangenc@gmail.com');
+        personalDb.users = personalDb.users.filter(u => u.username !== 'superadmin_sec@company.com');
         personalDb.sessions = [];
         writeDbSync(personalDb, { tenantId: 'personal', environment: 'test' });
 
         const index = await getTenantIndex('test');
-        delete index.userToTenants['yigitcangenc@gmail.com'];
+        delete index.userToTenants['superadmin_sec@company.com'];
         delete index.userToTenants[regularUserEmail];
         await saveTenantIndex(index, 'test');
 

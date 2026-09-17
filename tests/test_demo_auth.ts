@@ -69,13 +69,13 @@ async function run() {
 
         // ── Test 5: Super Admin Inspects Demo Logs via /api/admin/logs?workspace=demo ──
         const personalDb = readDb({ tenantId: 'personal' });
-        let superUser = personalDb.users.find(u => u.username === 'gencyigitcan' || u.id === 'usr-superadmin') || personalDb.users[0];
+        let superUser = personalDb.users.find(u => u.role === 'superadmin' || u.id === 'usr-superadmin') || personalDb.users[0];
         if (!superUser) {
             superUser = {
                 id: 'usr-superadmin',
-                username: 'gencyigitcan',
-                email: 'yigitcangenc@gmail.com',
-                name: 'Yiğitcan Genç',
+                username: 'superadmin_demo@company.com',
+                email: 'superadmin_demo@company.com',
+                name: 'Super Admin',
                 passwordHash: hashPassword('password123'),
                 avatarColor: '#4f46e5',
                 role: 'superadmin',

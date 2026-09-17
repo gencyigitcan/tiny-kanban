@@ -43,15 +43,25 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
     const env = req.environment || getEnvironment(req);
     const index = await getTenantIndex(env);
 
-    const isOwnerUser = normalizedUsername === 'yigitcangenc@gmail.com' || normalizedUsername === 'gencyigitcan';
+    const personalDb = readDb({ tenantId: 'personal', environment: env });
+    const existingSuperAdmin = personalDb.users.find(u => u.role === 'superadmin' && u.status === 'approved');
+    const isFirstSuperAdmin = !existingSuperAdmin;
 
-    // Check if user already exists in index (if not owner resetting/registering)
-    if (index.userToTenants[normalizedUsername] && !isOwnerUser) {
+    // Existing superadmin updating profile or password
+    const isExistingSuperUpdating = Boolean(existingSuperAdmin && (
+        existingSuperAdmin.username.toLowerCase() === normalizedUsername ||
+        (existingSuperAdmin.email && existingSuperAdmin.email.toLowerCase() === normalizedUsername)
+    ));
+
+    const isSuperAdminRegister = isFirstSuperAdmin || isExistingSuperUpdating;
+
+    // Check if user already exists in index (if not superadmin resetting/registering)
+    if (index.userToTenants[normalizedUsername] && !isSuperAdminRegister) {
         throw new AppError('Kullanıcı adı veya e-posta zaten kullanımda', 400);
     }
 
     const randomColor = PASTEL_COLORS[Math.floor(Math.random() * PASTEL_COLORS.length)];
-    const userId = isOwnerUser ? 'usr-superadmin' : ('usr-' + uid());
+    const userId = isSuperAdminRegister ? (existingSuperAdmin?.id || 'usr-superadmin') : ('usr-' + uid());
 
     let tenantId: string;
     let workspaceName: string;
@@ -69,14 +79,14 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
     const newUser: User = {
         id: userId,
         username: normalizedUsername,
-        email: normalizedUsername.includes('@') ? normalizedUsername : (isOwnerUser ? 'yigitcangenc@gmail.com' : undefined),
+        email: normalizedUsername.includes('@') ? normalizedUsername : undefined,
         name: name.trim(),
         passwordHash: hashPassword(password),
         avatarColor: randomColor,
-        role: isOwnerUser ? 'superadmin' : 'user',
-        status: isOwnerUser ? 'approved' : 'pending',
+        role: isSuperAdminRegister ? 'superadmin' : 'user',
+        status: isSuperAdminRegister ? 'approved' : 'pending',
         tenantId,
-        workspaces: isOwnerUser ? ['personal', tenantId] : [tenantId],
+        workspaces: isSuperAdminRegister ? ['personal', tenantId] : [tenantId],
         company: company ? company.trim() : undefined,
         createdAt: Date.now()
     };
@@ -91,22 +101,26 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
     }
     writeDbSync(db, { tenantId, environment: env });
 
-    // If owner user, also update usr-superadmin in personal DB and link workspaces
-    if (isOwnerUser) {
-        const personalDb = readDb({ tenantId: 'personal', environment: env });
-        const superIdx = personalDb.users.findIndex(u => u.id === 'usr-superadmin' || u.username.toLowerCase() === 'gencyigitcan');
+    // If super admin registration, update/insert usr-superadmin in personal DB and link workspaces
+    if (isSuperAdminRegister) {
+        const superIdx = personalDb.users.findIndex(u => u.id === 'usr-superadmin' || u.role === 'superadmin' || u.username.toLowerCase() === normalizedUsername);
         if (superIdx >= 0) {
             personalDb.users[superIdx].passwordHash = newUser.passwordHash;
-            personalDb.users[superIdx].email = 'yigitcangenc@gmail.com';
+            personalDb.users[superIdx].username = normalizedUsername;
+            personalDb.users[superIdx].name = name.trim();
+            if (newUser.email) personalDb.users[superIdx].email = newUser.email;
             personalDb.users[superIdx].status = 'approved';
+            personalDb.users[superIdx].role = 'superadmin';
             personalDb.users[superIdx].workspaces = Array.from(new Set([...(personalDb.users[superIdx].workspaces || []), 'personal', tenantId]));
         } else {
             personalDb.users.unshift(newUser);
         }
         writeDbSync(personalDb, { tenantId: 'personal', environment: env });
 
-        index.userToTenants['yigitcangenc@gmail.com'] = Array.from(new Set([...(index.userToTenants['yigitcangenc@gmail.com'] || []), 'personal', tenantId]));
-        index.userToTenants['gencyigitcan'] = Array.from(new Set([...(index.userToTenants['gencyigitcan'] || []), 'personal', tenantId]));
+        index.userToTenants[normalizedUsername] = Array.from(new Set([...(index.userToTenants[normalizedUsername] || []), 'personal', tenantId]));
+        if (newUser.email) {
+            index.userToTenants[newUser.email.toLowerCase()] = Array.from(new Set([...(index.userToTenants[newUser.email.toLowerCase()] || []), 'personal', tenantId]));
+        }
         await saveTenantIndex(index, env);
 
         // Create session token scoped to this workspace
@@ -150,7 +164,8 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
                 avatarColor: newUser.avatarColor,
                 role: newUser.role,
                 status: newUser.status,
-                tenantId,
+                tenantId: newUser.tenantId,
+                company: newUser.company,
                 workspaces: accessibleWorkspaces
             },
             workspaces: accessibleWorkspaces,
@@ -161,7 +176,6 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
 
     // NON-SUPERADMIN USER: Requires Super Admin Approval!
     // Send notification to Super Admin
-    const personalDb = readDb({ tenantId: 'personal', environment: env });
     personalDb.notifications = personalDb.notifications || [];
     personalDb.notifications.push({
         id: 'ntf-' + uid(),
@@ -231,30 +245,24 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
     const normalizedUsername = username.toLowerCase().trim();
     const env = req.environment || getEnvironment(req);
     const index = await getTenantIndex(env);
-    const isSuperAdminUser = normalizedUsername === 'yigitcangenc@gmail.com' || normalizedUsername === 'gencyigitcan';
 
     const userMatches = (u: User) => {
         const uName = (u.username || '').toLowerCase();
         const uEmail = (u.email || '').toLowerCase();
-        return uName === normalizedUsername ||
-               uEmail === normalizedUsername ||
-               (normalizedUsername === 'yigitcangenc@gmail.com' && uName === 'gencyigitcan') ||
-               (normalizedUsername === 'gencyigitcan' && uEmail === 'yigitcangenc@gmail.com');
+        return uName === normalizedUsername || uEmail === normalizedUsername;
     };
 
     let activeTenantId = '';
     let db: any = null;
     let user: User | undefined;
 
-    // 1. Only Superadmin / Yiğitcan Genç checks the master personal DB
-    if (isSuperAdminUser) {
-        const personalDb = readDb({ tenantId: 'personal', environment: env });
-        const candidate = personalDb.users.find(userMatches);
-        if (candidate && verifyPassword(password, candidate.passwordHash)) {
-            user = candidate;
-            activeTenantId = 'personal';
-            db = personalDb;
-        }
+    // 1. Check master personal DB (primary instance workspace)
+    const personalDb = readDb({ tenantId: 'personal', environment: env });
+    const personalCandidate = personalDb.users.find(userMatches);
+    if (personalCandidate && verifyPassword(password, personalCandidate.passwordHash)) {
+        user = personalCandidate;
+        activeTenantId = 'personal';
+        db = personalDb;
     }
 
     // 2. Check company / shared team workspace if explicitly provided
@@ -271,14 +279,10 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
         }
     }
 
-    // 3. Check user's assigned workspaces from index (isolated user DB or assigned teams)
+    // 3. Check user's assigned workspaces from index
     if (!user) {
-        const userWsIds = index.userToTenants[normalizedUsername] ||
-                         (normalizedUsername === 'yigitcangenc@gmail.com' ? index.userToTenants['gencyigitcan'] : undefined) ||
-                         (normalizedUsername === 'gencyigitcan' ? index.userToTenants['yigitcangenc@gmail.com'] : undefined) || [];
+        const userWsIds = index.userToTenants[normalizedUsername] || [];
         for (const wsId of userWsIds) {
-            // Non-superadmin users can NEVER access 'personal'
-            if (!isSuperAdminUser && wsId === 'personal') continue;
             const wsDb = readDb({ tenantId: wsId, environment: env });
             const candidate = wsDb.users.find(userMatches);
             if (candidate && verifyPassword(password, candidate.passwordHash)) {
@@ -290,7 +294,7 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
         }
     }
 
-    // 4. Fallback: check Demo DB if user belongs to Nova Demo team
+    // 4. Fallback: check Demo DB if user belongs to Demo workspace
     if (!user) {
         const demoDb = readDb({ tenantId: 'demo', environment: env });
         const candidate = demoDb.users.find(userMatches);
@@ -323,12 +327,10 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
 
     // Get all workspaces accessible by this user
     const directWsIds = index.userToTenants[normalizedUsername] || [];
-    const aliasWsIds = (normalizedUsername === 'yigitcangenc@gmail.com' ? index.userToTenants['gencyigitcan'] : 
-                       (normalizedUsername === 'gencyigitcan' ? index.userToTenants['yigitcangenc@gmail.com'] : [])) || [];
-    const allWsSet = new Set<string>([...directWsIds, ...aliasWsIds, activeTenantId, ...(user.workspaces || [])]);
+    const allWsSet = new Set<string>([...directWsIds, activeTenantId, ...(user.workspaces || [])]);
 
-    // Superadmin or Yiğitcan always has access to 'personal'
-    if (user.role === 'superadmin' || normalizedUsername === 'yigitcangenc@gmail.com' || normalizedUsername === 'gencyigitcan') {
+    // Role-based privilege: Super Admin always has full access to 'personal'
+    if (user.role === 'superadmin') {
         allWsSet.add('personal');
     }
     const userWorkspaceIds = Array.from(allWsSet);
@@ -359,7 +361,7 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
         action: 'LOGIN',
         entityType: 'auth',
         entityId: user.id,
-        details: `${user.name} (${user.username}) sisteme giriş yaptı.`,
+        details: `${user.name} (${user.username}) sisteme giriş yaptı (${activeTenantId}).`,
         workspaceId: activeTenantId,
         environment: env
     }, req);
@@ -372,14 +374,14 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
             email: user.email,
             name: user.name,
             avatarColor: user.avatarColor,
-            role: user.role || 'user',
-            status: user.status || 'approved',
+            role: user.role,
+            status: user.status,
             tenantId: activeTenantId,
+            company: user.company,
             workspaces: accessibleWorkspaces
         },
         workspaces: accessibleWorkspaces,
-        activeWorkspaceId: activeTenantId,
-        environment: env
+        activeWorkspaceId: activeTenantId
     });
 }));
 
@@ -484,15 +486,12 @@ authRouter.post('/switch-workspace', requireAuth, asyncHandler(async (req, res) 
     const index = await getTenantIndex(env);
     const username = req.user!.username.toLowerCase();
     const isSuperAdmin = req.user!.role === 'superadmin';
-    const isOwner = username === 'yigitcangenc@gmail.com' || username === 'gencyigitcan' || isSuperAdmin;
 
     const directWsIds = index.userToTenants[username] || [];
-    const aliasWsIds = (username === 'yigitcangenc@gmail.com' ? index.userToTenants['gencyigitcan'] : 
-                       (username === 'gencyigitcan' ? index.userToTenants['yigitcangenc@gmail.com'] : [])) || [];
-    const userWsSet = new Set([...directWsIds, ...aliasWsIds, ...(req.user!.workspaces || [])]);
-    if (isOwner) userWsSet.add('personal');
+    const userWsSet = new Set([...directWsIds, ...(req.user!.workspaces || [])]);
+    if (isSuperAdmin) userWsSet.add('personal');
 
-    if (!isOwner && !userWsSet.has(workspaceId)) {
+    if (!isSuperAdmin && !userWsSet.has(workspaceId)) {
         throw new AppError('Bu çalışma alanına erişim yetkiniz bulunmamaktadır', 403);
     }
 
@@ -556,13 +555,10 @@ authRouter.get('/me', requireAuth, asyncHandler(async (req, res) => {
     const index = await getTenantIndex(env);
     const username = user.username.toLowerCase();
     const isSuperAdmin = user.role === 'superadmin';
-    const isOwner = username === 'yigitcangenc@gmail.com' || username === 'gencyigitcan' || isSuperAdmin;
 
     const directWsIds = index.userToTenants[username] || [];
-    const aliasWsIds = (username === 'yigitcangenc@gmail.com' ? index.userToTenants['gencyigitcan'] : 
-                       (username === 'gencyigitcan' ? index.userToTenants['yigitcangenc@gmail.com'] : [])) || [];
-    const userWsSet = new Set([...directWsIds, ...aliasWsIds, ...(user.workspaces || []), req.tenantId || 'personal']);
-    if (isOwner) {
+    const userWsSet = new Set([...directWsIds, ...(user.workspaces || []), req.tenantId || 'personal']);
+    if (isSuperAdmin) {
         userWsSet.add('personal');
     }
 
@@ -607,7 +603,7 @@ authRouter.post('/request-demo', validate(requestDemoSchema), (req, res) => {
         throw new AppError('Bu e-posta adresiyle kayıtlı bir kullanıcı zaten mevcut', 400);
     }
 
-    // Create notification in personal DB for Super Admin (usr-superadmin / gencyigitcan)
+    // Create notification in personal DB for Super Admin
     const personalDb = readDb('personal');
     personalDb.notifications = personalDb.notifications || [];
     const hasPending = personalDb.notifications.some(n => n.type === 'demo-request' && n.email === emailLower && n.demoStatus === 'pending');

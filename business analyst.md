@@ -23,7 +23,7 @@ Tiny Kanban delivers a fast, distraction-free agile workspace that boots in unde
 
 The platform enforces four distinct authorization roles:
 
-| Capability / Feature | Public Demo | Pending User | Standard User | Team Admin | Super Admin (`yigitcangenc`) |
+| Capability / Feature | Public Demo | Pending User | Standard User | Team Admin | Instance Super Admin |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **Browse Demo Board** | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Login to Private Workspace** | ❌ | ❌ (Blocked: 403) | ✅ | ✅ | ✅ |
@@ -73,5 +73,5 @@ Every task card supports deep collaboration attributes:
 
 1. **Rule 1 (Zero Data Loss):** Under no circumstances should user cards or historical tickets be deleted or overwritten without explicit user action.
 2. **Rule 2 (Server Confirmation):** Every task creation, update, drag-and-drop column change, or deletion must receive positive server acknowledgement (HTTP 200/201). Silent fallback to local browser memory is strictly prohibited.
-3. **Rule 3 (Super Admin Supremacy):** The system owner accounts (`yigitcangenc@gmail.com` and `gencyigitcan`) must always maintain Super Admin status, bypass registration approval, and hold permanent access to the primary personal workspace.
+3. **Rule 3 (Super Admin Supremacy):** The instance owner/superadmin who sets up or purchases the software maintains Super Admin status with full management capabilities over all users, approvals, and workspaces, without hardcoded personal accounts.
 4. **Rule 4 (Auditing Integrity):** Any administrative intervention (approving a user, rejecting a user, removing an account, altering board states) must record an immutable audit log entry visible to Super Admins.

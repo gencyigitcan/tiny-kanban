@@ -36,9 +36,9 @@ async function runTenantIsolationTests() {
         const superRes = await api('/api/auth/register', {
             method: 'POST',
             body: JSON.stringify({
-                username: 'yigitcangenc@gmail.com',
+                username: 'superadmin_iso@company.com',
                 password: 'SuperPassword123!',
-                name: 'Yiğitcan Genç'
+                name: 'Super Admin'
             })
         });
         const superToken = superRes.body.token;
@@ -98,55 +98,55 @@ async function runTenantIsolationTests() {
         const alphaUsers = await api('/api/users', {
             headers: { Authorization: `Bearer ${alphaToken}` }
         });
-        const hasYigitcanInAlpha = alphaUsers.body.some((u: any) => u.name === 'Yiğitcan Genç' || u.username === 'gencyigitcan');
+        const hasSuperInAlpha = alphaUsers.body.some((u: any) => u.name === 'Super Admin' || u.username === 'superadmin_iso@company.com');
         const hasBetaInAlpha = alphaUsers.body.some((u: any) => u.name === 'Beta User');
-        if (hasYigitcanInAlpha) throw new Error('SECURITY LEAK: Yiğitcan Genç leaked to User Alpha!');
+        if (hasSuperInAlpha) throw new Error('SECURITY LEAK: Super Admin leaked to User Alpha!');
         if (hasBetaInAlpha) throw new Error('SECURITY LEAK: User Beta leaked to User Alpha!');
-        console.log('   ✓ User Alpha only sees isolated users (No Yiğitcan Genç, No User Beta)');
+        console.log('   ✓ User Alpha only sees isolated users (No Super Admin, No User Beta)');
 
-        // 6. User Alpha attempts cross-assignment to Yiğitcan Genç
+        // 6. User Alpha attempts cross-assignment to Super Admin
         const crossAssignRes = await api('/api/cards', {
             method: 'POST',
             headers: { Authorization: `Bearer ${alphaToken}` },
             body: JSON.stringify({
-                title: 'Malicious assignment to Yiğitcan Genç',
-                assignee: 'Yiğitcan Genç'
+                title: 'Malicious assignment to Super Admin',
+                assignee: 'Super Admin'
             })
         });
         if (crossAssignRes.status !== 400) {
-            throw new Error(`SECURITY VIOLATION: Cross-assignment to Yiğitcan Genç returned ${crossAssignRes.status} instead of 400 Bad Request!`);
+            throw new Error(`SECURITY VIOLATION: Cross-assignment to Super Admin returned ${crossAssignRes.status} instead of 400 Bad Request!`);
         }
-        console.log('   ✓ Cross-assignment to Yiğitcan Genç blocked with 400 Bad Request');
+        console.log('   ✓ Cross-assignment to Super Admin blocked with 400 Bad Request');
 
         // 7. User Alpha attempts cross-assignment to User Beta
         const crossAssignBeta = await api('/api/cards', {
             method: 'POST',
             headers: { Authorization: `Bearer ${alphaToken}` },
             body: JSON.stringify({
-                title: 'Malicious assignment to Beta User',
-                assignee: 'Beta User'
+                title: 'Malicious assignment to User Beta',
+                assignee: 'User Beta'
             })
         });
         if (crossAssignBeta.status !== 400) {
-            throw new Error(`SECURITY VIOLATION: Cross-assignment to Beta User returned ${crossAssignBeta.status} instead of 400 Bad Request!`);
+            throw new Error(`SECURITY VIOLATION: Cross-assignment to User Beta returned ${crossAssignBeta.status} instead of 400 Bad Request!`);
         }
         console.log('   ✓ Cross-assignment to Beta User blocked with 400 Bad Request');
 
-        // 8. User Alpha creates task assigned to Alpha User (Valid)
-        const validTask = await api('/api/cards', {
+        // 8. User Alpha attempts valid assignment to teammate in their workspace
+        const validAssignRes = await api('/api/cards', {
             method: 'POST',
             headers: { Authorization: `Bearer ${alphaToken}` },
             body: JSON.stringify({
-                title: 'Valid task for Alpha',
+                title: 'Valid teammate task',
                 assignee: 'Alpha User'
             })
         });
-        if (validTask.status !== 201) {
-            throw new Error(`Valid task creation failed with status ${validTask.status}`);
+        if (validAssignRes.status !== 201) {
+            throw new Error(`Valid teammate assignment failed with ${validAssignRes.status}!`);
         }
         console.log('   ✓ Valid assignment to teammate/self succeeded');
 
-        // 9. User Alpha attempts to switch to 'personal' workspace
+        // 9. User Alpha attempts unauthorized switch to personal workspace
         const switchRes = await api('/api/auth/switch-workspace', {
             method: 'POST',
             headers: { Authorization: `Bearer ${alphaToken}` },
@@ -159,7 +159,7 @@ async function runTenantIsolationTests() {
 
         // Cleanup superadmin user
         const personalDb = readDb({ tenantId: 'personal', environment: 'test' });
-        personalDb.users = personalDb.users.filter(u => u.username !== 'yigitcangenc@gmail.com' && u.username !== 'gencyigitcan');
+        personalDb.users = personalDb.users.filter(u => u.username !== 'superadmin_iso@company.com');
         writeDbSync(personalDb, { tenantId: 'personal', environment: 'test' });
 
         console.log('\n🎉 ALL UNIVERSAL TENANT ISOLATION TESTS PASSED WITH 100% SUCCESS!\n');

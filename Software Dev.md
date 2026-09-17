@@ -158,7 +158,7 @@ The request handler (`src/index.ts`) preloads relevant tenant records from D1 in
 ## 6. REST API Contracts & Endpoint Matrix
 
 ### 6.1 Authentication (`/api/auth`)
-- `POST /api/auth/register`: Register new user. Standard users default to `status: 'pending'`, while `yigitcangenc@gmail.com` / `gencyigitcan` automatically receive `superadmin` and `approved`.
+- `POST /api/auth/register`: Register new user. The first user to register on an uninitialized instance automatically becomes `role: 'superadmin'` with `status: 'approved'`. Subsequent registrations default to standard `user` with `status: 'pending'` awaiting admin approval.
 - `POST /api/auth/login`: Authenticate with username and password. Rejects pending users (`403`) and expired users (`401`).
 - `GET /api/auth/me`: Returns active session profile, permissions, and accessible workspaces.
 - `POST /api/auth/switch-workspace`: Issues a new token scoped to the selected tenant ID.
