@@ -119,11 +119,7 @@
                 <input type="text" id="searchInput" placeholder="Ara (veya N ile yeni)..." autocomplete="off">
             </div>
 
-            <!-- ENV BADGE -->
-            <div class="jira-env-switch">
-                <a href="/board" class="jira-env-chip active" id="envChipLive" title="Canlı Çalışma Alanı">📋 Canlı</a>
-                <a href="/demo" class="jira-env-chip" id="envChipDemo" title="Nova Demo Panosu">🎯 Demo</a>
-            </div>
+
 
             <!-- NOTIFICATIONS BELL -->
             <div class="notification-container">
@@ -151,6 +147,19 @@
                     <div class="jira-user-info-box">
                         <span class="jira-user-name" id="userProfileName">Misafir</span>
                         <span class="jira-user-role" id="userProfileRole">Üye</span>
+                    </div>
+                    <div id="demoPersonaSwitchSection" style="display: none; padding: 8px 12px; background: rgba(9, 30, 66, 0.04); border-radius: 6px; margin: 6px 8px;">
+                        <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+                            <span>🎯 DEMO ROLÜNÜ DEĞİŞTİR</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                            <button type="button" class="btn-demo-dropdown-chip" onclick="window.quickSwitchDemoPersona('admin')">👑 Ali (Yönetici)</button>
+                            <button type="button" class="btn-demo-dropdown-chip" onclick="window.quickSwitchDemoPersona('zeynep')">🎨 Zeynep (Tasarım)</button>
+                            <button type="button" class="btn-demo-dropdown-chip" onclick="window.quickSwitchDemoPersona('mehmet')">💻 Mehmet (Backend)</button>
+                            <button type="button" class="btn-demo-dropdown-chip" onclick="window.quickSwitchDemoPersona('selin')">📱 Selin (Mobil)</button>
+                            <button type="button" class="btn-demo-dropdown-chip" onclick="window.quickSwitchDemoPersona('caner')">⚙️ Caner (DevOps)</button>
+                            <button type="button" class="btn-demo-dropdown-chip" onclick="window.quickSwitchDemoPersona('burcu')">🧪 Burcu (QA)</button>
+                        </div>
                     </div>
                     <div class="jira-dropdown-divider"></div>
                     <button class="jira-dropdown-item btn-logout" id="logoutBtn" type="button">🚪 Oturumu Kapat</button>
@@ -231,6 +240,7 @@
                         <span class="bc-part" id="bcProjectName">Kişisel Pano</span>
                         <span class="bc-sep">/</span>
                         <span class="bc-current" id="bcViewName">Kanban Panosu</span>
+                        <span class="jira-demo-pill" id="demoBadgePill" style="display: none; margin-left: 8px; font-size: 11px; background: rgba(7, 71, 166, 0.1); color: #0747a6; padding: 2px 8px; border-radius: 10px; font-weight: 700;">🎯 Demo Ortamı</span>
                     </div>
 
                     <div class="jira-subnav-actions">
@@ -915,24 +925,24 @@
                 <p class="auth-subtitle">Modern Çevik İş ve Sprint Takip Platformu</p>
             </div>
 
-            <!-- Environment Mode Switcher (Canlı Sistem vs Nova Demo) -->
+            <!-- Environment Mode Switcher (Normal Giriş vs Demo Sistem Girişi) -->
             <div class="auth-mode-selector" style="display: flex; gap: 6px; margin-bottom: 18px; background: var(--bg-secondary); padding: 4px; border-radius: 10px; border: 1px solid var(--border);">
-                <button type="button" class="auth-mode-btn active" id="btnModeLive" style="flex: 1; padding: 9px 8px; border-radius: 8px; font-weight: 600; font-size: 13px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
-                    <span>🌐</span> Canlı Sistem <span style="font-size: 10px; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 1px 6px; border-radius: 4px; font-weight: 700;">PROD</span>
+                <button type="button" class="auth-mode-btn active" id="btnModeLive" style="flex: 1; padding: 10px 8px; border-radius: 8px; font-weight: 600; font-size: 13px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
+                    <span>🔐</span> Normal Giriş
                 </button>
-                <button type="button" class="auth-mode-btn" id="btnModeDemo" style="flex: 1; padding: 9px 8px; border-radius: 8px; font-weight: 600; font-size: 13px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
-                    <span>🚀</span> Nova Demo Ortamı <span style="font-size: 10px; background: rgba(99, 102, 241, 0.15); color: #6366f1; padding: 1px 6px; border-radius: 4px; font-weight: 700;">ÖNİZLEME</span>
+                <button type="button" class="auth-mode-btn" id="btnModeDemo" style="flex: 1; padding: 10px 8px; border-radius: 8px; font-weight: 600; font-size: 13px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
+                    <span>🚀</span> Demo Sistem Girişi <span style="font-size: 10px; background: rgba(99, 102, 241, 0.15); color: #6366f1; padding: 1px 6px; border-radius: 4px; font-weight: 700;">1-TIK</span>
                 </button>
             </div>
 
-            <!-- SECTION 1: LIVE SYSTEM SECTION -->
+            <!-- SECTION 1: NORMAL SYSTEM SECTION -->
             <div id="authLiveSection" class="auth-section active">
                 <div class="auth-tabs" style="margin-bottom: 16px;">
                     <button type="button" class="auth-tab active" id="tabLogin">Giriş Yap</button>
                     <button type="button" class="auth-tab" id="tabRegister">✚ Yeni Hesap Aç (Kayıt Ol)</button>
                 </div>
 
-                <!-- Live Login Form -->
+                <!-- Normal Login Form -->
                 <form id="loginForm" class="auth-form active">
                     <div class="form-group">
                         <label class="form-label" for="loginUser">Kullanıcı Adı veya E-posta</label>
@@ -948,7 +958,7 @@
                     </div>
                     <div class="auth-error" id="loginError"></div>
                     <button type="submit" class="btn btn-primary auth-submit-btn" style="height: 42px; font-size: 14px; font-weight: 600;">
-                        🌐 Canlı Sisteme Giriş Yap
+                        🔐 Giriş Yap
                     </button>
                 </form>
 
@@ -973,15 +983,15 @@
                     <div class="auth-error" id="registerError"></div>
                     <div class="register-success-box" id="regSuccessBox" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:12px; border-radius:8px; font-size:13px; margin-bottom:12px; line-height:1.5;"></div>
                     <button type="submit" class="btn btn-primary auth-submit-btn" id="btnRegisterSubmit" style="height: 42px; font-size: 14px; font-weight: 600;">
-                        ✚ Canlı Sistem Hesabı Oluştur
+                        ✚ Kayıt Ol ve Erişim Talep Et
                     </button>
                     <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">
-                        🛡️ Güvenlik gereği yeni canlı hesaplar Super Admin onayı ile aktive edilir.
+                        🛡️ Güvenlik gereği yeni hesaplar Super Admin onayı ile aktive edilir.
                     </p>
                 </form>
 
                 <div class="auth-footer-note" style="margin-top: 14px;">
-                    <span style="font-size: 11px; color: var(--text-secondary);">Demo ortamını incelemek için yukarıdaki <strong>"Nova Demo Ortamı"</strong> sekmesini seçebilirsiniz.</span>
+                    <span style="font-size: 11px; color: var(--text-secondary);">Demo sistemini şifresiz denemek için yukarıdaki <strong>"Demo Sistem Girişi"</strong> sekmesini seçebilirsiniz.</span>
                 </div>
             </div>
 

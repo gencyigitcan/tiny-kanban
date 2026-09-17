@@ -21,39 +21,38 @@ let syncIntervalId = null;
 
 // ── Boot ──────────────────────────────────────────────────
 async function boot() {
-    const isDemo = window.IS_DEMO_PAGE === true || window.location.pathname.includes('demo');
-    const token = localStorage.getItem('tiny_kanban_token') || localStorage.getItem('kanban_token');
+    const urlParams = new URLSearchParams(window.location.search);
+    const requestedMode = urlParams.get('mode') || (urlParams.get('demo') === '1' ? 'demo' : null);
+    let token = localStorage.getItem('tiny_kanban_token') || localStorage.getItem('kanban_token');
     
-    // Switch to auth screen only if NOT on demo page and no token
-    if (!isDemo && !token) {
-        showAuthScreen();
-        return;
+    // If no token exists:
+    if (!token) {
+        if (requestedMode === 'demo') {
+            try {
+                const res = await API.demoLogin('admin');
+                token = res.token;
+            } catch (e) {
+                showAuthScreen();
+                document.getElementById('btnModeDemo')?.click();
+                return;
+            }
+        } else {
+            showAuthScreen();
+            return;
+        }
     }
 
     try {
-        if (isDemo) {
-            currentUser = {
-                id: 'usr-1',
-                username: 'admin',
-                name: 'Ali Yılmaz',
-                avatarColor: '#4f46e5',
-                role: 'admin',
-                tenantId: 'demo'
-            };
+        try {
+            currentUser = await API.getMe();
             window.currentUser = currentUser;
             updateUserHeader();
-        } else if (token) {
-            try {
-                currentUser = await API.getMe();
-                window.currentUser = currentUser;
-                updateUserHeader();
-            } catch (e) {
-                console.warn('Session verify failed, clearing stale token:', e);
-                localStorage.removeItem('tiny_kanban_token');
-                localStorage.removeItem('kanban_token');
-                showAuthScreen();
-                return;
-            }
+        } catch (e) {
+            console.warn('Session verify failed, clearing stale token:', e);
+            localStorage.removeItem('tiny_kanban_token');
+            localStorage.removeItem('kanban_token');
+            showAuthScreen();
+            return;
         }
 
         // Fetch core data directly from Server DB
@@ -829,6 +828,13 @@ function updateUserHeader() {
         sidebarAuditBtn.style.display = canManage ? 'inline-flex' : 'none';
     }
 
+    const isDemo = currentUser.tenantId === 'demo';
+    const demoBadgePill = document.getElementById('demoBadgePill');
+    if (demoBadgePill) demoBadgePill.style.display = isDemo ? 'inline-block' : 'none';
+
+    const demoPersonaSection = document.getElementById('demoPersonaSwitchSection');
+    if (demoPersonaSection) demoPersonaSection.style.display = isDemo ? 'block' : 'none';
+
     renderWorkspaceSwitcher();
 }
 
@@ -1056,6 +1062,21 @@ function selectDemoUser(username) {
     }
 }
 window.selectDemoUser = selectDemoUser;
+
+window.quickSwitchDemoPersona = async function(username) {
+    try {
+        closeAllJiraDropdowns();
+        showToast('Demo rolü değiştiriliyor…', 'info');
+        const res = await API.demoLogin(username);
+        currentUser = res.user;
+        window.currentUser = currentUser;
+        updateUserHeader();
+        await boot();
+        showToast(`Rol değiştirildi: ${currentUser.name}`);
+    } catch (err) {
+        showToast(err.message || 'Rol değiştirilemedi', 'error');
+    }
+};
 
 async function initDemoPersonas() {
     try {

@@ -14,8 +14,8 @@ async function request(url, options = {}) {
         ...(options.headers || {})
     };
     
-    // In demo mode, automatically scope requests to demo tenant
-    if (IS_DEMO) {
+    // In demo mode or if session is demo, scope requests to demo tenant
+    if ((token && token.startsWith('demo:')) || IS_DEMO) {
         options.headers['X-Workspace'] = 'demo';
         options.headers['X-Tenant-Id'] = 'demo';
     }

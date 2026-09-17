@@ -562,9 +562,19 @@ authRouter.get('/me', requireAuth, asyncHandler(async (req, res) => {
         userWsSet.add('personal');
     }
 
-    const accessible = index.workspaces.filter(w =>
+    let accessible = index.workspaces.filter(w =>
         isSuperAdmin || userWsSet.has(w.id) || w.ownerId === user.id
     );
+
+    if (req.tenantId === 'demo') {
+        accessible = [{
+            id: 'demo',
+            name: 'Demo Panosu (Nova Takımı)',
+            type: 'team' as any,
+            ownerId: 'admin',
+            createdAt: Date.now()
+        }, ...accessible];
+    }
 
     res.json({
         id: user.id,

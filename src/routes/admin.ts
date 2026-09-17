@@ -127,9 +127,19 @@ adminRouter.get('/workspaces', asyncHandler(async (req, res) => {
     // Super Admin sees all workspaces; others see their authorized workspaces
     const userWorkspaceIds = index.userToTenants[username] || [req.tenantId || 'personal'];
     
-    const accessible = index.workspaces.filter(w =>
+    let accessible = index.workspaces.filter(w =>
         isSuperAdmin || userWorkspaceIds.includes(w.id) || w.ownerId === req.user!.id
     );
+
+    if (req.tenantId === 'demo') {
+        accessible = [{
+            id: 'demo',
+            name: 'Demo Panosu (Nova Takımı)',
+            type: 'team' as any,
+            ownerId: 'admin',
+            createdAt: Date.now()
+        }, ...accessible];
+    }
 
     res.json({
         workspaces: accessible,

@@ -107,7 +107,10 @@ app.get('/', (_req, res) => {
     res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
 });
 app.get('/demo', (_req, res) => {
-    res.sendFile(path.join(process.cwd(), 'public', 'demo.html'));
+    res.redirect('/board?mode=demo');
+});
+app.get('/demo.html', (_req, res) => {
+    res.redirect('/board?mode=demo');
 });
 app.get('/board', (_req, res) => {
     res.sendFile(path.join(process.cwd(), 'public', 'board.html'));
