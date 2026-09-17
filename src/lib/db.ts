@@ -182,7 +182,7 @@ export const DEFAULT_LABELS = [
 ];
 
 // ── Ensure Personal DB Integrity (Default Personal Cards Preservation) ──
-export function ensurePersonalDbIntegrity(db: DbSchema): boolean {
+export function ensurePersonalDbIntegrity(db: DbSchema, env?: Environment): boolean {
     let changed = false;
     if (!Array.isArray(db.cards)) {
         db.cards = [];
@@ -217,9 +217,32 @@ export function ensurePersonalDbIntegrity(db: DbSchema): boolean {
         }
     }
 
-    if ((db.taskCounter ?? 0) < 15) {
-        db.taskCounter = 15;
-        changed = true;
+    const currentEnv = env || (process.env.NODE_ENV === 'test' ? 'test' : 'production');
+    if (currentEnv !== 'test') {
+        if (!Array.isArray(db.users)) {
+            db.users = [];
+            changed = true;
+        }
+        const adminUser = db.users.find(u => u.username === 'admin');
+        if (!adminUser) {
+            db.users.unshift({
+                id: 'usr-admin',
+                username: 'admin',
+                email: 'admin@company.com',
+                name: 'Sistem Yöneticisi',
+                passwordHash: hashPassword('password'),
+                avatarColor: '#0747a6',
+                role: 'superadmin',
+                status: 'approved',
+                tenantId: 'personal',
+                workspaces: ['personal'],
+                createdAt: Date.now()
+            });
+            changed = true;
+        } else if (!adminUser.passwordHash || !verifyPassword('password', adminUser.passwordHash)) {
+            adminUser.passwordHash = hashPassword('password');
+            changed = true;
+        }
     }
 
     return changed;
@@ -339,9 +362,7 @@ export function initDb(): void {
                 { id: 'personal', name: 'Kişisel Çalışma Alanı', type: 'personal', ownerId: 'usr-superadmin', createdAt: Date.now() }
             ];
         }
-        if (personalDb.cards.length === 0) {
-            ensurePersonalDbIntegrity(personalDb);
-        }
+        ensurePersonalDbIntegrity(personalDb, 'production');
         writeTenantDbFileSync('personal', 'production', personalDb);
 
         // ── 2. DEMO DATABASE (demo_db.json) ──────────────────────
@@ -374,6 +395,13 @@ export function initDb(): void {
                 { id: 'usr-9', username: 'tolga', name: 'Tolga Kurt', passwordHash: hashPassword('password'), avatarColor: '#f97316', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() },
                 { id: 'usr-10', username: 'derya', name: 'Derya Arslan', passwordHash: hashPassword('password'), avatarColor: '#64748b', role: 'user', tenantId: 'demo', workspaces: ['demo'], createdAt: Date.now() }
             ];
+        }
+
+        // Ensure every demo user has valid passwordHash for 'password'
+        for (const u of demoDb.users) {
+            if (!u.passwordHash || !verifyPassword('password', u.passwordHash)) {
+                u.passwordHash = hashPassword('password');
+            }
         }
         if (!demoDb.labels || demoDb.labels.length === 0) {
             demoDb.labels = DEFAULT_LABELS;

@@ -1,3 +1,6 @@
+process.env.APP_ENV = 'test';
+process.env.NODE_ENV = 'test';
+
 import { app } from '../src/index.js';
 import { getTenantIndex, readDb, saveTenantIndex, writeDbSync } from '../src/lib/db.js';
 
@@ -28,6 +31,16 @@ async function runTenantIsolationTests() {
     server = app.listen(0);
     const port = server.address().port;
     baseUrl = `http://localhost:${port}`;
+
+    // Reset test environment personal state
+    const personalDbInit = readDb({ tenantId: 'personal', environment: 'test' });
+    personalDbInit.users = [];
+    personalDbInit.sessions = [];
+    writeDbSync(personalDbInit, { tenantId: 'personal', environment: 'test' });
+
+    const testIndex = await getTenantIndex('test');
+    delete testIndex.userToTenants['superadmin_iso@company.com'];
+    await saveTenantIndex(testIndex, 'test');
 
     try {
         const runId = Math.random().toString(36).substring(2, 7);
