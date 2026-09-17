@@ -1,14 +1,14 @@
 # Software Development Specification & Architecture Manual
-**Project:** Tiny Kanban (Enterprise Real-Time Board System)  
-**Target Audience:** AI Engineering Teams, Senior Software Engineers, Full-Stack Developers  
-**Status:** Production Grade (Transitioned from POC)  
-**Version:** 1.3.0
+**Project:** Kanban (Enterprise Real-Time Board System)  
+**Role:** Senior Full-Stack Software Engineer (Edge & Cloud Native)  
+**Version:** 1.3.0  
+**Date:** 2026-09-16  
 
 ---
 
-## 1. Executive Summary & Engineering Philosophy
+## 1. Executive Summary & Philosophy
 
-Tiny Kanban is an ultra-fast, zero-bloat, multi-tenant agile task and project management application. Unlike legacy monolithic issue trackers (e.g., Jira, ClickUp) that suffer from heavy bundle sizes, slow cold starts, and excessive network waterfalls, Tiny Kanban is engineered around three core engineering tenets:
+Kanban is an ultra-fast, zero-bloat, multi-tenant agile task and project management application. Unlike legacy monolithic issue trackers (e.g., Jira, ClickUp) that suffer from heavy bundle sizes, slow cold starts, and excessive network waterfalls, Kanban is engineered around three core engineering tenets:
 1. **Edge-Native Performance:** Zero-overhead execution running identically on Node.js and Cloudflare Pages / Workers Edge compute.
 2. **Deterministic Multi-Tenancy:** Complete tenant isolation across personal workspaces, enterprise teams, and public demo environments using scoped database keys and `AsyncLocalStorage`.
 3. **Pure REST & In-Memory Client State:** Strict elimination of client-side database emulation (`localStorage` DB hacks). All mutations are dispatched to the server REST API, persisted atomically, confirmed with HTTP 200/201, and reflected into reactive UI state.

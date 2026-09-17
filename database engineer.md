@@ -1,5 +1,5 @@
 # Database Engineering & Data Governance Manual
-**Project:** Tiny Kanban  
+**Project:** Kanban  
 **Target Audience:** Database Administrators (DBA), Data Engineers, Backend Architects  
 **Primary Database Engine:** Cloudflare D1 (Distributed SQLite at the Edge)  
 **Local Persistence:** Atomic JSON Engine (`write-file-atomic`)  
@@ -9,7 +9,7 @@
 
 ## 1. Database Topology & Storage Engine
 
-Tiny Kanban utilizes a distributed serverless SQLite storage engine provided by **Cloudflare D1**.
+Kanban utilizes a distributed serverless SQLite storage engine provided by **Cloudflare D1**.
 
 ```
                    ┌────────────────────────────────────────┐

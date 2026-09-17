@@ -1,4 +1,4 @@
-# Tiny-Kanban — Enterprise Solutions Architecture & System Design
+# Kanban — Enterprise Solutions Architecture & System Design
 **Author:** Solutions Architect & Principal Systems Engineer  
 **Scope:** v1.3.0 Enterprise Architecture & 2026-2027 Edge Cloud Platform  
 **Target Environment:** Cloudflare Pages (Edge CDN) + Cloudflare Workers (Edge Compute) + Cloudflare D1 (Global Edge SQL)
@@ -7,7 +7,7 @@
 
 ## 1. High-Level Architecture Overview
 
-Tiny-Kanban is designed with a **Serverless Edge-Native Architecture** that eliminates traditional origin server single points of failure (SPOF) while achieving sub-50ms global latency for Kanban interactions.
+Kanban is designed with a **Serverless Edge-Native Architecture** that eliminates traditional origin server single points of failure (SPOF) while achieving sub-50ms global latency for Kanban interactions.
 
 ```
                   ┌────────────────────────────────────────────────────────┐

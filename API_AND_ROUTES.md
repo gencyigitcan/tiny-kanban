@@ -1,6 +1,6 @@
-# Tiny Kanban — Erişim Yolları ve API Referans Kılavuzu
+# Kanban — Erişim Yolları ve API Referans Kılavuzu
 
-Bu belge, Tiny Kanban projesinde arayüz sayfaları, yönetim uç noktaları, kimlik doğrulama, ortam erişimi (Test vs Canlı) ve veri API'lerinin tam listesini içermektedir.
+Bu belge, Kanban projesinde arayüz sayfaları, yönetim uç noktaları, kimlik doğrulama, ortam erişimi (Test vs Canlı) ve veri API'lerinin tam listesini içermektedir.
 
 ---
 
@@ -20,7 +20,7 @@ Sistem istek geldiğinde ortamı otomatik olarak tespit eder. Test ortamında ve
 
 | Yöntem | Örnek | Açıklama |
 |---|---|---|
-| **Subdomain / Host** | `test.tiny-kanban.pages.dev`<br>`preview.tiny-kanban.pages.dev` | Domain adında `test`, `preview`, `staging` geçtiğinde otomatik **Test DB** kullanılır. |
+| **Subdomain / Host** | `test.kanban.pages.dev`<br>`preview.kanban.pages.dev` | Domain adında `test`, `preview`, `staging` geçtiğinde otomatik **Test DB** kullanılır. |
 | **URL Parametresi** | `/board.html?env=test` | Sayfa veya API çağrısına `?env=test` eklendiğinde test ortamı tetiklenir. |
 | **HTTP Başlığı (Header)** | `X-Environment: test` | API istemcileri (Postman, fetch, curl vb.) üzerinden test ortamına erişim sağlar. |
 | **Ortam Değişkeni** | `APP_ENV=test` | Cloudflare Pages / Workers veya yerel `.env` ayarlarında tanımlanabilir. |

@@ -1,7 +1,7 @@
 {
-  "name": "tiny-kanban",
+  "name": "kanban",
   "version": "1.3.0",
-  "description": "Jira-like Kanban board with TypeScript backend, Zod validation, and server-side persistence",
+  "description": "Enterprise Jira-like Kanban platform with TypeScript backend, Zod validation, and multi-tenant persistence",
   "main": "src/index.ts",
   "scripts": {
     "start": "tsx src/index.ts",

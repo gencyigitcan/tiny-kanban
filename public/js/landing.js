@@ -1,5 +1,5 @@
 /* ============================================================
-   TINY KANBAN v1.3 – APPLE-GRADE 2026 LANDING PAGE CONTROLLER
+   KANBAN v1.3 – APPLE-GRADE 2026 LANDING PAGE CONTROLLER
    Interactive Showcase Tabs & Secure Gateway Handlers
    ============================================================ */
 

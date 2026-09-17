@@ -1,5 +1,5 @@
 # Business Analysis & Product Requirements Document (PRD)
-**Project:** Tiny Kanban  
+**Project:** Kanban  
 **Target Audience:** Product Managers, Business Analysts, Stakeholders, Engineering Leads  
 **Version:** 1.3.0  
 **Status:** Approved for Production
@@ -11,8 +11,8 @@
 ### 1.1 Problem Statement
 Modern project management suites (e.g. Jira, ClickUp, Asana) have evolved into bloated, complex, and slow platforms. Teams waste significant engineering hours waiting on slow page reloads, navigating multi-level configuration menus, and dealing with subscription paywalls for basic agile features like Gantt charts, subtasks, and sprint analytics.
 
-### 1.2 The Tiny Kanban Solution
-Tiny Kanban delivers a fast, distraction-free agile workspace that boots in under 200 milliseconds. It features:
+### 1.2 The Kanban Solution
+Kanban delivers a fast, distraction-free agile workspace that boots in under 200 milliseconds. It features:
 - **Instantaneous Kanban Workflow:** Drag-and-drop task boards with zero network lag.
 - **Enterprise Team Governance:** Multi-tenant workspace isolation with a Super Admin approval gate for all new signups.
 - **Built-in Agile Analytics:** Integrated Gantt timeline, Sprint velocity charts, story points tracking, and effort variance analysis—without third-party plugins.

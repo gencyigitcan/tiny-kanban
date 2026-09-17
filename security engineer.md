@@ -1,5 +1,5 @@
 # Security Engineering & Threat Modeling Specification
-**Project:** Tiny Kanban  
+**Project:** Kanban  
 **Target Audience:** Security Engineers, Penetration Testers, Compliance Officers, DevSecOps  
 **Compliance Standards:** OWASP ASVS Level 2, SOC 2 Type II Alignment  
 **Status:** Production Grade
@@ -8,7 +8,7 @@
 
 ## 1. Security Architecture & Threat Model (STRIDE)
 
-Tiny Kanban is architected with defense-in-depth principles across the edge, application, and database layers:
+Kanban is architected with defense-in-depth principles across the edge, application, and database layers:
 
 ```
                   [ HTTPS TLS 1.3 Strict Edge Termination ]
@@ -28,7 +28,7 @@ Tiny Kanban is architected with defense-in-depth principles across the edge, app
 
 ### STRIDE Threat Matrix & Countermeasures
 
-| Threat Category | Potential Attack Vector | Architectural Mitigation in Tiny Kanban |
+| Threat Category | Potential Attack Vector | Architectural Mitigation in Kanban |
 | :--- | :--- | :--- |
 | **Spoofing** | Forged user identity or hijacked session tokens | Cryptographic tokens generated via `crypto.randomBytes(24)`, scoped to specific tenant IDs, expiring after 7 days. |
 | **Tampering** | Parameter manipulation or payload tampering | Strict Zod validation schemas (`src/lib/schemas.ts`) stripping unknown properties and rejecting invalid formats. |

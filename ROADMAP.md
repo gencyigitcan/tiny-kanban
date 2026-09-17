@@ -1,5 +1,5 @@
 # Strategic Product & Engineering Roadmap (2026 – 2027)
-**Project:** Tiny Kanban  
+**Project:** Kanban  
 **Status:** Approved Strategic Roadmap & Technical Audit  
 **Owner:** Executive Engineering & Product Leadership
 
@@ -67,7 +67,7 @@ A thorough architectural, operational, and security review was conducted across 
 ---
 
 ### Phase 3: Enterprise Integrations & Webhook Engine (Q2 2027)
-**Objective:** Connect Tiny Kanban into the broader enterprise toolchain.
+**Objective:** Connect Kanban into the broader enterprise toolchain.
 - **Milestone 3.1:** **GitHub & GitLab Sync:** Automatically move tickets to `YAPILIYOR` when a branch is created, and to `TAMAMLANDI` when a PR merges.
 - **Milestone 3.2:** **Bi-Directional Webhooks:** Outgoing webhooks on card creation, status change, and approval events for Zapier, Make, and internal microservices.
 - **Milestone 3.3:** **ChatOps Integrations:** Slack and Discord bots providing interactive task creation and sprint summary cards directly in chat channels.

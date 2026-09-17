@@ -1,5 +1,5 @@
 # DevOps & Infrastructure Engineering Manual
-**Project:** Tiny Kanban  
+**Project:** Kanban  
 **Target Audience:** DevOps Engineers, Cloud Architects, Site Reliability Engineers (SRE)  
 **Infrastructure Provider:** Cloudflare (Pages, Workers, D1 Serverless SQL, Edge CDN)  
 **Production Domain:** https://kanban.gencyigitcan.com  
@@ -9,7 +9,7 @@
 
 ## 1. Infrastructure Topology & Architecture
 
-Tiny Kanban runs on a fully serverless, distributed edge computing topology with zero virtual machine management, zero Docker overhead, and automatic global multi-region scalability:
+Kanban runs on a fully serverless, distributed edge computing topology with zero virtual machine management, zero Docker overhead, and automatic global multi-region scalability:
 
 ```
                   [ Global Anycast CDN / DNS: kanban.gencyigitcan.com ]
@@ -40,7 +40,7 @@ Tiny Kanban runs on a fully serverless, distributed edge computing topology with
 The deployment is declared via [`wrangler.toml`](file:///Users/yigitcangenc/Github/Antigravity/kanban/wrangler.toml):
 
 ```toml
-name = "tiny-kanban"
+name = "kanban"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "./public"
@@ -141,7 +141,7 @@ The application build pipeline compiles TypeScript code and bundles the worker i
 npm run build
 
 # Deploy directly via Wrangler
-npx wrangler pages deploy public --project-name=tiny-kanban
+npx wrangler pages deploy public --project-name=kanban
 ```
 
 ---
@@ -150,7 +150,7 @@ npx wrangler pages deploy public --project-name=tiny-kanban
 
 ### 6.1 Real-Time Worker Tail Logs
 ```bash
-npx wrangler pages deployment tail --project-name=tiny-kanban
+npx wrangler pages deployment tail --project-name=kanban
 ```
 
 ### 6.2 Health Check & Heartbeat Endpoint
@@ -185,8 +185,8 @@ npx wrangler d1 execute kanban-db --file=./backup_20260916.sql --remote
 If an issue occurs in a newly deployed commit, roll back instantly through Cloudflare Pages dashboard or via CLI:
 ```bash
 # List previous deployments
-npx wrangler pages deployment list --project-name=tiny-kanban
+npx wrangler pages deployment list --project-name=kanban
 
 # Rollback to specific deployment ID
-npx wrangler pages deployment rollback <DEPLOYMENT_ID> --project-name=tiny-kanban
+npx wrangler pages deployment rollback <DEPLOYMENT_ID> --project-name=kanban
 ```

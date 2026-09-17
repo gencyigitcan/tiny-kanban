@@ -1,5 +1,5 @@
 # Architectural Intent & Visionary Principles (ADRs)
-**Project:** Tiny Kanban  
+**Project:** Kanban  
 **Status:** Living Engineering Manifesto & Architecture Decision Record (ADR)  
 **Target Audience:** Chief Technology Officers, Principal Architects, AI Engineers
 
@@ -7,9 +7,9 @@
 
 ## 1. Core Intent & Engineering Philosophy
 
-Tiny Kanban was conceived to counter the systemic degradation of modern developer productivity tools. Over the last decade, enterprise task management software has grown exponentially complex, sluggish, and fragile. A tool designed to organize work should never take longer to load than the task itself takes to comprehend.
+Kanban was conceived to counter the systemic degradation of modern developer productivity tools. Over the last decade, enterprise task management software has grown exponentially complex, sluggish, and fragile. A tool designed to organize work should never take longer to load than the task itself takes to comprehend.
 
-The fundamental intent of Tiny Kanban is:
+The fundamental intent of Kanban is:
 > **"Deliver maximum cognitive clarity and instantaneous response times through radical architectural simplicity, edge-native compute, and uncompromising data integrity."**
 
 ---

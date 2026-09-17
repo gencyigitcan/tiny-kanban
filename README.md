@@ -58,7 +58,7 @@ For deep technical specifications, architecture blueprints, and operations manua
 ## Project Structure
 
 ```
-tiny-kanban/
+kanban/
 ├── src/
 │   ├── index.ts              # Entry point — Express app + middleware
 │   ├── types/index.ts        # Domain types (Card, Epic, Sprint, …)

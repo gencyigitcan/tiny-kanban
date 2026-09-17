@@ -1,5 +1,5 @@
 # Quality Assurance (QA) Engineering Manual
-**Project:** Tiny Kanban  
+**Project:** Kanban  
 **Target Audience:** QA Engineers, Test Automation Specialists, SDETs  
 **Test Frameworks:** tsx, Node.js Test Runner, esbuild, Supertest/Fetch  
 **Status:** Production Grade
@@ -8,7 +8,7 @@
 
 ## 1. Quality Assurance Strategy & Test Pyramid
 
-Tiny Kanban adheres to a pragmatic, edge-first testing pyramid:
+Kanban adheres to a pragmatic, edge-first testing pyramid:
 
 ```
                      ┌─────────────────┐
