@@ -143,6 +143,16 @@ const API = {
     async deleteSprint(id) {
         return await request(`/api/sprints/${id}`, { method: 'DELETE' });
     },
+    async completeSprint(id, payload) {
+        return await request(`/api/sprints/${id}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    },
+    async getSprintReport(id) {
+        return await request(`/api/sprints/${id}/report`);
+    },
 
     // ── Authentication & Session ────────────────────────────
     async login(username, password, company) {
@@ -345,5 +355,18 @@ const API = {
     },
     async readAllNotifications() {
         return await request('/api/notifications/read-all', { method: 'POST' });
+    },
+
+    // ── Reports & Performance ────────────────────────────────
+    async getEmployeePerformance(params = {}) {
+        const query = new URLSearchParams();
+        Object.entries(params).forEach(([k, v]) => {
+            if (v !== undefined && v !== null && v !== '') query.append(k, v);
+        });
+        const qs = query.toString();
+        return await request(`/api/reports/employee-performance${qs ? '?' + qs : ''}`);
+    },
+    async getClosedSprints() {
+        return await request('/api/reports/closed-sprints');
     }
 };

@@ -31,6 +31,7 @@ import { adminRouter } from './routes/admin.js';
 import { labelsRouter } from './routes/labels.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { columnRouter } from './routes/columns.js';
+import { reportsRouter } from './routes/reports.js';
 import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/error.js';
 
@@ -103,6 +104,7 @@ app.use('/api/cards', requireAuth, cardRouter);
 app.use('/api/columns', requireAuth, columnRouter);
 app.use('/api/epics', requireAuth, epicRouter);
 app.use('/api/sprints', requireAuth, sprintRouter);
+app.use('/api/reports', requireAuth, reportsRouter);
 
 // ── Serve HTML Pages ──────────────────────────────────────
 app.get('/', (_req, res) => {

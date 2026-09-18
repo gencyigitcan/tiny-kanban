@@ -101,7 +101,23 @@ export const createSprintSchema = z.object({
 
 export const updateSprintSchema = createSprintSchema.partial().extend({
     active: z.boolean().optional(),
+    status: z.enum(['planned', 'active', 'closed']).optional(),
 });
+
+export const completeSprintSchema = z.object({
+    incompleteAction: z.enum(['backlog', 'next_sprint']).default('backlog'),
+    targetSprintId: z.string().nullable().optional(),
+});
+export type CompleteSprintInput = z.infer<typeof completeSprintSchema>;
+
+export const performanceFilterSchema = z.object({
+    timeRange: z.string().optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+    sprintId: z.string().optional(),
+    assignee: z.string().optional(),
+});
+export type PerformanceFilterInput = z.infer<typeof performanceFilterSchema>;
 
 // ── Auth ─────────────────────────────────────────────────────
 export const registerSchema = z.object({

@@ -181,12 +181,26 @@ function renderAll() {
 function updateSprintBadge() {
     const active = sprints.find(s => s.active);
     const el = document.getElementById('sprintBadge');
+    const completeBtn = document.getElementById('completeSprintBtn');
     if (el) {
         if (active) {
             const dateStr = active.startDate && active.endDate ? ` · ${active.startDate} → ${active.endDate}` : '';
             el.textContent = `🟢 ${active.name}${dateStr}`;
         } else {
             el.textContent = 'Sprint yok';
+        }
+    }
+    if (completeBtn) {
+        if (active) {
+            completeBtn.style.display = 'inline-flex';
+            completeBtn.onclick = (e) => {
+                e.preventDefault();
+                if (typeof window.openCompleteSprintModal === 'function') {
+                    window.openCompleteSprintModal(active.id);
+                }
+            };
+        } else {
+            completeBtn.style.display = 'none';
         }
     }
 }
@@ -735,11 +749,12 @@ function renderSprintList() {
     document.getElementById('sprintList').innerHTML = sprints.map(s => `
         <div class="manager-item">
             <div class="manager-item-info">
-                <div class="manager-item-name">${escHtml(s.name)} ${s.active ? '<span class="sprint-active-badge">Aktif</span>' : ''}</div>
+                <div class="manager-item-name">${escHtml(s.name)} ${s.active ? '<span class="sprint-active-badge">Aktif</span>' : (s.status === 'closed' ? '<span class="status-done-badge" style="font-size:10px;padding:1px 6px;">Kapatıldı</span>' : '')}</div>
                 <div class="manager-item-sub">${s.startDate || '?'} → ${s.endDate || '?'} &nbsp;·&nbsp; ${cards.filter(c => c.sprintId === s.id).length} görev</div>
             </div>
             <div class="manager-item-actions">
-                ${!s.active ? `<button class="btn btn-sm btn-secondary" onclick="activateSprint('${s.id}')">Aktif Yap</button>` : ''}
+                ${s.active ? `<button class="btn btn-sm btn-success" onclick="openCompleteSprintModal('${s.id}')">🏁 Tamamla</button>` : `<button class="btn btn-sm btn-secondary" onclick="activateSprint('${s.id}')">Aktif Yap</button>`}
+                ${(s.status === 'closed' || s.report) ? `<button class="btn btn-sm btn-outline-primary" onclick="openSprintReportModal('${s.id}')">📊 Rapor</button>` : ''}
                 <button class="btn btn-sm btn-danger" onclick="deleteSprint('${s.id}')">Sil</button>
             </div>
         </div>`).join('') || '<p style="color:var(--text-muted);font-size:13px">Henüz sprint yok</p>';
@@ -794,6 +809,25 @@ async function deleteSprint(id) {
     } catch { showToast('Sprint silinemedi', 'error'); }
 }
 window.deleteSprint = deleteSprint;
+
+window.reloadAppData = async function() {
+    try {
+        [cards, sprints, epics] = await Promise.all([
+            API.getCards(),
+            API.getSprints(),
+            API.getEpics()
+        ]);
+        window.cards = cards;
+        window.sprints = sprints;
+        window.epics = epics;
+        populateSprintFilter();
+        populateEpicFilter();
+        renderSprintList();
+        renderAll();
+    } catch (e) {
+        console.error('Failed to reload app data:', e);
+    }
+};
 
 // ── Modal helpers ─────────────────────────────────────────
 function openModal(id) {

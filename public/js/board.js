@@ -1172,177 +1172,837 @@ function renderGantt(cards) {
   }, 120);
 }
 
-// ── Reports view render ──────────────────────────────────
-function renderReports(cards, epics = [], sprints = []) {
+// ── Sprint Completion & Retrospective Report Handlers ──────
+window._completingSprintId = null;
+
+function openCompleteSprintModal(sprintId) {
+  const currentSprints = window.sprints || [];
+  const currentCards = window.cards || [];
+  const sprint = currentSprints.find(s => s.id === sprintId) || currentSprints.find(s => s.active);
+  if (!sprint) {
+    showToast('Aktif sprint bulunamadı', 'error');
+    return;
+  }
+
+  window._completingSprintId = sprint.id;
+  const sCards = currentCards.filter(c => c.sprintId === sprint.id);
+  const doneCards = sCards.filter(c => isCardDone(c));
+  const incompleteCards = sCards.filter(c => !isCardDone(c));
+
+  const titleEl = document.getElementById('completeSprintModalTitle');
+  if (titleEl) titleEl.textContent = `🏁 ${sprint.name} Sprintini Tamamla`;
+
+  const descEl = document.getElementById('completeSprintDesc');
+  if (descEl) {
+    descEl.innerHTML = `<strong>${escHtml(sprint.name)}</strong> sprintini kapatmak ve retrospektif raporunu üretmek üzeresiniz.`;
+  }
+
+  const doneCountEl = document.getElementById('csDoneCount');
+  if (doneCountEl) doneCountEl.textContent = doneCards.length;
+
+  const incCountEl = document.getElementById('csIncompleteCount');
+  if (incCountEl) incCountEl.textContent = incompleteCards.length;
+
+  const incGroup = document.getElementById('csIncompleteActionsGroup');
+  const nextSelect = document.getElementById('csNextSprintSelect');
+  const radioNext = document.getElementById('csRadioNextSprint');
+
+  if (incompleteCards.length > 0) {
+    if (incGroup) incGroup.style.display = 'block';
+    if (radioNext) radioNext.checked = true;
+
+    // Populate future sprints dropdown
+    const futureSprints = currentSprints.filter(s => s.id !== sprint.id && !s.active && s.status !== 'closed');
+    if (nextSelect) {
+      nextSelect.disabled = false;
+      let opts = futureSprints.map(fs => `<option value="${fs.id}">${escHtml(fs.name)} (${fs.startDate || '?'} → ${fs.endDate || '?'})</option>`).join('');
+      opts += `<option value="create_new">✚ Yeni Sprint Oluştur ve Oraya Aktar</option>`;
+      nextSelect.innerHTML = opts;
+    }
+  } else {
+    if (incGroup) incGroup.style.display = 'none';
+  }
+
+  openModal('completeSprintModal');
+}
+window.openCompleteSprintModal = openCompleteSprintModal;
+
+function toggleCsSprintSelect() {
+  const isNext = document.getElementById('csRadioNextSprint')?.checked;
+  const nextSelect = document.getElementById('csNextSprintSelect');
+  if (nextSelect) {
+    nextSelect.disabled = !isNext;
+  }
+}
+window.toggleCsSprintSelect = toggleCsSprintSelect;
+
+async function doCompleteSprint() {
+  const sprintId = window._completingSprintId;
+  if (!sprintId) return;
+
+  const btn = document.getElementById('btnConfirmCompleteSprint');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Kapatılıyor…';
+  }
+
+  try {
+    const isBacklog = document.getElementById('csRadioBacklog')?.checked;
+    const nextSelect = document.getElementById('csNextSprintSelect');
+    let action = isBacklog ? 'backlog' : 'next_sprint';
+    let targetSprintId = undefined;
+
+    if (action === 'next_sprint' && nextSelect) {
+      if (nextSelect.value === 'create_new') {
+        const currentSprints = window.sprints || [];
+        const sprint = currentSprints.find(s => s.id === sprintId);
+        const newSprintNum = currentSprints.length + 1;
+        const newSprint = await API.addSprint({
+          name: `Sprint ${newSprintNum}`,
+          startDate: sprint?.endDate || new Date().toISOString().slice(0, 10),
+          endDate: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
+        });
+        targetSprintId = newSprint.id;
+      } else if (nextSelect.value) {
+        targetSprintId = nextSelect.value;
+      }
+    }
+
+    const payload = {
+      incompleteAction: action,
+      targetSprintId: targetSprintId || undefined
+    };
+
+    const res = await API.completeSprint(sprintId, payload);
+    closeModal('completeSprintModal');
+    showToast(`🏁 "${res.sprint?.name || 'Sprint'}" başarıyla tamamlandı!`, 'success');
+
+    if (typeof window.reloadAppData === 'function') {
+      await window.reloadAppData();
+    }
+
+    // Automatically open the Sprint Close / Retrospective Report Modal!
+    openSprintReportModal(sprintId);
+  } catch (err) {
+    console.error('Sprint complete failed:', err);
+    showToast(err.message || 'Sprint tamamlanamadı', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🏁 Tamamla ve Kapat';
+    }
+  }
+}
+window.doCompleteSprint = doCompleteSprint;
+
+async function openSprintReportModal(sprintId) {
+  const modalBody = document.getElementById('sprintReportModalBody');
+  const modalTitle = document.getElementById('sprintReportModalTitle');
+  const modalSubtitle = document.getElementById('sprintReportModalSubtitle');
+  const modalTime = document.getElementById('sprintReportFooterTime');
+
+  if (modalTitle) modalTitle.textContent = '📊 Sprint Retrospektif & Kapanış Raporu';
+  if (modalSubtitle) modalSubtitle.textContent = 'Yükleniyor…';
+  if (modalBody) modalBody.innerHTML = '<div style="text-align:center;padding:50px;color:var(--text-secondary);"><div class="spinner" style="margin:0 auto 12px auto;"></div> Rapor hesaplanıyor ve yükleniyor…</div>';
+
+  openModal('sprintReportModal');
+
+  try {
+    const report = await API.getSprintReport(sprintId);
+    if (!report) throw new Error('Rapor verisi bulunamadı');
+
+    if (modalTitle) modalTitle.textContent = `📊 ${report.sprintName} — Retrospektif & Kapanış Raporu`;
+    const closedDateStr = report.closedAt ? new Date(report.closedAt).toLocaleString('tr-TR') : 'Tamamlandı';
+    const closedByStr = report.closedBy?.name ? ` · Kapatan: ${report.closedBy.name}` : '';
+    if (modalSubtitle) {
+      modalSubtitle.textContent = `Dönem: ${report.startDate || '—'} → ${report.endDate || '—'} · Kapanış: ${closedDateStr}${closedByStr}`;
+    }
+    if (modalTime) {
+      modalTime.textContent = `Oluşturulma: ${new Date(report.generatedAt).toLocaleString('tr-TR')}`;
+    }
+
+    // Member Contribution Rows
+    const memberRows = (report.memberMetrics || []).map(m => {
+      const dev = m.spentEffort - m.estimatedEffort;
+      const devTag = dev > 0 
+        ? `<span class="dev-tag deviation-negative">+${dev} sa</span>` 
+        : (dev < 0 ? `<span class="dev-tag deviation-positive">${dev} sa</span>` : '<span class="dev-tag deviation-zero">0 sa</span>');
+      const avatarColor = getAssigneeColor(m.userName);
+
+      return `
+        <tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="user-avatar" style="background:${avatarColor};width:26px;height:26px;font-size:11px;font-weight:700;color:#fff;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;">${initials(m.userName)}</span>
+              <strong>${escHtml(m.userName)}</strong>
+            </div>
+          </td>
+          <td><strong>${m.completedCards}</strong> / ${m.assignedCards} bilet</td>
+          <td><span class="sp-badge" style="font-weight:700;background:rgba(99,102,241,0.12);color:var(--primary);">${m.completedSP} SP</span></td>
+          <td>${m.estimatedEffort} sa</td>
+          <td>${m.spentEffort} sa</td>
+          <td>${devTag}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div class="subtask-bar-track" style="width:60px;height:6px;">
+                <div class="subtask-bar-fill ${m.accuracyPct >= 90 ? 'done' : ''}" style="width:${Math.min(100, m.accuracyPct)}%"></div>
+              </div>
+              <span style="font-size:11px;font-weight:600;">%${m.accuracyPct}</span>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Üye metrik verisi bulunamadı</td></tr>';
+
+    // Completed Cards list
+    const completedCardsRows = (report.completedCards || []).map(c => `
+      <tr>
+        <td style="white-space:nowrap;"><span class="ticket-key-badge" style="background:rgba(16,185,129,0.1);color:#10b981;font-weight:700;padding:2px 6px;border-radius:4px;font-size:11px;">${escHtml(c.key || c.id)}</span></td>
+        <td><strong>${escHtml(c.title)}</strong></td>
+        <td>${escHtml(c.assignee || 'Atanmamış')}</td>
+        <td><span class="sp-badge">${c.storyPoints ?? 0} SP</span></td>
+        <td>${c.spentEffort ?? 0} sa / ${c.estimatedEffort ?? 0} sa</td>
+      </tr>
+    `).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:14px;">Tamamlanan bilet yok</td></tr>';
+
+    // Incomplete Cards list
+    const incompleteCardsRows = (report.incompleteCards || []).map(c => `
+      <tr>
+        <td style="white-space:nowrap;"><span class="ticket-key-badge" style="background:rgba(245,158,11,0.1);color:#f59e0b;font-weight:700;padding:2px 6px;border-radius:4px;font-size:11px;">${escHtml(c.key || c.id)}</span></td>
+        <td><strong>${escHtml(c.title)}</strong></td>
+        <td>${escHtml(c.assignee || 'Atanmamış')}</td>
+        <td><span class="sp-badge">${c.storyPoints ?? 0} SP</span></td>
+        <td><span class="status-pill status-todo">${escHtml(c.status || 'Yapılacak')}</span></td>
+      </tr>
+    `).join('');
+
+    const incompleteSection = report.incompleteCardsCount > 0 ? `
+      <div class="retro-section-title">
+        <span>📦 Tamamlanamayan / Aktarılan Biletler (${report.incompleteCardsCount})</span>
+      </div>
+      <div class="retro-table-wrap">
+        <table class="retro-table">
+          <thead>
+            <tr>
+              <th>Bilet</th>
+              <th>Başlık</th>
+              <th>Kişi</th>
+              <th>Story Points</th>
+              <th>Durum</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${incompleteCardsRows}
+          </tbody>
+        </table>
+      </div>
+    ` : '';
+
+    if (modalBody) {
+      modalBody.innerHTML = `
+        <div class="retro-modal-content">
+          <!-- KPI Cards Grid -->
+          <div class="retro-kpi-grid">
+            <div class="retro-kpi-card">
+              <div class="retro-kpi-label">Hız (Velocity) / SP</div>
+              <div class="retro-kpi-val text-primary">${report.completedSP} <span style="font-size:14px;color:var(--text-secondary);font-weight:500;">/ ${report.committedSP} SP</span></div>
+              <div class="retro-kpi-sub">%${report.velocityPct} Başarı Oranı</div>
+            </div>
+
+            <div class="retro-kpi-card">
+              <div class="retro-kpi-label">Tamamlanan Bilet</div>
+              <div class="retro-kpi-val text-success">${report.completedCardsCount} <span style="font-size:14px;color:var(--text-secondary);font-weight:500;">/ ${report.totalCardsCount}</span></div>
+              <div class="retro-kpi-sub">${report.incompleteCardsCount} bilet aktarıldı</div>
+            </div>
+
+            <div class="retro-kpi-card">
+              <div class="retro-kpi-label">Efor Tüketimi</div>
+              <div class="retro-kpi-val">${report.totalSpentEffort} sa</div>
+              <div class="retro-kpi-sub">Öngörü: ${report.totalEstimatedEffort} sa</div>
+            </div>
+
+            <div class="retro-kpi-card">
+              <div class="retro-kpi-label">Efor Sapması</div>
+              <div class="retro-kpi-val ${report.effortVariance > 0 ? 'text-danger' : 'text-success'}">
+                ${report.effortVariance > 0 ? '+' : ''}${report.effortVariance} sa
+              </div>
+              <div class="retro-kpi-sub">${report.effortVariance > 0 ? 'Öngörülenden fazla harcandı' : 'Hedef zaman dahilinde'}</div>
+            </div>
+          </div>
+
+          <!-- Section 1: Member Contribution ("Kimin Ne Yaptığı") -->
+          <div class="retro-section-title">
+            <span>👥 Takım Üyelerinin Katkıları ("Kimin Ne Yaptığı")</span>
+          </div>
+          <div class="retro-table-wrap">
+            <table class="retro-table">
+              <thead>
+                <tr>
+                  <th>Takım Üyesi</th>
+                  <th>Tamamlanan Görev</th>
+                  <th>Teslim Edilen SP</th>
+                  <th>Planlanan Efor</th>
+                  <th>Harcanan Efor</th>
+                  <th>Sapma</th>
+                  <th>Efor Doğruluğu</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${memberRows}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Section 2: Completed Tickets List -->
+          <div class="retro-section-title">
+            <span>✅ Tamamlanan Biletler (${report.completedCardsCount})</span>
+          </div>
+          <div class="retro-table-wrap">
+            <table class="retro-table">
+              <thead>
+                <tr>
+                  <th>Bilet</th>
+                  <th>Başlık</th>
+                  <th>Kişi</th>
+                  <th>Story Points</th>
+                  <th>Harcanan Efor</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${completedCardsRows}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Section 3: Incomplete Tickets -->
+          ${incompleteSection}
+        </div>
+      `;
+    }
+  } catch (err) {
+    console.error('Failed to open sprint report:', err);
+    if (modalBody) {
+      modalBody.innerHTML = `<div class="auth-error" style="display:block;margin:20px;">Rapor alınırken hata oluştu: ${escHtml(err.message)}</div>`;
+    }
+  }
+}
+window.openSprintReportModal = openSprintReportModal;
+
+function printSprintReportModal() {
+  window.print();
+}
+window.printSprintReportModal = printSprintReportModal;
+
+// ── Global Filter State for Reports View ──────────────────
+window._reportsFilter = window._reportsFilter || {
+  timeRange: 'all',
+  startDate: '',
+  endDate: '',
+  sprintId: '',
+  assignee: ''
+};
+
+// ── Reports View Render (Performance & Progress Center) ───
+function renderReports(cards = [], epics = [], sprints = []) {
   const container = document.getElementById('reportsView');
   if (!container) return;
 
-  // 1. Assignee effort allocation calculation
-  const assignees = [...new Set(cards.map(c => c.assignee).filter(Boolean))].sort();
-  // Include unassigned as "Atanmamış" if there are unassigned cards
-  if (cards.some(c => !c.assignee)) {
-    assignees.push('');
-  }
+  const currentFilter = window._reportsFilter;
 
-  const assigneeRows = assignees.map(name => {
-    const ac = cards.filter(c => c.assignee === name);
-    const doneCount = ac.filter(c => c.col === 'done').length;
-    const sp = ac.reduce((sum, c) => sum + (c.storyPoints || 0), 0);
-    const est = ac.reduce((sum, c) => sum + (c.estimatedEffort || 0), 0);
-    const spent = ac.reduce((sum, c) => sum + (c.spentEffort || 0), 0);
-    const dev = spent - est;
-    const devClass = dev > 0 ? 'deviation-negative' : (dev < 0 ? 'deviation-positive' : 'deviation-zero');
-    const pct = est ? Math.round((spent / est) * 100) : 0;
-    const barClass = pct > 100 ? 'over' : (pct === 100 ? 'done' : '');
-
-    return `<tr>
-      <td><strong>${escHtml(name || 'Atanmamış')}</strong></td>
-      <td>${ac.length} (${doneCount} tamamlandı)</td>
-      <td><span class="sp-badge">${sp}</span></td>
-      <td>${est} sa</td>
-      <td>${spent} sa</td>
-      <td><span class="dev-tag ${devClass}">${dev > 0 ? '+' : ''}${dev} sa</span></td>
-      <td>
-        <div style="display:flex;align-items:center;gap:6px">
-          <div class="subtask-bar-track" style="width:60px;height:6px">
-            <div class="subtask-bar-fill ${barClass}" style="width:${Math.min(100, pct)}%"></div>
-          </div>
-          <span style="font-size:11px;font-weight:600">%${pct}</span>
-        </div>
-      </td>
-    </tr>`;
-  }).join('');
-
-  // 2. Epic progress and effort calculation
-  const epicRows = epics.map(e => {
-    const ec = cards.filter(c => c.epicId === e.id);
-    const doneCount = ec.filter(c => c.col === 'done').length;
-    const pct = ec.length ? Math.round((doneCount / ec.length) * 100) : 0;
-    const est = ec.reduce((sum, c) => sum + (c.estimatedEffort || 0), 0);
-    const spent = ec.reduce((sum, c) => sum + (c.spentEffort || 0), 0);
-
-    return `<tr>
-      <td><span class="epic-pill" style="background:${e.color}20;color:${e.color}">${escHtml(e.name)}</span></td>
-      <td>
-        <div style="display:flex;align-items:center;gap:8px">
-          <div class="subtask-bar-track" style="width:80px;height:6px">
-            <div class="subtask-bar-fill ${pct === 100 ? 'done' : ''}" style="width:${pct}%"></div>
-          </div>
-          <span style="font-size:11px;font-weight:600">%${pct} (${doneCount}/${ec.length})</span>
-        </div>
-      </td>
-      <td>${est} sa</td>
-      <td>${spent} sa</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Epic yok</td></tr>';
-
-  // 3. Sprint performance and velocity
-  const sprintRows = sprints.map(s => {
-    const sc = cards.filter(c => c.sprintId === s.id);
-    const doneCards = sc.filter(c => c.col === 'done');
-    const completedSP = doneCards.reduce((sum, c) => sum + (c.storyPoints || 0), 0);
-    const totalSP = sc.reduce((sum, c) => sum + (c.storyPoints || 0), 0);
-    const est = sc.reduce((sum, c) => sum + (c.estimatedEffort || 0), 0);
-    const spent = sc.reduce((sum, c) => sum + (c.spentEffort || 0), 0);
-    
-    let statusBadge = s.active 
-      ? '<span class="sprint-active-badge">Aktif</span>' 
-      : (new Date(s.endDate) < new Date() ? '<span class="status-done-badge">Tamamlandı</span>' : '<span class="status-planned-badge">Planlandı</span>');
-
-    return `<tr>
-      <td><strong>${escHtml(s.name)}</strong></td>
-      <td>${statusBadge}</td>
-      <td>${s.startDate || '?'} / ${s.endDate || '?'}</td>
-      <td><strong>${completedSP}</strong> / ${totalSP} SP</td>
-      <td>${est} sa</td>
-      <td>${spent} sa</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sprint yok</td></tr>';
-
-  // Render HTML structure
+  // Render Skeleton Structure
   container.innerHTML = `
     <div class="reports-dashboard">
       <!-- Report Header -->
       <div class="reports-header-row no-print">
         <div>
-          <h2>📊 Efor ve Proje İlerleme Raporu</h2>
-          <p class="reports-subtitle">2026 - 2027 Yol Haritası Efor Dağılımları, Takım İlerlemesi ve Performans Analizi (Nova Takımı)</p>
+          <h2>📊 Performans, Sprint &amp; Proje Analiz Merkezi</h2>
+          <p class="reports-subtitle">Zaman bazlı çalışan çıktısı, efor sapmaları, sprint retrospektifleri ve proje hız (velocity) takibi.</p>
         </div>
         <div class="reports-actions">
-          <button class="btn btn-secondary" onclick="exportToCSV(cards, epics, sprints)">📥 CSV Dışa Aktar</button>
+          <button class="btn btn-secondary" onclick="exportToCSV(window.cards || [], window.epics || [], window.sprints || [])">📥 CSV Dışa Aktar</button>
           <button class="btn btn-primary" onclick="window.print()">🖨️ PDF / Raporu Yazdır</button>
         </div>
       </div>
 
       <!-- Printable Only Header -->
       <div class="print-only-header">
-        <h1>Kanban Proje Raporu</h1>
-        <p>Tarih: ${new Date().toLocaleDateString('tr-TR')} · Çalışma Dönemi: 2026 - 2027 Takvim Yılları (Nova Takımı - 10 Kişi)</p>
+        <h1>Kanban Proje &amp; Performans Raporu</h1>
+        <p>Tarih: ${new Date().toLocaleDateString('tr-TR')} · Çalışma Alanı: ${(window.currentUser && window.currentUser.company) || 'Kişisel / Proje'}</p>
         <hr style="margin:16px 0; border:0; border-top:1px solid #ddd">
       </div>
 
-      <!-- Section 1: User Efforts -->
-      <div class="reports-card">
-        <h3 class="reports-card-title">👥 Kullanıcı Efor ve İş Yükü Dağılımı</h3>
-        <table class="reports-table">
-          <thead>
-            <tr>
-              <th>Takım Üyesi</th>
-              <th>Görev Sayısı</th>
-              <th>Öngörülen Story Points</th>
-              <th>Planlanan Efor (Saat)</th>
-              <th>Harcanan Efor (Saat)</th>
-              <th>Sapma Değeri</th>
-              <th>Efor Tüketim Oranı</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${assigneeRows}
-          </tbody>
-        </table>
+      <!-- Time & Criteria Filter Bar -->
+      <div class="perf-filter-bar no-print">
+        <div style="min-width: 170px;">
+          <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">📅 Zaman Aralığı</label>
+          <select class="form-select" id="repFilterTimeRange" style="font-size: 13px; padding: 7px 12px; width: 100%; font-weight: 500;">
+            <option value="all" ${currentFilter.timeRange === 'all' ? 'selected' : ''}>Tüm Zamanlar</option>
+            <option value="30d" ${currentFilter.timeRange === '30d' ? 'selected' : ''}>Son 30 Gün</option>
+            <option value="90d" ${currentFilter.timeRange === '90d' ? 'selected' : ''}>Son 3 Ay (90 Gün)</option>
+            <option value="180d" ${currentFilter.timeRange === '180d' ? 'selected' : ''}>Son 6 Ay (180 Gün)</option>
+            <option value="2026" ${currentFilter.timeRange === '2026' ? 'selected' : ''}>2026 Yılı</option>
+            <option value="2027" ${currentFilter.timeRange === '2027' ? 'selected' : ''}>2027 Yılı</option>
+            <option value="custom" ${currentFilter.timeRange === 'custom' ? 'selected' : ''}>Özel Tarih Aralığı…</option>
+          </select>
+        </div>
+
+        <div id="repCustomDateWrap" style="display: ${currentFilter.timeRange === 'custom' ? 'flex' : 'none'}; gap: 8px;">
+          <div>
+            <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Başlangıç</label>
+            <input type="date" class="form-input" id="repFilterStartDate" value="${currentFilter.startDate || ''}" style="font-size: 13px; padding: 6px 10px;">
+          </div>
+          <div>
+            <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Bitiş</label>
+            <input type="date" class="form-input" id="repFilterEndDate" value="${currentFilter.endDate || ''}" style="font-size: 13px; padding: 6px 10px;">
+          </div>
+        </div>
+
+        <div style="min-width: 170px;">
+          <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">⚡ Sprint Filtresi</label>
+          <select class="form-select" id="repFilterSprint" style="font-size: 13px; padding: 7px 12px; width: 100%;">
+            <option value="">Tüm Sprintler</option>
+            ${sprints.map(s => `<option value="${s.id}" ${currentFilter.sprintId === s.id ? 'selected' : ''}>${escHtml(s.name)}</option>`).join('')}
+          </select>
+        </div>
+
+        <div style="min-width: 170px;">
+          <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">👤 Takım Üyesi</label>
+          <select class="form-select" id="repFilterAssignee" style="font-size: 13px; padding: 7px 12px; width: 100%;">
+            <option value="">Tüm Takım</option>
+            ${[...new Set(cards.map(c => c.assignee).filter(Boolean))].sort().map(name => `
+              <option value="${escHtml(name)}" ${currentFilter.assignee === name ? 'selected' : ''}>${escHtml(name)}</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div>
+          <button class="btn btn-secondary btn-sm" id="btnResetReportsFilter" style="height: 38px; padding: 0 14px;">Temizle</button>
+        </div>
+      </div>
+
+      <!-- Live Project KPI Metrics Container -->
+      <div id="reportsKpiContainer">
+        <div style="text-align:center;padding:24px;color:var(--text-secondary);"><div class="spinner" style="margin:0 auto 8px auto;"></div> Performans metrikleri yükleniyor…</div>
+      </div>
+
+      <!-- Section 1: Employee Performance & Contribution ("Kimin Ne Yaptığı") -->
+      <div class="reports-card" id="reportsEmployeeCard">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div>
+            <h3 class="reports-card-title" style="margin: 0;">👥 Zaman Bazlı Çalışan Performans Takibi ("Kimin Ne Yaptığı")</h3>
+            <p style="font-size: 12px; color: var(--text-secondary); margin: 4px 0 0 0;">Seçilen zaman penceresinde çalışanların bitirdiği biletler, teslim ettiği SP ve harcanan efor doğruluğu.</p>
+          </div>
+          <span id="repMembersCountBadge" style="font-size: 12px; color: var(--text-secondary); font-weight: 600;"></span>
+        </div>
+        <div id="reportsEmployeeTableWrap">
+          <div style="text-align:center;padding:20px;color:var(--text-secondary);">Veriler hesaplanıyor…</div>
+        </div>
+      </div>
+
+      <!-- Section 2: Closed Sprints Archive & Retrospectives -->
+      <div class="reports-card" id="reportsClosedSprintsCard">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div>
+            <h3 class="reports-card-title" style="margin: 0;">🏁 Kapatılan Sprintler Arşivi &amp; Retrospektif Kayıtları</h3>
+            <p style="font-size: 12px; color: var(--text-secondary); margin: 4px 0 0 0;">Kapatılan geçmiş sprintlerin özet performansları, teslim edilen SP ve detaylı retrospektif raporları.</p>
+          </div>
+        </div>
+        <div id="reportsClosedSprintsWrap">
+          <div style="text-align:center;padding:20px;color:var(--text-secondary);">Kapatılan sprintler yükleniyor…</div>
+        </div>
       </div>
 
       <div class="reports-row-grid">
-        <!-- Section 2: Epics Progress -->
+        <!-- Section 3: Epics Progress -->
         <div class="reports-card">
           <h3 class="reports-card-title">🏷️ Epic Durumu ve Harcanan Süreler</h3>
-          <table class="reports-table">
-            <thead>
-              <tr>
-                <th>Epic Modülü</th>
-                <th>İlerleme Durumu</th>
-                <th>Tahmini Efor</th>
-                <th>Harcanan Efor</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${epicRows}
-            </tbody>
-          </table>
+          <div id="reportsEpicTableWrap"></div>
         </div>
 
-        <!-- Section 3: Sprint Performance -->
+        <!-- Section 4: Sprint Velocity -->
         <div class="reports-card">
-          <h3 class="reports-card-title">⚡ Sprint Hızı (Velocity) ve Efor Takibi</h3>
-          <table class="reports-table">
-            <thead>
-              <tr>
-                <th>Sprint Adı</th>
-                <th>Durum</th>
-                <th>Tarih Aralığı</th>
-                <th>Tamamlanan Hız</th>
-                <th>Planlanan Efor</th>
-                <th>Harcanan Efor</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${sprintRows}
-            </tbody>
-          </table>
+          <h3 class="reports-card-title">⚡ Tüm Sprintler ve Hız (Velocity)</h3>
+          <div id="reportsSprintTableWrap"></div>
         </div>
       </div>
     </div>
   `;
+
+  // Attach Event Listeners to Filter Controls
+  const timeRangeSelect = document.getElementById('repFilterTimeRange');
+  const customDateWrap = document.getElementById('repCustomDateWrap');
+  const startDateInput = document.getElementById('repFilterStartDate');
+  const endDateInput = document.getElementById('repFilterEndDate');
+  const sprintSelect = document.getElementById('repFilterSprint');
+  const assigneeSelect = document.getElementById('repFilterAssignee');
+  const resetBtn = document.getElementById('btnResetReportsFilter');
+
+  if (timeRangeSelect) {
+    timeRangeSelect.addEventListener('change', (e) => {
+      window._reportsFilter.timeRange = e.target.value;
+      if (customDateWrap) {
+        customDateWrap.style.display = e.target.value === 'custom' ? 'flex' : 'none';
+      }
+      loadPerformanceData();
+    });
+  }
+
+  if (startDateInput) {
+    startDateInput.addEventListener('change', (e) => {
+      window._reportsFilter.startDate = e.target.value;
+      loadPerformanceData();
+    });
+  }
+
+  if (endDateInput) {
+    endDateInput.addEventListener('change', (e) => {
+      window._reportsFilter.endDate = e.target.value;
+      loadPerformanceData();
+    });
+  }
+
+  if (sprintSelect) {
+    sprintSelect.addEventListener('change', (e) => {
+      window._reportsFilter.sprintId = e.target.value;
+      loadPerformanceData();
+    });
+  }
+
+  if (assigneeSelect) {
+    assigneeSelect.addEventListener('change', (e) => {
+      window._reportsFilter.assignee = e.target.value;
+      loadPerformanceData();
+    });
+  }
+
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      window._reportsFilter = { timeRange: 'all', startDate: '', endDate: '', sprintId: '', assignee: '' };
+      renderReports(cards, epics, sprints);
+    });
+  }
+
+  // Render Epics & Sprints static parts
+  renderEpicsAndSprintsTables(cards, epics, sprints);
+
+  // Trigger Dynamic Performance Data Fetch
+  loadPerformanceData();
+}
+window.renderReports = renderReports;
+
+async function loadPerformanceData() {
+  const kpiContainer = document.getElementById('reportsKpiContainer');
+  const empTableWrap = document.getElementById('reportsEmployeeTableWrap');
+  const closedWrap = document.getElementById('reportsClosedSprintsWrap');
+  const membersBadge = document.getElementById('repMembersCountBadge');
+
+  try {
+    const [perfData, closedSprintsData] = await Promise.all([
+      API.getEmployeePerformance(window._reportsFilter),
+      API.getClosedSprints().catch(() => ({ closedSprints: [] }))
+    ]);
+
+    const pm = perfData.projectMetrics || {};
+    const members = perfData.members || [];
+    const closedList = closedSprintsData.closedSprints || [];
+
+    // Render KPI Cards
+    if (kpiContainer) {
+      kpiContainer.innerHTML = `
+        <div class="manager-kpi-grid" style="margin-bottom: 0;">
+          <div class="kpi-card">
+            <div class="kpi-label">Atanan Bilet</div>
+            <div class="kpi-value">${pm.totalAssignedCards || 0}</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Filtrelenen Görevler</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Tamamlanan Bilet</div>
+            <div class="kpi-value text-success">${pm.totalCompletedCards || 0} <span style="font-size:13px;font-weight:600;color:var(--text-secondary);">(%${pm.overallCompletionRatePct || 0})</span></div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Başarı Oranı</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Teslim Edilen SP</div>
+            <div class="kpi-value text-primary">${pm.totalDeliveredSP || 0} <span style="font-size:13px;font-weight:600;color:var(--text-secondary);">SP</span></div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Story Points</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Harcanan Efor &amp; Sapma</div>
+            <div class="kpi-value">${pm.totalSpentEffort || 0} <span style="font-size:13px;font-weight:500;color:var(--text-secondary);">/ ${pm.totalEstimatedEffort || 0} sa</span></div>
+            <div style="font-size:11px;font-weight:600;color:${pm.effortVariance > 0 ? '#ef4444' : '#10b981'};margin-top:2px;">
+              ${pm.effortVariance > 0 ? '+' : ''}${pm.effortVariance || 0} sa sapma
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Ortalama Velocity</div>
+            <div class="kpi-value text-primary">${pm.averageVelocity || 0} <span style="font-size:13px;font-weight:500;color:var(--text-secondary);">SP/Sprint</span></div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Kapatılan: ${pm.closedSprintsCount || 0} Sprint</div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (membersBadge) {
+      membersBadge.textContent = `${members.length} Takım Üyesi`;
+    }
+
+    // Render Employee Performance Table ("Kimin Ne Yaptığı")
+    if (empTableWrap) {
+      if (members.length === 0) {
+        empTableWrap.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-secondary);">Filtre kriterlerine uygun çalışan çıktısı bulunamadı.</div>';
+      } else {
+        const rows = members.map((m, idx) => {
+          const avatarColor = getAssigneeColor(m.userName);
+          const dev = m.spentEffort - m.estimatedEffort;
+          const devTag = dev > 0 
+            ? `<span class="dev-tag deviation-negative">+${dev} sa</span>` 
+            : (dev < 0 ? `<span class="dev-tag deviation-positive">${dev} sa</span>` : '<span class="dev-tag deviation-zero">0 sa</span>');
+          const rowId = `emp-details-${idx}`;
+
+          const ticketsListHtml = (m.completedTickets && m.completedTickets.length > 0)
+            ? m.completedTickets.map(t => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed var(--border);">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <span class="ticket-key-badge" style="background:rgba(16,185,129,0.12);color:#10b981;font-weight:700;padding:2px 6px;border-radius:4px;font-size:10px;">${escHtml(t.key || t.id)}</span>
+                    <span style="font-weight:600;color:var(--text-primary);">${escHtml(t.title)}</span>
+                    ${t.sprintName ? `<span style="font-size:11px;color:var(--text-secondary);background:var(--surface);padding:1px 6px;border-radius:4px;border:1px solid var(--border);">${escHtml(t.sprintName)}</span>` : ''}
+                  </div>
+                  <div style="display:flex;gap:12px;align-items:center;font-size:11px;">
+                    <span style="color:var(--text-secondary);">Efor: <strong>${t.spentEffort ?? 0} sa</strong></span>
+                    <span class="sp-badge">${t.storyPoints ?? 0} SP</span>
+                  </div>
+                </div>
+              `).join('')
+            : '<div style="color:var(--text-secondary);font-size:12px;padding:6px 0;">Bu dönemde tamamlanan bilet bulunmuyor.</div>';
+
+          return `
+            <tr>
+              <td>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <span class="user-avatar" style="background:${avatarColor};width:30px;height:30px;font-size:12px;font-weight:700;color:#fff;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;">${initials(m.userName)}</span>
+                  <div>
+                    <strong style="color:var(--text-primary);display:block;">${escHtml(m.userName)}</strong>
+                    ${m.username ? `<span style="font-size:11px;color:var(--text-secondary);">@${escHtml(m.username)}</span>` : ''}
+                  </div>
+                </div>
+              </td>
+              <td><strong>${m.completedCount}</strong> / ${m.assignedCount} bilet</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <div class="subtask-bar-track" style="width:60px;height:6px;">
+                    <div class="subtask-bar-fill ${m.completionRatePct === 100 ? 'done' : ''}" style="width:${Math.min(100, m.completionRatePct)}%"></div>
+                  </div>
+                  <span style="font-size:11px;font-weight:600;">%${m.completionRatePct}</span>
+                </div>
+              </td>
+              <td><span class="sp-badge" style="font-size:12px;padding:2px 8px;font-weight:700;background:rgba(99,102,241,0.12);color:var(--primary);">${m.totalSP} SP</span></td>
+              <td>${m.estimatedEffort} sa</td>
+              <td>${m.spentEffort} sa</td>
+              <td>${devTag}</td>
+              <td>
+                <span style="font-weight:600;color:${m.effortAccuracyPct >= 85 ? '#10b981' : '#f59e0b'};">%${m.effortAccuracyPct}</span>
+              </td>
+              <td>
+                <button type="button" class="perf-details-toggle" onclick="toggleEmpTickets('${rowId}', this)">
+                  🔍 Biletler (${m.completedCount})
+                </button>
+              </td>
+            </tr>
+            <tr id="${rowId}" style="display:none;background:var(--surface-2, rgba(0,0,0,0.02));">
+              <td colspan="9" style="padding:12px 16px;">
+                <div class="perf-tickets-drawer">
+                  <div style="font-weight:700;margin-bottom:8px;color:var(--text-primary);font-size:12px;">
+                    📋 ${escHtml(m.userName)} — Bu Dönemde Tamamladığı Biletler (${m.completedCount})
+                  </div>
+                  ${ticketsListHtml}
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        empTableWrap.innerHTML = `
+          <div style="overflow-x: auto;">
+            <table class="reports-table">
+              <thead>
+                <tr>
+                  <th>Takım Üyesi</th>
+                  <th>Görev Durumu</th>
+                  <th>Tamamlanma %</th>
+                  <th>Teslim Edilen SP</th>
+                  <th>Planlanan Efor</th>
+                  <th>Harcanan Efor</th>
+                  <th>Efor Sapması</th>
+                  <th>Doğruluk %</th>
+                  <th>Aksiyon</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    }
+
+    // Render Closed Sprints Archive
+    if (closedWrap) {
+      if (closedList.length === 0) {
+        closedWrap.innerHTML = '<div style="text-align:center;padding:28px;color:var(--text-secondary);">Henüz kapatılmış sprint kaydı bulunmamaktadır. Aktif sprint tamamlandığında burada arşivlenecektir.</div>';
+      } else {
+        const cRows = closedList.map(cs => {
+          const closedDate = cs.closedAt ? new Date(cs.closedAt).toLocaleDateString('tr-TR') : 'Tamamlandı';
+          return `
+            <tr>
+              <td>
+                <strong style="color:var(--text-primary);">${escHtml(cs.name)}</strong>
+              </td>
+              <td>
+                <span class="status-pill status-done" style="font-weight:700;">🏁 Kapatıldı</span>
+              </td>
+              <td style="color:var(--text-secondary);font-size:12px;">
+                ${cs.startDate || '—'} → ${cs.endDate || '—'}
+              </td>
+              <td>
+                <span style="font-size:12px;color:var(--text-secondary);">${closedDate}</span>
+                ${cs.closedBy?.name ? `<span style="font-size:11px;color:var(--text-secondary);display:block;">(${escHtml(cs.closedBy.name)})</span>` : ''}
+              </td>
+              <td><strong>${cs.report?.completedCardsCount ?? 0} bilet</strong></td>
+              <td><span class="sp-badge" style="font-weight:700;">${cs.report?.completedSP ?? 0} SP</span></td>
+              <td style="text-align:right;">
+                <button class="btn btn-sm btn-primary" onclick="openSprintReportModal('${cs.id}')" style="font-size:12px;padding:4px 12px;gap:4px;">
+                  📊 Retrospektif Raporunu İncele
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        closedWrap.innerHTML = `
+          <div style="overflow-x: auto;">
+            <table class="reports-table">
+              <thead>
+                <tr>
+                  <th>Sprint Adı</th>
+                  <th>Durum</th>
+                  <th>Tarih Aralığı</th>
+                  <th>Kapanış Tarihi</th>
+                  <th>Tamamlanan Görev</th>
+                  <th>Teslim Edilen Hız</th>
+                  <th style="text-align:right;">Rapor</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${cRows}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load performance data:', err);
+    if (kpiContainer) kpiContainer.innerHTML = `<div class="auth-error" style="display:block;margin:12px;">Veriler yüklenemedi: ${escHtml(err.message)}</div>`;
+  }
+}
+window.loadPerformanceData = loadPerformanceData;
+
+function toggleEmpTickets(rowId, btn) {
+  const row = document.getElementById(rowId);
+  if (!row) return;
+  const isHidden = row.style.display === 'none';
+  row.style.display = isHidden ? 'table-row' : 'none';
+  if (btn) {
+    btn.textContent = isHidden ? '▲ Gizle' : '🔍 Biletler';
+  }
+}
+window.toggleEmpTickets = toggleEmpTickets;
+
+function renderEpicsAndSprintsTables(cards, epics, sprints) {
+  const epicWrap = document.getElementById('reportsEpicTableWrap');
+  const sprintWrap = document.getElementById('reportsSprintTableWrap');
+
+  if (epicWrap) {
+    const epicRows = epics.map(e => {
+      const ec = cards.filter(c => c.epicId === e.id);
+      const doneCount = ec.filter(c => isCardDone(c)).length;
+      const pct = ec.length ? Math.round((doneCount / ec.length) * 100) : 0;
+      const est = ec.reduce((sum, c) => sum + (c.estimatedEffort || 0), 0);
+      const spent = ec.reduce((sum, c) => sum + (c.spentEffort || 0), 0);
+
+      return `<tr>
+        <td><span class="epic-pill" style="background:${e.color}20;color:${e.color}">${escHtml(e.name)}</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="subtask-bar-track" style="width:80px;height:6px">
+              <div class="subtask-bar-fill ${pct === 100 ? 'done' : ''}" style="width:${pct}%"></div>
+            </div>
+            <span style="font-size:11px;font-weight:600">%${pct} (${doneCount}/${ec.length})</span>
+          </div>
+        </td>
+        <td>${est} sa</td>
+        <td>${spent} sa</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Epic yok</td></tr>';
+
+    epicWrap.innerHTML = `
+      <table class="reports-table">
+        <thead>
+          <tr>
+            <th>Epic Modülü</th>
+            <th>İlerleme Durumu</th>
+            <th>Tahmini Efor</th>
+            <th>Harcanan Efor</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${epicRows}
+        </tbody>
+      </table>
+    `;
+  }
+
+  if (sprintWrap) {
+    const sprintRows = sprints.map(s => {
+      const sc = cards.filter(c => c.sprintId === s.id);
+      const doneCards = sc.filter(c => isCardDone(c));
+      const completedSP = doneCards.reduce((sum, c) => sum + (c.storyPoints || 0), 0);
+      const totalSP = sc.reduce((sum, c) => sum + (c.storyPoints || 0), 0);
+      const est = sc.reduce((sum, c) => sum + (c.estimatedEffort || 0), 0);
+      const spent = sc.reduce((sum, c) => sum + (c.spentEffort || 0), 0);
+      
+      let statusBadge = s.active 
+        ? '<span class="sprint-active-badge">Aktif</span>' 
+        : (s.status === 'closed' ? '<span class="status-done-badge">Kapatıldı</span>' : '<span class="status-planned-badge">Planlandı</span>');
+
+      return `<tr>
+        <td><strong>${escHtml(s.name)}</strong></td>
+        <td>${statusBadge}</td>
+        <td>${s.startDate || '?'} / ${s.endDate || '?'}</td>
+        <td><strong>${completedSP}</strong> / ${totalSP} SP</td>
+        <td>${est} sa</td>
+        <td>${spent} sa</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sprint yok</td></tr>';
+
+    sprintWrap.innerHTML = `
+      <table class="reports-table">
+        <thead>
+          <tr>
+            <th>Sprint Adı</th>
+            <th>Durum</th>
+            <th>Tarih Aralığı</th>
+            <th>Hız (SP)</th>
+            <th>Planlanan</th>
+            <th>Harcanan</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sprintRows}
+        </tbody>
+      </table>
+    `;
+  }
 }
 
 // ── CSV Exporter ──────────────────────────────────────────
@@ -1896,7 +2556,8 @@ function renderSprintsView(cards = [], sprints = []) {
               <strong>${aCards.length} Görev</strong> &nbsp;·&nbsp; ${aSP} Story Points
             </div>
           </div>
-          <div style="display:flex;gap:8px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-success btn-sm" onclick="openCompleteSprintModal('${activeSprint.id}')" style="font-weight:600;">🏁 Sprinti Tamamla</button>
             <button class="btn btn-secondary btn-sm" onclick="switchView('board')">📋 Board'a Git</button>
             <button class="btn btn-secondary btn-sm" onclick="switchView('backlog')">📦 Backlog'a Git</button>
           </div>
@@ -1920,11 +2581,13 @@ function renderSprintsView(cards = [], sprints = []) {
     const sDone = sCards.filter(c => c.col === 'done');
     const sPct = sCards.length ? Math.round((sDone.length / sCards.length) * 100) : 0;
     const sSP = sCards.reduce((acc, c) => acc + (Number(c.storyPoints) || 0), 0);
-    const isCompleted = completedSprints.includes(s);
+    const isCompleted = s.status === 'closed' || completedSprints.includes(s);
 
     let statusPill = '';
     if (s.active) {
       statusPill = '<span class="status-pill status-doing" style="font-weight:700;">🟢 Aktif</span>';
+    } else if (s.status === 'closed') {
+      statusPill = '<span class="status-pill status-done">🏁 Kapatıldı</span>';
     } else if (isCompleted) {
       statusPill = '<span class="status-pill status-done">✅ Tamamlandı</span>';
     } else {
@@ -1951,7 +2614,9 @@ function renderSprintsView(cards = [], sprints = []) {
         </td>
         <td style="text-align:right;">
           <div style="display:inline-flex;gap:6px;">
-            ${!s.active ? `<button class="btn btn-sm btn-secondary" onclick="activateSprint('${s.id}')">Aktif Yap</button>` : ''}
+            ${s.active ? `<button class="btn btn-sm btn-success" onclick="openCompleteSprintModal('${s.id}')">🏁 Tamamla</button>` : ''}
+            ${(!s.active && !isCompleted) ? `<button class="btn btn-sm btn-secondary" onclick="activateSprint('${s.id}')">Aktif Yap</button>` : ''}
+            ${(isCompleted || s.report) ? `<button class="btn btn-sm btn-outline-primary" onclick="openSprintReportModal('${s.id}')" title="Retrospektif Kapanış Raporunu İncele">📊 Rapor</button>` : ''}
             <button class="btn btn-sm btn-danger" onclick="deleteSprint('${s.id}')">Sil</button>
           </div>
         </td>

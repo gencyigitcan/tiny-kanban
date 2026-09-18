@@ -70,12 +70,90 @@ export interface Epic {
     createdAt: number;
 }
 
+export interface SprintCardSummary {
+    id: string;
+    key: string;
+    title: string;
+    col: string;
+    colName?: string;
+    assignee: string | null;
+    storyPoints: number | null;
+    estimatedEffort: number | null;
+    spentEffort: number | null;
+    isDone: boolean;
+}
+
+export interface SprintMemberMetric {
+    userId?: string;
+    username?: string;
+    name: string;
+    avatarColor?: string;
+    assignedCardsCount: number;
+    completedCardsCount: number;
+    completedSP: number;
+    estimatedEffort: number;
+    spentEffort: number;
+    effortVariance: number;
+    completedCardKeys: string[];
+}
+
+export interface SprintCloseReport {
+    sprintId: string;
+    sprintName: string;
+    startDate: string | null;
+    endDate: string | null;
+    closedAt: number;
+    closedBy?: { id: string; name: string; username: string };
+    totalCards: number;
+    completedCardsCount: number;
+    incompleteCardsCount: number;
+    incompleteAction: 'backlog' | 'next_sprint';
+    movedCardsCount: number;
+    targetSprintId?: string | null;
+    targetSprintName?: string | null;
+    committedSP: number;
+    completedSP: number;
+    velocityPct: number;
+    totalEstimatedEffort: number;
+    totalSpentEffort: number;
+    effortVariance: number;
+    memberMetrics: SprintMemberMetric[];
+    completedCards: SprintCardSummary[];
+    incompleteCards: SprintCardSummary[];
+}
+
+export interface EmployeePerformanceSummary {
+    name: string;
+    username?: string;
+    avatarColor?: string;
+    assignedCount: number;
+    completedCount: number;
+    completionRatePct: number;
+    totalSP: number;
+    estimatedEffort: number;
+    spentEffort: number;
+    effortAccuracyPct: number;
+    completedTickets: {
+        id: string;
+        key: string;
+        title: string;
+        sprintName?: string;
+        completedAt?: number;
+        spentEffort?: number;
+        storyPoints?: number;
+    }[];
+}
+
 export interface Sprint {
     id: string;
     name: string;
     startDate: string | null;
     endDate: string | null;
     active: boolean;
+    status?: 'planned' | 'active' | 'closed';
+    closedAt?: number | null;
+    closedBy?: { id: string; name: string; username: string };
+    report?: SprintCloseReport | null;
     createdAt: number;
 }
 
@@ -170,7 +248,11 @@ export type ActivityAction =
     | 'COLUMN_CREATE'
     | 'COLUMN_UPDATE'
     | 'COLUMN_DELETE'
-    | 'COLUMN_REORDER';
+    | 'COLUMN_REORDER'
+    | 'SPRINT_COMPLETE'
+    | 'SPRINT_CREATE'
+    | 'SPRINT_UPDATE'
+    | 'SPRINT_DELETE';
 
 export interface ActivityLog {
     id: string;
@@ -179,7 +261,7 @@ export interface ActivityLog {
     name: string;
     userRole: string;
     action: ActivityAction;
-    entityType: 'auth' | 'card' | 'workspace' | 'user';
+    entityType: 'auth' | 'card' | 'workspace' | 'user' | 'sprint';
     entityId?: string;
     details: string;
     workspaceId?: string;
