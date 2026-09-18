@@ -248,6 +248,28 @@ const API = {
             method: 'DELETE'
         });
     },
+    async getCustomFields() {
+        return await request('/api/custom-fields');
+    },
+    async createCustomField(data) {
+        return await request('/api/custom-fields', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    },
+    async updateCustomField(fieldId, data) {
+        return await request(`/api/custom-fields/${fieldId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    },
+    async deleteCustomField(fieldId) {
+        return await request(`/api/custom-fields/${fieldId}`, {
+            method: 'DELETE'
+        });
+    },
     async updateWorkspace(workspaceId, data) {
         return await request(`/api/admin/workspaces/${workspaceId}`, {
             method: 'PUT',

@@ -42,6 +42,7 @@ export const createCardSchema = z.object({
     sprintId: z.string().nullable().optional(),
     blockedBy: z.array(z.string()).optional().default([]),
     blocks: z.array(z.string()).optional().default([]),
+    customFields: z.record(z.string(), z.any()).optional().default({}),
 });
 
 export const updateCardSchema = z.object({
@@ -63,6 +64,23 @@ export const updateCardSchema = z.object({
     sprintId: z.string().nullable().optional(),
     blockedBy: z.array(z.string()).optional(),
     blocks: z.array(z.string()).optional(),
+    customFields: z.record(z.string(), z.any()).optional(),
+});
+
+export const createCustomFieldSchema = z.object({
+    name: z.string().min(1, 'Alan adı boş olamaz').max(50).trim(),
+    type: z.enum(['text', 'number', 'currency', 'select', 'checkbox']),
+    options: z.array(z.string().max(100)).max(50).optional(),
+    unit: z.string().max(20).optional(),
+    required: z.boolean().optional().default(false)
+});
+
+export const updateCustomFieldSchema = z.object({
+    name: z.string().min(1).max(50).trim().optional(),
+    type: z.enum(['text', 'number', 'currency', 'select', 'checkbox']).optional(),
+    options: z.array(z.string().max(100)).max(50).optional(),
+    unit: z.string().max(20).optional(),
+    required: z.boolean().optional()
 });
 
 // ── Columns ──────────────────────────────────────────────────

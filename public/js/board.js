@@ -171,6 +171,22 @@ function cardHTML(card, epics = [], readonly = false) {
     </div>
     ${card.desc ? `<p class="card-desc">${escHtml(card.desc)}</p>` : ''}
     ${labels.length ? `<div class="card-labels">${labels.map(l => `<span class="label-tag" style="background:${l.bg};color:${l.color}">${escHtml(l.name)}</span>`).join('')}</div>` : ''}
+    ${(() => {
+      if (!card.customFields || typeof card.customFields !== 'object') return '';
+      const allCfs = window.customFields || [];
+      const badges = [];
+      for (const [cfId, val] of Object.entries(card.customFields)) {
+        if (val === null || val === undefined || val === '' || val === false) continue;
+        const def = allCfs.find(f => f.id === cfId);
+        const name = def ? def.name : cfId;
+        let displayVal = val;
+        if (def?.type === 'currency') displayVal = `${def.unit || '₺'}${val}`;
+        else if (def?.type === 'checkbox') displayVal = '✓';
+        else if (def?.unit) displayVal = `${val} ${def.unit}`;
+        badges.push(`<span class="card-cf-badge" title="${escHtml(name)}: ${escHtml(String(displayVal))}">${escHtml(name)}: <strong>${escHtml(String(displayVal))}</strong></span>`);
+      }
+      return badges.length > 0 ? `<div class="card-cf-row">${badges.join('')}</div>` : '';
+    })()}
     
     ${subtasks.length ? `
     <div class="subtask-bar">
@@ -410,6 +426,105 @@ async function deleteColumnAction(colId) {
 }
 window.deleteColumnAction = deleteColumnAction;
 
+// ── Custom Fields Management (Monday & Jira) ──────────────
+async function openCustomFieldsModal() {
+  const canManage = window.currentUser?.role === 'superadmin' || window.currentUser?.role === 'admin';
+  if (!canManage) {
+    showToast('Özel alanları yönetmek için yönetici yetkisi gereklidir', 'warn');
+    return;
+  }
+  await refreshCustomFieldsList();
+  openModal('customFieldsModal');
+}
+window.openCustomFieldsModal = openCustomFieldsModal;
+
+async function refreshCustomFieldsList() {
+  try {
+    const fields = await API.getCustomFields();
+    window.customFields = Array.isArray(fields) ? fields : [];
+    renderCustomFieldsList();
+  } catch (err) {
+    console.error('Failed to load custom fields:', err);
+  }
+}
+window.refreshCustomFieldsList = refreshCustomFieldsList;
+
+function renderCustomFieldsList() {
+  const container = document.getElementById('customFieldsList');
+  if (!container) return;
+  const fields = window.customFields || [];
+  if (fields.length === 0) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px;text-align:center;">Henüz tanımlanmış özel alan bulunmuyor.</div>';
+    return;
+  }
+  const typeIcons = {
+    text: '📝 Metin',
+    number: '🔢 Sayı',
+    currency: '💰 Para',
+    select: '📋 Liste',
+    checkbox: '☑️ Onay'
+  };
+  container.innerHTML = fields.map(f => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid var(--border);gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-weight:600;font-size:13px;">${escHtml(f.name)}</span>
+        <span style="font-size:11px;color:var(--text-muted);background:var(--surface-2);padding:2px 6px;border-radius:4px;">${typeIcons[f.type] || f.type}${f.unit ? ` (${escHtml(f.unit)})` : ''}</span>
+      </div>
+      <button type="button" class="btn btn-danger btn-xs" onclick="deleteCustomField('${f.id}')" title="Alanı Sil">Sil</button>
+    </div>
+  `).join('');
+}
+window.renderCustomFieldsList = renderCustomFieldsList;
+
+function onCustomFieldTypeChange() {
+  const type = document.getElementById('newCfType')?.value;
+  const unitRow = document.getElementById('newCfUnitRow');
+  const optsRow = document.getElementById('newCfOptionsRow');
+  if (unitRow) unitRow.style.display = (type === 'currency' || type === 'number') ? 'flex' : 'none';
+  if (optsRow) optsRow.style.display = (type === 'select') ? 'flex' : 'none';
+}
+window.onCustomFieldTypeChange = onCustomFieldTypeChange;
+
+async function addCustomFieldSubmit(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const name = document.getElementById('newCfName')?.value.trim();
+  const type = document.getElementById('newCfType')?.value;
+  const unit = document.getElementById('newCfUnit')?.value.trim();
+  const rawOpts = document.getElementById('newCfOptions')?.value.trim();
+  const options = rawOpts ? rawOpts.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+  if (!name) {
+    showToast('Alan adı boş olamaz', 'warn');
+    return;
+  }
+
+  try {
+    await API.createCustomField({ name, type, unit, options });
+    showToast('Özel alan eklendi ✓');
+    document.getElementById('newCfName').value = '';
+    document.getElementById('newCfUnit').value = '';
+    document.getElementById('newCfOptions').value = '';
+    await refreshCustomFieldsList();
+    if (typeof renderAll === 'function') renderAll();
+  } catch (err) {
+    showToast('Alan eklenemedi: ' + (err.message || 'Hata'), 'error');
+  }
+}
+window.addCustomFieldSubmit = addCustomFieldSubmit;
+
+async function deleteCustomField(id) {
+  if (!confirm('Bu özel alanı silmek istediğinize emin misiniz? Biletlerdeki bu alana ait veriler temizlenecektir.')) return;
+  try {
+    await API.deleteCustomField(id);
+    showToast('Özel alan silindi');
+    await refreshCustomFieldsList();
+    if (typeof renderAll === 'function') renderAll();
+  } catch (err) {
+    showToast('Silinemedi: ' + (err.message || 'Hata'), 'error');
+  }
+}
+window.deleteCustomField = deleteCustomField;
+
 function renderBoard(cards, epics = [], readonly = false) {
   const container = document.getElementById('boardColumnsContainer');
   if (!container) return;
@@ -427,6 +542,8 @@ function renderBoard(cards, epics = [], readonly = false) {
 
   const btnAddCol = document.getElementById('btnAddNewColumn');
   if (btnAddCol) btnAddCol.style.display = canManage ? 'inline-flex' : 'none';
+  const btnManageCf = document.getElementById('btnManageCustomFields');
+  if (btnManageCf) btnManageCf.style.display = canManage ? 'inline-flex' : 'none';
 
   // Check if container structure matches current columns
   const existingColIds = Array.from(container.querySelectorAll('.column')).map(el => el.dataset.col);

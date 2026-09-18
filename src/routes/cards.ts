@@ -444,7 +444,8 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
         createdAt: Date.now(),
         activity: [],
         blockedBy: body.blockedBy ?? [],
-        blocks: body.blocks ?? []
+        blocks: body.blocks ?? [],
+        customFields: body.customFields ?? {}
     };
     db.cards.push(card);
     syncCardDependencies(db.cards);
@@ -500,7 +501,7 @@ cardRouter.put('/:id', validate(updateCardSchema), asyncHandler(async (req, res)
         'startDate', 'dueDate', 'labels', 'storyPoints',
         'estimatedEffort', 'spentEffort',
         'subtasks', 'comments', 'epicId', 'sprintId',
-        'blockedBy', 'blocks'
+        'blockedBy', 'blocks', 'customFields'
     ];
     for (const key of allowed) {
         if (req.body[key] !== undefined) {

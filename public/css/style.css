@@ -5554,3 +5554,28 @@ kbd {
 .issue-type-story { background: rgba(5, 150, 105, 0.12); color: #059669; border: 1px solid rgba(5, 150, 105, 0.3); }
 .issue-type-incident { background: rgba(185, 28, 28, 0.16); color: #b91c1c; border: 1px solid rgba(185, 28, 28, 0.35); }
 .issue-type-improvement { background: rgba(124, 58, 237, 0.12); color: #7c3aed; border: 1px solid rgba(124, 58, 237, 0.3); }
+
+/* ── Custom Fields (Monday & Jira) ── */
+.card-cf-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+}
+.card-cf-badge {
+  font-size: 10.5px;
+  background: rgba(99, 102, 241, 0.09);
+  color: var(--text-secondary);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  border-radius: 4px;
+  padding: 1px 6px;
+  line-height: 1.3;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.card-cf-badge strong {
+  color: var(--accent);
+  font-weight: 600;
+}

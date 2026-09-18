@@ -361,7 +361,10 @@
             <div class="board-toolbar-left" style="display: flex; align-items: center; gap: 8px;">
                 <span class="board-col-count-badge" id="boardColCountBadge" style="font-size: 12px; font-weight: 600; color: var(--text-muted); background: var(--bg-secondary); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);">3 Kolon</span>
             </div>
-            <div class="board-toolbar-right" id="boardToolbarActions">
+            <div class="board-toolbar-right" id="boardToolbarActions" style="display: flex; gap: 8px; align-items: center;">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnManageCustomFields" onclick="openCustomFieldsModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                    ✨ Özel Alanlar
+                </button>
                 <button type="button" class="btn btn-secondary btn-sm" id="btnAddNewColumn" onclick="openCreateColumnModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
                     ✚ Yeni Kolon Ekle
                 </button>
@@ -664,6 +667,17 @@
                         </div>
                     </div>
 
+                    <!-- Custom Fields (Özel Alanlar) -->
+                    <div class="form-group" id="cardCustomFieldsGroup" style="display:none;">
+                        <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>✨ Özel Alanlar (Custom Fields)</span>
+                            <button type="button" class="btn btn-ghost btn-xs" onclick="openCustomFieldsModal()" style="font-size:11px;color:var(--accent);padding:0 4px;">⚙️ Alanları Yönet</button>
+                        </label>
+                        <div id="cardCustomFieldsContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
+                            <!-- Populated dynamically based on workspace custom fields -->
+                        </div>
+                    </div>
+
                     <!-- Labels -->
                     <div class="form-group">
                         <label class="form-label">Etiketler</label>
@@ -833,6 +847,66 @@
                     <button type="submit" class="btn btn-primary" id="saveColumnBtn">Kaydet</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ============================================================
+     CUSTOM FIELDS MANAGER MODAL (Monday & Jira)
+     ============================================================ -->
+    <div class="modal-overlay" id="customFieldsModal" role="dialog" aria-modal="true">
+        <div class="modal" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3 class="modal-title">✨ Özel Alanlar (Custom Fields)</h3>
+                <button type="button" class="modal-close" onclick="closeModal('customFieldsModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+                    Monday.com ve Jira benzeri özel veri alanları tanımlayarak biletlerinize özel sütunlar ekleyebilirsiniz (Bütçe, Müşteri, Ortam, Durum vb.).
+                </p>
+                <div class="manager-list" id="customFieldsList" style="max-height:220px;overflow-y:auto;margin-bottom:16px;border:1px solid var(--border);border-radius:6px;padding:8px;background:var(--surface);">
+                    <!-- List of custom fields with delete/edit buttons -->
+                </div>
+                
+                <div style="border-top:1px solid var(--border);padding-top:14px;">
+                    <h4 style="font-size:13px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+                        <span>➕ Yeni Özel Alan Ekle</span>
+                    </h4>
+                    <form id="addCustomFieldForm" onsubmit="addCustomFieldSubmit(event)" style="display:flex;flex-direction:column;gap:10px;">
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label" style="font-size:11px;">Alan Adı <span style="color:var(--danger)">*</span></label>
+                                <input type="text" id="newCfName" class="form-input" placeholder="ör. Bütçe, Müşteri Adı" required maxlength="50">
+                            </div>
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label" style="font-size:11px;">Alan Tipi</label>
+                                <select id="newCfType" class="form-select" onchange="onCustomFieldTypeChange()">
+                                    <option value="text">📝 Metin (Text)</option>
+                                    <option value="number">🔢 Sayı (Number)</option>
+                                    <option value="currency">💰 Para Birimi (Currency)</option>
+                                    <option value="select">📋 Çoktan Seçmeli (Dropdown)</option>
+                                    <option value="checkbox">☑️ Onay Kutusu (Checkbox)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row" id="newCfUnitRow" style="display:none;">
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label" style="font-size:11px;">Birim Sembolü (ör. ₺, $, €, saat)</label>
+                                <input type="text" id="newCfUnit" class="form-input" placeholder="₺" maxlength="10">
+                            </div>
+                        </div>
+                        <div class="form-row" id="newCfOptionsRow" style="display:none;">
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label" style="font-size:11px;">Seçenekler (Virgülle ayırın)</label>
+                                <input type="text" id="newCfOptions" class="form-input" placeholder="ör. Test, Staging, Canlı">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-start;">+ Alanı Kaydet</button>
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('customFieldsModal')">Kapat</button>
+            </div>
         </div>
     </div>
 

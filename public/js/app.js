@@ -57,14 +57,16 @@ async function boot() {
 
         // Fetch core data directly from Server DB
         let columns = [];
-        [cards, epics, sprints, users, labels, notifications, columns] = await Promise.all([
+        let customFields = [];
+        [cards, epics, sprints, users, labels, notifications, columns, customFields] = await Promise.all([
             API.getCards(),
             API.getEpics(),
             API.getSprints(),
             API.getUsers(),
             API.getLabels(),
             API.getNotifications(),
-            API.getColumns().catch(() => [])
+            API.getColumns().catch(() => []),
+            API.getCustomFields().catch(() => [])
         ]);
         window.cards = cards;
         window.epics = epics;
@@ -74,6 +76,7 @@ async function boot() {
         window.LABELS = labels;
         window.LABEL_MAP = Object.fromEntries(labels.map(l => [l.id, l]));
         window.boardColumns = Array.isArray(columns) && columns.length > 0 ? columns : (window.DEFAULT_COLUMNS || []);
+        window.customFields = Array.isArray(customFields) ? customFields : [];
         
         // Setup dropdown elements with registered users, epics, and sprints list
         populateAssigneeSelects();
@@ -274,6 +277,57 @@ function openCardDetail(id, defaultCol) {
     document.getElementById('cardSpentEffort').value = card?.spentEffort ?? '';
     document.getElementById('cardStart').value = card?.startDate || '';
     document.getElementById('cardDue').value = card?.dueDate || '';
+
+    // Render Custom Fields in Modal
+    const cfGroup = document.getElementById('cardCustomFieldsGroup');
+    const cfContainer = document.getElementById('cardCustomFieldsContainer');
+    const cfs = window.customFields || [];
+    if (cfGroup && cfContainer) {
+        if (cfs.length === 0) {
+            cfGroup.style.display = 'none';
+            cfContainer.innerHTML = '';
+        } else {
+            cfGroup.style.display = 'block';
+            const cardCfs = card?.customFields || {};
+            cfContainer.innerHTML = cfs.map(cf => {
+                const val = cardCfs[cf.id] ?? '';
+                let inputHtml = '';
+                if (cf.type === 'text') {
+                    inputHtml = `<input type="text" class="form-input cf-input" data-cf-id="${cf.id}" data-cf-type="text" value="${escHtml(String(val))}" placeholder="${escHtml(cf.name)}">`;
+                } else if (cf.type === 'number') {
+                    inputHtml = `<input type="number" class="form-input cf-input" data-cf-id="${cf.id}" data-cf-type="number" value="${val !== '' ? Number(val) : ''}" placeholder="${cf.unit ? cf.unit : '0'}">`;
+                } else if (cf.type === 'currency') {
+                    inputHtml = `
+                        <div style="display:flex;align-items:center;position:relative;">
+                            <span style="position:absolute;left:8px;font-weight:700;color:var(--accent);font-size:13px;">${escHtml(cf.unit || '₺')}</span>
+                            <input type="number" class="form-input cf-input" data-cf-id="${cf.id}" data-cf-type="currency" value="${val !== '' ? Number(val) : ''}" style="padding-left:26px;" placeholder="0.00">
+                        </div>`;
+                } else if (cf.type === 'select') {
+                    const opts = cf.options || [];
+                    inputHtml = `
+                        <select class="form-select cf-input" data-cf-id="${cf.id}" data-cf-type="select">
+                            <option value="">— Seçiniz —</option>
+                            ${opts.map(o => `<option value="${escHtml(o)}" ${val === o ? 'selected' : ''}>${escHtml(o)}</option>`).join('')}
+                        </select>`;
+                } else if (cf.type === 'checkbox') {
+                    inputHtml = `
+                        <div style="display:flex;align-items:center;gap:8px;padding-top:6px;">
+                            <input type="checkbox" class="cf-input" data-cf-id="${cf.id}" data-cf-type="checkbox" ${val ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;">
+                            <span style="font-size:12px;color:var(--text);">${val ? 'Evet / Aktif' : 'Hayır'}</span>
+                        </div>`;
+                }
+                return `
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label" style="font-size:11px;font-weight:600;margin-bottom:4px;display:flex;justify-content:space-between;">
+                            <span>${escHtml(cf.name)}</span>
+                            <span style="font-size:10px;color:var(--text-muted);font-weight:normal;">${cf.type}</span>
+                        </label>
+                        ${inputHtml}
+                    </div>
+                `;
+            }).join('');
+        }
+    }
 
     // Epics dropdown
     const epicSel = document.getElementById('cardEpic');
@@ -590,6 +644,20 @@ safeAddListener('cardSaveBtn', 'click', async () => {
     const selectedLabels = [...document.querySelectorAll('#labelsGrid .label-chip.selected')].map(el => el.dataset.lid);
     const blockedBy = Array.from(document.querySelectorAll('#cardBlockedByContainer input[name="cardBlockedBy"]:checked')).map(cb => cb.value);
     
+    const customFieldsPayload = {};
+    document.querySelectorAll('.cf-input').forEach(el => {
+        const cfId = el.dataset.cfId;
+        const type = el.dataset.cfType;
+        if (!cfId) return;
+        if (type === 'checkbox') {
+            customFieldsPayload[cfId] = el.checked;
+        } else if (type === 'number' || type === 'currency') {
+            customFieldsPayload[cfId] = el.value !== '' ? Number(el.value) : null;
+        } else {
+            customFieldsPayload[cfId] = el.value || '';
+        }
+    });
+
     const payload = {
         title,
         desc: document.getElementById('cardDesc').value,
@@ -608,6 +676,7 @@ safeAddListener('cardSaveBtn', 'click', async () => {
         blockedBy,
         subtasks: _editSubtasks,
         comments: _editComments,
+        customFields: customFieldsPayload
     };
 
     try {

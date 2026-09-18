@@ -29,6 +29,18 @@ export interface BoardColumn {
     isDone?: boolean;
 }
 
+export type CustomFieldType = 'text' | 'number' | 'currency' | 'select' | 'checkbox';
+
+export interface CustomFieldDefinition {
+    id: string;
+    name: string;
+    type: CustomFieldType;
+    options?: string[];
+    unit?: string;
+    required?: boolean;
+    createdAt: number;
+}
+
 export interface Card {
     id: string;
     key: string;
@@ -53,6 +65,7 @@ export interface Card {
     blockedBy?: string[];
     blocks?: string[];
     dueNotificationSentAt?: number;
+    customFields?: Record<string, any>;
 }
 
 export interface CardActivity {
@@ -283,6 +296,7 @@ export interface DbSchema {
     taskCounter: number;
     workspaces?: Workspace[];
     logs?: ActivityLog[];
+    customFields?: CustomFieldDefinition[];
 }
 
 export interface TenantMeta {
