@@ -18,6 +18,7 @@ export interface Comment {
 
 export type Priority = 'high' | 'medium' | 'low';
 export type Column = 'todo' | 'doing' | 'done' | string;
+export type IssueType = 'task' | 'bug' | 'story' | 'incident' | 'improvement';
 
 export interface BoardColumn {
     id: string;
@@ -33,6 +34,7 @@ export interface Card {
     key: string;
     title: string;
     desc: string;
+    issueType?: IssueType;
     assignee: string;
     priority: Priority;
     col: Column;

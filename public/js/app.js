@@ -257,6 +257,9 @@ function openCardDetail(id, defaultCol) {
     document.getElementById('cardDesc').value = card?.desc || '';
     document.getElementById('cardAssignee').value = card?.assignee || '';
     document.getElementById('cardPriority').value = card?.priority || 'medium';
+    if (document.getElementById('cardIssueType')) {
+        document.getElementById('cardIssueType').value = card?.issueType || 'task';
+    }
 
     // Populate dynamic columns dropdown
     const colSel = document.getElementById('cardColumn');
@@ -590,6 +593,7 @@ safeAddListener('cardSaveBtn', 'click', async () => {
     const payload = {
         title,
         desc: document.getElementById('cardDesc').value,
+        issueType: document.getElementById('cardIssueType')?.value || 'task',
         assignee: document.getElementById('cardAssignee').value,
         priority: document.getElementById('cardPriority').value,
         col: document.getElementById('cardColumn').value,
@@ -677,6 +681,7 @@ safeAddListener('filterSprint', 'change', () => renderAll());
 safeAddListener('filterEpic', 'change', () => renderAll());
 safeAddListener('filterAssignee', 'change', () => renderAll());
 safeAddListener('filterPriority', 'change', () => renderAll());
+safeAddListener('filterIssueType', 'change', () => renderAll());
 
 // ── Header buttons ────────────────────────────────────────
 safeAddListener('addTaskBtn', 'click', () => openCardDetail(null));

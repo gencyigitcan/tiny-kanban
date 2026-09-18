@@ -161,16 +161,17 @@ async function runTests() {
             body: JSON.stringify({
                 title: 'Kullanıcı Kayıt ve Onay Test Kartı',
                 desc: 'Otomasyon testi ile oluşturuldu',
+                issueType: 'bug',
                 assignee: 'Selin Yılmaz',
                 priority: 'high',
                 col: 'todo'
             })
         });
-        if (createCard.status !== 201) {
+        if (createCard.status !== 201 || createCard.body.issueType !== 'bug') {
             throw new Error(`Card creation failed: ${JSON.stringify(createCard.body)}`);
         }
         const cardId = createCard.body.id;
-        console.log(`   ✓ Card created: ${createCard.body.key} - ${createCard.body.title}`);
+        console.log(`   ✓ Card created: ${createCard.body.key} - ${createCard.body.title} [issueType: ${createCard.body.issueType}]`);
 
         // Move Card
         const moveCard = await api(`/api/cards/${cardId}`, {

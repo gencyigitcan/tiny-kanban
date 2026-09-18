@@ -79,6 +79,18 @@ function dueBadge(dueDate) {
   return `<span class="due-badge ${cls}">${icon} ${escHtml(label)}</span>`;
 }
 
+function getIssueTypeInfo(type) {
+  const map = {
+    task: { id: 'task', name: 'Görev', icon: '📝', color: '#0284c7', bg: 'rgba(2,132,199,0.12)' },
+    bug: { id: 'bug', name: 'Hata (Bug)', icon: '🐛', color: '#dc2626', bg: 'rgba(220,38,38,0.12)' },
+    story: { id: 'story', name: 'Hikaye (Story)', icon: '📖', color: '#059669', bg: 'rgba(5,150,105,0.12)' },
+    incident: { id: 'incident', name: 'Acil (Incident)', icon: '🚨', color: '#b91c1c', bg: 'rgba(185,28,28,0.18)' },
+    improvement: { id: 'improvement', name: 'İyileştirme', icon: '💡', color: '#7c3aed', bg: 'rgba(124,58,237,0.12)' }
+  };
+  return map[type] || map.task;
+}
+window.getIssueTypeInfo = getIssueTypeInfo;
+
 // ── Card HTML ────────────────────────────────────────────
 function cardHTML(card, epics = [], readonly = false) {
   const epic = epics.find(e => e.id === card.epicId);
@@ -87,20 +99,10 @@ function cardHTML(card, epics = [], readonly = false) {
   const subtaskPct = subtasks.length ? Math.round((doneSubtasks / subtasks.length) * 100) : 0;
   const labels = (card.labels || []).map(id => window.LABEL_MAP[id]).filter(Boolean);
 
-  // Issue Type Icon & Title (Jira standard: 📕 Bug, 📘 Story, 📗 Task)
-  let issueTypeIcon = '📗';
-  let issueTypeTitle = 'Görev (Task)';
-  const labelNames = (card.labels || []).map(id => (window.LABEL_MAP[id]?.name || id).toLowerCase());
-  if (labelNames.some(l => l.includes('bug') || l.includes('hata'))) {
-    issueTypeIcon = '📕';
-    issueTypeTitle = 'Hata (Bug)';
-  } else if (labelNames.some(l => l.includes('feature') || l.includes('özellik') || l.includes('hikaye'))) {
-    issueTypeIcon = '📘';
-    issueTypeTitle = 'Hikaye (Story)';
-  } else if (labelNames.some(l => l.includes('design') || l.includes('tasarım'))) {
-    issueTypeIcon = '🎨';
-    issueTypeTitle = 'Tasarım';
-  }
+  // Jira Issue Type Info
+  const itInfo = getIssueTypeInfo(card.issueType || 'task');
+  const issueTypeIcon = itInfo.icon;
+  const issueTypeTitle = itInfo.name;
 
   // Priority icon & label
   const priIcons = {
@@ -252,6 +254,10 @@ function cardMatchesGlobalFilters(c, options = { checkSprint: true }) {
 
   // 4. Priority check
   if (fp && c.priority !== fp) return false;
+
+  // 4b. Issue Type check
+  const fit = (document.getElementById('filterIssueType')?.value || '').trim();
+  if (fit && (c.issueType || 'task') !== fit) return false;
 
   // 5. Search query
   if (q) {
@@ -478,12 +484,13 @@ function renderBoard(cards, epics = [], readonly = false) {
   const fa = (document.getElementById('filterAssignee')?.value || '').toLowerCase().trim();
   const fe = (document.getElementById('filterEpic')?.value || '').trim();
   const fp = (document.getElementById('filterPriority')?.value || '').trim();
+  const fit = (document.getElementById('filterIssueType')?.value || '').trim();
   const q = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
   const fs = document.getElementById('filterSprint')?.value || 'active';
   const allSprints = window.sprints || [];
   const activeSprint = allSprints.find(s => s.active);
 
-  const hasFilter = !!(fa || fe || fp || q);
+  const hasFilter = !!(fa || fe || fp || fit || q);
 
   cols.forEach(col => {
     const body = document.getElementById('col-' + col.id);

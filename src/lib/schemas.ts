@@ -4,6 +4,7 @@
 import { z } from 'zod';
 
 const priority = z.enum(['high', 'medium', 'low']);
+const issueType = z.enum(['task', 'bug', 'story', 'incident', 'improvement']);
 const column = z.string().min(1).max(50);
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}(T.*)?$/).nullable().optional();
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/).optional();
@@ -26,6 +27,7 @@ const commentSchema = z.object({
 export const createCardSchema = z.object({
     title: z.string().min(1, 'Başlık boş olamaz').max(200).trim(),
     desc: z.string().max(2000).optional().default(''),
+    issueType: issueType.optional().default('task'),
     assignee: z.string().max(100).optional().default(''),
     priority: priority.optional().default('medium'),
     col: column.optional().default('todo'),
@@ -45,6 +47,7 @@ export const createCardSchema = z.object({
 export const updateCardSchema = z.object({
     title: z.string().min(1, 'Başlık boş olamaz').max(200).trim().optional(),
     desc: z.string().max(2000).optional(),
+    issueType: issueType.optional(),
     assignee: z.string().max(100).optional(),
     priority: priority.optional(),
     col: column.optional(),

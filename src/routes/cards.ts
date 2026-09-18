@@ -427,6 +427,7 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
         key,
         title: body.title,
         desc: body.desc ?? '',
+        issueType: body.issueType ?? 'task',
         assignee: body.assignee,
         priority: body.priority ?? 'medium',
         col: body.col ?? 'todo',
@@ -458,7 +459,7 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
         action: 'CARD_CREATE',
         entityType: 'card',
         entityId: card.id,
-        details: `'${card.title}' (${card.key}) kartı oluşturuldu. Kolon: ${card.col}, Öncelik: ${card.priority}`,
+        details: `'${card.title}' (${card.key}) yeni kartı oluşturuldu.`,
         workspaceId: req.tenantId || 'personal',
         environment: req.environment || getEnvironment(req)
     }, req);
@@ -495,7 +496,7 @@ cardRouter.put('/:id', validate(updateCardSchema), asyncHandler(async (req, res)
     const title = req.body.title || target.title;
 
     const allowed: (keyof Card)[] = [
-        'title', 'desc', 'assignee', 'priority', 'col',
+        'title', 'desc', 'issueType', 'assignee', 'priority', 'col',
         'startDate', 'dueDate', 'labels', 'storyPoints',
         'estimatedEffort', 'spentEffort',
         'subtasks', 'comments', 'epicId', 'sprintId',
