@@ -1650,7 +1650,160 @@ async function doCompleteSprint() {
 }
 window.doCompleteSprint = doCompleteSprint;
 
-async function openSprintReportModal(sprintId) {
+function switchSprintReportTab(tab) {
+  const tabs = ['summary', 'burndown', 'burnup'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`btnTabSprint${t.charAt(0).toUpperCase() + t.slice(1)}`);
+    const sec = document.getElementById(`sprintReportSection_${t}`);
+    if (btn) {
+      if (t === tab) {
+        btn.classList.add('active', 'btn-primary');
+        btn.classList.remove('btn-secondary');
+      } else {
+        btn.classList.remove('active', 'btn-primary');
+        btn.classList.add('btn-secondary');
+      }
+    }
+    if (sec) sec.style.display = (t === tab) ? 'block' : 'none';
+  });
+}
+window.switchSprintReportTab = switchSprintReportTab;
+
+function renderBurndownSvg(data, isBurnup = false) {
+  if (!data || !data.days || data.days.length === 0) {
+    return '<div style="padding:40px;text-align:center;color:var(--text-muted);">Grafik oluşturmak için yeterli sprint verisi bulunmuyor.</div>';
+  }
+
+  const w = 780;
+  const h = 320;
+  const padLeft = 55;
+  const padRight = 35;
+  const padTop = 30;
+  const padBottom = 45;
+
+  const chartW = w - padLeft - padRight;
+  const chartH = h - padTop - padBottom;
+
+  const maxVal = Math.max(10, Math.ceil((data.summary?.committedSP || data.sprint?.totalSP || 10) * 1.15));
+  const days = data.days;
+  const dayCount = days.length;
+
+  const getX = (idx) => padLeft + (idx / Math.max(1, dayCount - 1)) * chartW;
+  const getY = (val) => padTop + chartH - (Math.max(0, val) / maxVal) * chartH;
+
+  // Horizontal Grid Lines & Y-Labels
+  const yTicks = 5;
+  let gridLines = '';
+  for (let t = 0; t <= yTicks; t++) {
+    const val = Math.round((maxVal / yTicks) * t);
+    const y = getY(val);
+    gridLines += `
+      <line x1="${padLeft}" y1="${y}" x2="${w - padRight}" y2="${y}" stroke="var(--border)" stroke-dasharray="2 2" opacity="0.6"/>
+      <text x="${padLeft - 8}" y="${y + 4}" fill="var(--text-muted)" font-size="11" text-anchor="end">${val} SP</text>
+    `;
+  }
+
+  // Vertical Grid Lines & X-Labels
+  let xLines = '';
+  const xStep = Math.max(1, Math.floor(dayCount / 8));
+  days.forEach((d, idx) => {
+    if (idx % xStep === 0 || idx === dayCount - 1) {
+      const x = getX(idx);
+      const shortDate = d.date ? d.date.slice(5) : `G${idx}`;
+      xLines += `
+        <line x1="${x}" y1="${padTop}" x2="${x}" y2="${padTop + chartH}" stroke="var(--border)" stroke-dasharray="2 2" opacity="0.4"/>
+        <text x="${x}" y="${padTop + chartH + 18}" fill="var(--text-muted)" font-size="10.5" text-anchor="middle">${shortDate}</text>
+        <text x="${x}" y="${padTop + chartH + 30}" fill="var(--text-secondary)" font-size="9.5" text-anchor="middle">${d.dayLabel || ''}</text>
+      `;
+    }
+  });
+
+  if (!isBurnup) {
+    // BURNDOWN: Ideal descending line vs Actual remaining line
+    const idealPath = days.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.idealRemainingSP)}`).join(' ');
+    const actualPoints = days.filter(d => d.actualRemainingSP !== null);
+    const actualPath = actualPoints.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(d.dayIndex)} ${getY(d.actualRemainingSP)}`).join(' ');
+
+    let areaPath = '';
+    if (actualPoints.length > 0) {
+      const firstX = getX(actualPoints[0].dayIndex);
+      const lastX = getX(actualPoints[actualPoints.length - 1].dayIndex);
+      const baselineY = padTop + chartH;
+      areaPath = `${actualPath} L ${lastX} ${baselineY} L ${firstX} ${baselineY} Z`;
+    }
+
+    const dots = actualPoints.map(d => `
+      <circle cx="${getX(d.dayIndex)}" cy="${getY(d.actualRemainingSP)}" r="4.5" fill="#6366f1" stroke="#fff" stroke-width="2">
+        <title>${d.date} (${d.dayLabel}): Kalan ${d.actualRemainingSP} SP (İdeal: ${d.idealRemainingSP} SP)</title>
+      </circle>
+    `).join('');
+
+    return `
+      <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block;background:var(--surface-2);border-radius:10px;border:1px solid var(--border);">
+        <defs>
+          <linearGradient id="burndownGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#6366f1" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#6366f1" stop-opacity="0.02"/>
+          </linearGradient>
+        </defs>
+        ${gridLines}
+        ${xLines}
+        ${areaPath ? `<path d="${areaPath}" fill="url(#burndownGrad)"/>` : ''}
+        <path d="${idealPath}" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6 4"/>
+        ${actualPath ? `<path d="${actualPath}" fill="none" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>` : ''}
+        ${dots}
+      </svg>
+    `;
+  } else {
+    // BURNUP: Scope line vs Completed line
+    const scopePath = days.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.totalScopeSP)}`).join(' ');
+    const completedPoints = days.filter(d => d.completedSP !== null);
+    const completedPath = completedPoints.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(d.dayIndex)} ${getY(d.completedSP)}`).join(' ');
+
+    let areaPath = '';
+    if (completedPoints.length > 0) {
+      const firstX = getX(completedPoints[0].dayIndex);
+      const lastX = getX(completedPoints[completedPoints.length - 1].dayIndex);
+      const baselineY = padTop + chartH;
+      areaPath = `${completedPath} L ${lastX} ${baselineY} L ${firstX} ${baselineY} Z`;
+    }
+
+    const dots = completedPoints.map(d => `
+      <circle cx="${getX(d.dayIndex)}" cy="${getY(d.completedSP)}" r="4.5" fill="#10b981" stroke="#fff" stroke-width="2">
+        <title>${d.date} (${d.dayLabel}): Tamamlanan ${d.completedSP} SP / Toplam ${d.totalScopeSP} SP</title>
+      </circle>
+    `).join('');
+
+    return `
+      <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block;background:var(--surface-2);border-radius:10px;border:1px solid var(--border);">
+        <defs>
+          <linearGradient id="burnupGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#10b981" stop-opacity="0.02"/>
+          </linearGradient>
+        </defs>
+        ${gridLines}
+        ${xLines}
+        ${areaPath ? `<path d="${areaPath}" fill="url(#burnupGrad)"/>` : ''}
+        <path d="${scopePath}" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="6 4"/>
+        ${completedPath ? `<path d="${completedPath}" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round"/>` : ''}
+        ${dots}
+      </svg>
+    `;
+  }
+}
+
+function openActiveSprintBurndown() {
+  const active = (window.sprints || []).find(s => s.active);
+  if (!active) {
+    showToast('Şu anda aktif bir sprint bulunmuyor', 'warn');
+    return;
+  }
+  openSprintReportModal(active.id, 'burndown');
+}
+window.openActiveSprintBurndown = openActiveSprintBurndown;
+
+async function openSprintReportModal(sprintId, initialTab = 'summary') {
   const modalBody = document.getElementById('sprintReportModalBody');
   const modalTitle = document.getElementById('sprintReportModalTitle');
   const modalSubtitle = document.getElementById('sprintReportModalSubtitle');
@@ -1663,17 +1816,20 @@ async function openSprintReportModal(sprintId) {
   openModal('sprintReportModal');
 
   try {
-    const report = await API.getSprintReport(sprintId);
+    const [report, burndown] = await Promise.all([
+      API.getSprintReport(sprintId),
+      API.getSprintBurndown(sprintId).catch(() => null)
+    ]);
     if (!report) throw new Error('Rapor verisi bulunamadı');
 
-    if (modalTitle) modalTitle.textContent = `📊 ${report.sprintName} — Retrospektif & Kapanış Raporu`;
-    const closedDateStr = report.closedAt ? new Date(report.closedAt).toLocaleString('tr-TR') : 'Tamamlandı';
+    if (modalTitle) modalTitle.textContent = `📊 ${report.sprintName} — Retrospektif & Grafikler`;
+    const closedDateStr = report.closedAt ? new Date(report.closedAt).toLocaleString('tr-TR') : 'Aktif / Devam Ediyor';
     const closedByStr = report.closedBy?.name ? ` · Kapatan: ${report.closedBy.name}` : '';
     if (modalSubtitle) {
-      modalSubtitle.textContent = `Dönem: ${report.startDate || '—'} → ${report.endDate || '—'} · Kapanış: ${closedDateStr}${closedByStr}`;
+      modalSubtitle.textContent = `Dönem: ${report.startDate || '—'} → ${report.endDate || '—'} · Durum: ${closedDateStr}${closedByStr}`;
     }
     if (modalTime) {
-      modalTime.textContent = `Oluşturulma: ${new Date(report.generatedAt).toLocaleString('tr-TR')}`;
+      modalTime.textContent = `Oluşturulma: ${new Date(report.generatedAt || Date.now()).toLocaleString('tr-TR')}`;
     }
 
     // Member Contribution Rows
@@ -1755,7 +1911,8 @@ async function openSprintReportModal(sprintId) {
 
     if (modalBody) {
       modalBody.innerHTML = `
-        <div class="retro-modal-content">
+        <!-- TAB 1: SUMMARY -->
+        <div id="sprintReportSection_summary" class="retro-modal-content">
           <!-- KPI Cards Grid -->
           <div class="retro-kpi-grid">
             <div class="retro-kpi-card">
@@ -1832,7 +1989,42 @@ async function openSprintReportModal(sprintId) {
           <!-- Section 3: Incomplete Tickets -->
           ${incompleteSection}
         </div>
+
+        <!-- TAB 2: BURNDOWN CHART -->
+        <div id="sprintReportSection_burndown" style="display:none;padding:10px 0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
+            <div style="display:flex;gap:14px;align-items:center;font-size:12px;">
+              <span style="display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:14px;height:3px;background:#94a3b8;border-top:2px dashed #94a3b8;"></span> İdeal Kılavuz Hedef</span>
+              <span style="display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:14px;height:3px;background:#6366f1;"></span> Gerçekleşen Kalan SP</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);">
+              Kalan: <strong style="color:var(--primary);">${burndown?.summary?.remainingSP ?? 0} SP</strong> / Toplam: <strong>${burndown?.summary?.committedSP ?? 0} SP</strong>
+            </div>
+          </div>
+          ${renderBurndownSvg(burndown, false)}
+          <div style="font-size:11.5px;color:var(--text-muted);margin-top:10px;text-align:center;">
+            💡 İdeal eğrinin altında kalan çizgiler takımın sprint takviminin önünde olduğunu, üstündeki çizgiler ise yetiştirme riski bulunduğunu gösterir.
+          </div>
+        </div>
+
+        <!-- TAB 3: BURNUP CHART -->
+        <div id="sprintReportSection_burnup" style="display:none;padding:10px 0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
+            <div style="display:flex;gap:14px;align-items:center;font-size:12px;">
+              <span style="display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:14px;height:3px;background:#64748b;border-top:2px dashed #64748b;"></span> Toplam Kapsam (Scope SP)</span>
+              <span style="display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:14px;height:3px;background:#10b981;"></span> Teslim Edilen SP</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);">
+              Teslim Edilen: <strong style="color:var(--success);">${burndown?.summary?.completedSP ?? 0} SP</strong> / Kapsam: <strong>${burndown?.summary?.committedSP ?? 0} SP</strong>
+            </div>
+          </div>
+          ${renderBurndownSvg(burndown, true)}
+          <div style="font-size:11.5px;color:var(--text-muted);margin-top:10px;text-align:center;">
+            💡 Burnup grafiği, sprint kapsamına eklenen yeni biletleri ve teslim edilen toplam değerin artış eğrisini gösterir.
+          </div>
+        </div>
       `;
+      switchSprintReportTab(initialTab);
     }
   } catch (err) {
     console.error('Failed to open sprint report:', err);

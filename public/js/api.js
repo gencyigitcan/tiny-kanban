@@ -413,6 +413,9 @@ const API = {
     async getClosedSprints() {
         return await request('/api/reports/closed-sprints');
     },
+    async getSprintBurndown(sprintId) {
+        return await request(`/api/sprints/${sprintId}/burndown`);
+    },
 
     // ── Issue Templates ──────────────────────────────────────
     async getTemplates() {

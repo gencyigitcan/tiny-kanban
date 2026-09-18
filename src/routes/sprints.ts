@@ -139,6 +139,100 @@ sprintRouter.get('/:id/report', (req, res) => {
     return res.json(report);
 });
 
+/**
+ * Computes Burndown and Burnup time-series data for a sprint
+ */
+export function buildSprintBurndown(sprint: Sprint, cards: Card[], columns?: BoardColumn[]) {
+    function isCardDone(colId: string): boolean {
+        if (columns && columns.length > 0) {
+            const found = columns.find(c => c.id === colId);
+            if (found && typeof found.isDone === 'boolean') return found.isDone;
+        }
+        return colId === 'done';
+    }
+
+    const sprintCards = cards.filter(c => c.sprintId === sprint.id || (sprint.report?.completedCards || []).some((sc: any) => sc.id === c.id));
+    const committedSP = sprintCards.reduce((acc, c) => acc + (Number(c.storyPoints) || 0), 0) || (sprint.report?.committedSP || 0);
+
+    const now = Date.now();
+    const startMs = sprint.startDate ? new Date(sprint.startDate).getTime() : (sprint.createdAt || (now - 14 * 86400000));
+    let endMs = sprint.endDate ? new Date(sprint.endDate).getTime() : (startMs + 14 * 86400000);
+    if (endMs <= startMs) endMs = startMs + 14 * 86400000;
+
+    const totalDays = Math.max(1, Math.min(60, Math.round((endMs - startMs) / 86400000)));
+
+    const completedCards = sprintCards.filter(c => isCardDone(c.col) || (sprint.report?.completedCards || []).some((sc: any) => sc.id === c.id));
+    const completedSPTotal = completedCards.reduce((acc, c) => acc + (Number(c.storyPoints) || 0), 0) || (sprint.report?.completedSP || 0);
+
+    const days = [];
+    for (let i = 0; i <= totalDays; i++) {
+        const dayTime = startMs + i * 86400000;
+        const dateStr = new Date(dayTime).toISOString().slice(0, 10);
+        
+        const idealRemainingSP = Math.max(0, Math.round((committedSP - (committedSP * (i / totalDays))) * 10) / 10);
+
+        let completedSPByDay = 0;
+        if (dayTime <= now || sprint.report) {
+            for (const c of completedCards) {
+                const sp = Number(c.storyPoints) || 0;
+                const completedAt = c.slaCompletedAt || c.createdAt || startMs;
+                if (completedAt <= dayTime + 86400000) {
+                    completedSPByDay += sp;
+                }
+            }
+        } else {
+            completedSPByDay = completedSPTotal;
+        }
+
+        const actualRemainingSP = (dayTime <= now || sprint.report) ? Math.max(0, committedSP - completedSPByDay) : null;
+
+        days.push({
+            date: dateStr,
+            dayIndex: i,
+            dayLabel: `Gün ${i}`,
+            idealRemainingSP,
+            actualRemainingSP,
+            totalScopeSP: committedSP,
+            completedSP: (dayTime <= now || sprint.report) ? completedSPByDay : null
+        });
+    }
+
+    const remainingSP = Math.max(0, committedSP - completedSPTotal);
+    return {
+        sprint: {
+            id: sprint.id,
+            name: sprint.name,
+            startDate: sprint.startDate,
+            endDate: sprint.endDate,
+            active: sprint.active,
+            status: sprint.status,
+            totalSP: committedSP,
+            completedSP: completedSPTotal,
+            remainingSP
+        },
+        days,
+        summary: {
+            totalCards: sprintCards.length,
+            completedCardsCount: completedCards.length,
+            committedSP,
+            completedSP: completedSPTotal,
+            remainingSP,
+            velocityPct: committedSP > 0 ? Math.round((completedSPTotal / committedSP) * 100) : 0,
+            status: remainingSP === 0 ? 'completed' : 'in_progress'
+        }
+    };
+}
+
+/** GET /api/sprints/:id/burndown */
+sprintRouter.get('/:id/burndown', (req, res) => {
+    const db = readDb(req);
+    const sprint = db.sprints.find(s => s.id === req.params.id);
+    if (!sprint) throw new NotFoundError('Sprint not found');
+
+    const burndown = buildSprintBurndown(sprint, db.cards, db.columns);
+    return res.json(burndown);
+});
+
 /** POST /api/sprints */
 sprintRouter.post('/', validate(createSprintSchema), (req, res) => {
     const db = readDb(req);

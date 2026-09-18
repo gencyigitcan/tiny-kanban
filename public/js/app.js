@@ -193,6 +193,10 @@ function updateSprintBadge() {
             el.textContent = 'Sprint yok';
         }
     }
+    const burndownBtn = document.getElementById('sprintBurndownBtn');
+    if (burndownBtn) {
+        burndownBtn.style.display = active ? 'inline-flex' : 'none';
+    }
     if (completeBtn) {
         if (active) {
             completeBtn.style.display = 'inline-flex';
