@@ -379,21 +379,33 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
         user.tenantId = 'demo';
         accessibleWorkspaces = [{ id: 'demo', name: 'Demo Panosu' }];
     } else {
-        const directWsIds = (index.userToTenants[normalizedUsername] || []).filter(id => id !== 'demo');
-        const userWsSet = new Set<string>([...directWsIds, activeTenantId, ...(user.workspaces || []).filter(id => id !== 'demo')]);
+        if (user.role === 'superadmin') {
+            const wsMap = new Map<string, string>();
+            wsMap.set('personal', 'Kişisel Çalışma Alanı');
+            for (const w of index.workspaces) {
+                if (w.id !== 'demo') {
+                    wsMap.set(w.id, w.name || w.id);
+                }
+            }
+            accessibleWorkspaces = Array.from(wsMap.entries()).map(([id, name]) => ({ id, name }));
+            user.workspaces = accessibleWorkspaces.map(w => w.id);
+        } else {
+            const directWsIds = (index.userToTenants[normalizedUsername] || []).filter(id => id !== 'demo');
+            const userWsSet = new Set<string>([...directWsIds, activeTenantId, ...(user.workspaces || []).filter(id => id !== 'demo')]);
 
-        // Personal workspace can ONLY be included if the user explicitly owns or is assigned 'personal'
-        if (user.role === 'superadmin' && (user.workspaces?.includes('personal') || directWsIds.includes('personal') || user.tenantId === 'personal')) {
-            userWsSet.add('personal');
-        } else if (!user.workspaces?.includes('personal') && !directWsIds.includes('personal') && user.tenantId !== 'personal') {
-            userWsSet.delete('personal');
+            // Add workspaces where user is in members or is owner
+            for (const w of index.workspaces) {
+                if (w.members?.some(m => m.userId === user.id || m.username?.toLowerCase() === normalizedUsername) || w.ownerId === user.id) {
+                    userWsSet.add(w.id);
+                }
+            }
+
+            const wsNameMap = Object.fromEntries(index.workspaces.map(w => [w.id, w.name]));
+            accessibleWorkspaces = Array.from(userWsSet).map(id => ({
+                id,
+                name: wsNameMap[id] || (id === 'personal' ? 'Kişisel Çalışma Alanı' : id)
+            }));
         }
-
-        const wsNameMap = Object.fromEntries(index.workspaces.map(w => [w.id, w.name]));
-        accessibleWorkspaces = Array.from(userWsSet).map(id => ({
-            id,
-            name: wsNameMap[id] || (id === 'personal' ? 'Kişisel Çalışma Alanı' : id)
-        }));
     }
 
     // Create session token prefixed with active workspace ID
@@ -538,7 +550,8 @@ authRouter.post('/switch-workspace', requireAuth, asyncHandler(async (req, res) 
     }
 
     const username = req.user!.username.toLowerCase();
-    const isDemoUser = req.user?.tenantId === 'demo' || req.tenantId === 'demo' || DEMO_USERNAMES.has(username);
+    const isSuperAdmin = req.user!.role === 'superadmin';
+    const isDemoUser = !isSuperAdmin && (req.user?.tenantId === 'demo' || req.tenantId === 'demo' || DEMO_USERNAMES.has(username));
 
     // Strictly deny demo users from switching to any workspace other than 'demo'
     if (isDemoUser && workspaceId !== 'demo') {
@@ -547,23 +560,55 @@ authRouter.post('/switch-workspace', requireAuth, asyncHandler(async (req, res) 
 
     const env = req.environment || getEnvironment(req);
     const index = await getTenantIndex(env);
-    const isSuperAdmin = req.user!.role === 'superadmin';
+
+    const exists = index.workspaces.some(w => w.id === workspaceId) || workspaceId === 'personal' || workspaceId === 'demo';
+    if (!exists) {
+        throw new AppError('Çalışma alanı bulunamadı', 404);
+    }
 
     const directWsIds = index.userToTenants[username] || [];
     const userWsSet = new Set([...directWsIds, ...(req.user!.workspaces || [])]);
 
-    // Personal workspace can ONLY be switched to if explicitly assigned
-    if (isSuperAdmin && (req.user!.workspaces?.includes('personal') || directWsIds.includes('personal') || req.user!.tenantId === 'personal')) {
-        userWsSet.add('personal');
-    } else if (workspaceId === 'personal' && !userWsSet.has('personal')) {
-        throw new AppError('Kişisel çalışma alanına yetkisiz erişim', 403);
-    }
+    const targetWsObj = index.workspaces.find(w => w.id === workspaceId);
+    const isMemberOfTarget = targetWsObj?.members?.some(m => m.userId === req.user!.id || m.username?.toLowerCase() === username);
+    const isOwnerOfTarget = targetWsObj?.ownerId === req.user!.id;
 
-    if (!userWsSet.has(workspaceId)) {
+    // Super Admin has unrestricted access to all workspaces in the system.
+    // For non-superadmin users, verify workspace membership, ownership, or userToTenants mapping.
+    if (!isSuperAdmin && !userWsSet.has(workspaceId) && !isMemberOfTarget && !isOwnerOfTarget) {
+        if (workspaceId === 'personal') {
+            throw new AppError('Kişisel çalışma alanına yetkisiz erişim', 403);
+        }
         throw new AppError('Bu çalışma alanına erişim yetkiniz bulunmamaktadır', 403);
     }
 
     const targetDb = readDb({ tenantId: workspaceId, environment: env });
+
+    // CRITICAL: Ensure the switching user exists in targetDb.users so subsequent requireAuth requests succeed!
+    let targetUser: User | undefined = targetDb.users.find(u => u.id === req.user!.id || u.username.toLowerCase() === username);
+    if (!targetUser) {
+        const newUserRecord: User = {
+            id: req.user!.id,
+            username: req.user!.username,
+            name: req.user!.name,
+            email: req.user!.email,
+            avatarColor: req.user!.avatarColor,
+            passwordHash: req.user!.passwordHash || '',
+            role: isSuperAdmin ? 'superadmin' : (req.user!.role || 'user'),
+            status: 'approved',
+            tenantId: workspaceId,
+            company: req.user!.company,
+            workspaces: [workspaceId],
+            createdAt: req.user!.createdAt || Date.now(),
+            lastLoginAt: Date.now()
+        };
+        targetDb.users.push(newUserRecord);
+    } else {
+        if (isSuperAdmin) {
+            targetUser.role = 'superadmin';
+        }
+        targetUser.status = 'approved';
+    }
 
     // Generate new token for the target workspace
     const randomToken = crypto.randomBytes(32).toString('hex');
@@ -576,6 +621,44 @@ authRouter.post('/switch-workspace', requireAuth, asyncHandler(async (req, res) 
     };
     targetDb.sessions.push(newSession);
     writeDbSync(targetDb, { tenantId: workspaceId, environment: env });
+
+    // Ensure index.userToTenants maintains this workspace mapping for the user
+    let indexDirty = false;
+    if (!index.userToTenants[username]) {
+        index.userToTenants[username] = [];
+        indexDirty = true;
+    }
+    if (!index.userToTenants[username].includes(workspaceId)) {
+        index.userToTenants[username].push(workspaceId);
+        indexDirty = true;
+    }
+    if (req.user!.email) {
+        const normEmail = req.user!.email.toLowerCase();
+        if (!index.userToTenants[normEmail]) {
+            index.userToTenants[normEmail] = [];
+            indexDirty = true;
+        }
+        if (!index.userToTenants[normEmail].includes(workspaceId)) {
+            index.userToTenants[normEmail].push(workspaceId);
+            indexDirty = true;
+        }
+    }
+    if (indexDirty) {
+        await saveTenantIndex(index, env);
+    }
+
+    logActivity({
+        userId: req.user!.id,
+        username: req.user!.username,
+        name: req.user!.name,
+        userRole: req.user!.role || 'user',
+        action: 'LOGIN',
+        entityType: 'auth',
+        entityId: req.user!.id,
+        details: `${req.user!.name} (${req.user!.username}) '${workspaceId}' çalışma alanına geçiş yaptı.`,
+        workspaceId,
+        environment: env
+    }, req);
 
     res.json({
         ok: true,
@@ -631,17 +714,31 @@ authRouter.get('/me', requireAuth, asyncHandler(async (req, res) => {
     }
 
     let accessible = index.workspaces.filter(w =>
-        isSuperAdmin || userWsSet.has(w.id) || w.ownerId === user.id
+        isSuperAdmin || userWsSet.has(w.id) || w.ownerId === user.id || w.members?.some(m => m.userId === user.id || m.username?.toLowerCase() === username)
     );
 
+    if (isSuperAdmin || userWsSet.has('personal') || req.tenantId === 'personal') {
+        if (!accessible.some(w => w.id === 'personal')) {
+            accessible.unshift({
+                id: 'personal',
+                name: 'Kişisel Çalışma Alanı',
+                type: 'personal' as any,
+                ownerId: user.id,
+                createdAt: Date.now()
+            });
+        }
+    }
+
     if (req.tenantId === 'demo') {
-        accessible = [{
-            id: 'demo',
-            name: 'Demo Panosu (Nova Takımı)',
-            type: 'team' as any,
-            ownerId: 'admin',
-            createdAt: Date.now()
-        }, ...accessible];
+        if (!accessible.some(w => w.id === 'demo')) {
+            accessible = [{
+                id: 'demo',
+                name: 'Demo Panosu (Nova Takımı)',
+                type: 'team' as any,
+                ownerId: 'admin',
+                createdAt: Date.now()
+            }, ...accessible];
+        }
     }
 
     res.json({

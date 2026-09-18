@@ -106,7 +106,8 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
     }
 
     // Cross-tenant workspace validation (BOLA / IDOR mitigation)
-    const isDemoUser = sessionTenantId === 'demo' || user.tenantId === 'demo' || user.username?.toLowerCase() === 'admin';
+    const isSuperAdmin = user.role === 'superadmin';
+    const isDemoUser = !isSuperAdmin && (sessionTenantId === 'demo' || user.tenantId === 'demo' || user.username?.toLowerCase() === 'admin');
     const requestedWorkspace = (req.headers['x-workspace'] || req.headers['x-tenant-id'] || req.query?.workspace) as string | undefined;
 
     if (isDemoUser) {
@@ -117,11 +118,11 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
         req.dbScope = 'demo';
     } else if (requestedWorkspace && requestedWorkspace !== 'demo') {
         const userWorkspaces = user.workspaces || (user.tenantId ? [user.tenantId] : []);
-        // Personal workspace can ONLY be accessed if user explicitly has 'personal' in userWorkspaces or is personal owner
-        if (requestedWorkspace === 'personal' && !userWorkspaces.includes('personal') && user.tenantId !== 'personal') {
+        // Personal workspace can ONLY be accessed if user explicitly has 'personal' in userWorkspaces, is personal owner, or is superadmin
+        if (requestedWorkspace === 'personal' && !isSuperAdmin && !userWorkspaces.includes('personal') && user.tenantId !== 'personal') {
             throw new AppError('Forbidden: Kişisel çalışma alanına yetkisiz erişim', 403);
         }
-        if (user.role === 'superadmin' || userWorkspaces.includes(requestedWorkspace)) {
+        if (isSuperAdmin || userWorkspaces.includes(requestedWorkspace)) {
             req.tenantId = requestedWorkspace;
             req.dbScope = requestedWorkspace;
         } else {

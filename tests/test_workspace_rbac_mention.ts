@@ -243,6 +243,32 @@ async function runTests() {
         assert.strictEqual(updateMembersRes.status, 200);
         console.log('   ✓ Workspace members updated with roles');
 
+        // 3f: Test Super Admin workspace switching to any workspace
+        const switchRes = await req('/api/auth/switch-workspace', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${superToken}` },
+            body: JSON.stringify({ workspaceId: newWsId })
+        });
+        assert.strictEqual(switchRes.status, 200, 'Super admin should switch to newly created workspace without 403');
+        assert(switchRes.body.token, 'Must return new workspace token');
+        
+        // Verify me with switched token
+        const switchedMe = await req('/api/auth/me', {
+            headers: { 'Authorization': `Bearer ${switchRes.body.token}` }
+        });
+        assert.strictEqual(switchedMe.status, 200, 'Super admin authenticated in target workspace');
+        assert.strictEqual(switchedMe.body.role, 'superadmin');
+        console.log(`   ✓ Super Admin switched to '${newWsId}' seamlessly`);
+
+        // Test switching back to personal
+        const switchBackRes = await req('/api/auth/switch-workspace', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${switchRes.body.token}` },
+            body: JSON.stringify({ workspaceId: 'personal' })
+        });
+        assert.strictEqual(switchBackRes.status, 200, 'Super admin switched back to personal');
+        console.log('   ✓ Super Admin switched back to personal workspace');
+
         // ── Step 4: Card Creation, Commenting, @Mention & Notifications ──
         console.log('\n🔹 Phase 4: Testing Card Commenting, @Mentions & Notifications...');
 
