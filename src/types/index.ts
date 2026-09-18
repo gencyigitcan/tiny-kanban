@@ -151,7 +151,10 @@ export type ActivityAction =
     | 'SUBTASK_TOGGLE'
     | 'SUBTASK_ADD'
     | 'WORKSPACE_SWITCH'
-    | 'WORKSPACE_CREATE';
+    | 'WORKSPACE_CREATE'
+    | 'WORKSPACE_UPDATE'
+    | 'WORKSPACE_DELETE'
+    | 'WORKSPACE_MEMBER_UPDATE';
 
 export interface ActivityLog {
     id: string;

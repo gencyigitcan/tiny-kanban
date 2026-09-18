@@ -4869,3 +4869,222 @@ kbd {
   vertical-align: middle;
   letter-spacing: 0.02em;
 }
+
+/* ============================================================
+   WORKSPACES MANAGEMENT VIEW & CARDS
+   ============================================================ */
+.workspaces-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+  margin-top: 8px;
+}
+
+.workspace-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.workspace-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.workspace-card.active-workspace {
+  border: 2px solid #0052cc;
+  background: linear-gradient(to bottom, var(--surface), rgba(0, 82, 204, 0.02));
+}
+
+.ws-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ws-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.ws-card-icon {
+  font-size: 24px;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ws-card-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.ws-card-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  min-height: 36px;
+}
+
+.ws-card-members-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+}
+
+.ws-avatar-stack {
+  display: flex;
+  align-items: center;
+}
+
+.ws-avatar-stack-item {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  margin-left: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.ws-avatar-stack-item:first-child {
+  margin-left: 0;
+}
+
+.ws-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+/* Member Assignment Modal Rows */
+.ws-member-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.ws-member-item:hover {
+  border-color: var(--accent);
+  background: var(--bg-secondary);
+}
+
+.ws-member-item.selected {
+  border-color: #0052cc;
+  background: rgba(0, 82, 204, 0.04);
+}
+
+/* ============================================================
+   @MENTION SUGGESTIONS POPUP & MENTION TAGS
+   ============================================================ */
+.mention-suggestions {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  width: 280px;
+  overflow-y: auto;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.mention-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.mention-item:last-child {
+  border-bottom: none;
+}
+
+.mention-item:hover,
+.mention-item.active {
+  background: rgba(0, 82, 204, 0.08);
+  color: #0052cc;
+}
+
+.mention-item-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.mention-item-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mention-item-handle {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* In comment list */
+.mention-tag {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(0, 82, 204, 0.12);
+  color: #0052cc;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin: 0 2px;
+  font-size: 0.95em;
+  border: 1px solid rgba(0, 82, 204, 0.2);
+}

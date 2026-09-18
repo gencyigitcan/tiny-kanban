@@ -17,7 +17,7 @@ notificationsRouter.get('/', (req, res) => {
     const currentDb = readDb(req);
     let allNotifs = [...(currentDb.notifications || [])];
 
-    if (isSuperAdmin && req.tenantId !== 'personal') {
+    if (req.tenantId !== 'personal') {
         const env = req.environment || getEnvironment(req);
         try {
             const personalDb = readDb({ tenantId: 'personal', environment: env });
@@ -52,17 +52,15 @@ notificationsRouter.post('/:id/read', (req, res) => {
         writeDbSync(db, req);
     }
 
-    if (isSuperAdmin) {
-        try {
-            const personalDb = readDb({ tenantId: 'personal', environment: env });
-            const pNotif = personalDb.notifications?.find(n => n.id === req.params.id);
-            if (pNotif) {
-                pNotif.read = true;
-                writeDbSync(personalDb, { tenantId: 'personal', environment: env });
-                if (!notification) notification = pNotif;
-            }
-        } catch {}
-    }
+    try {
+        const personalDb = readDb({ tenantId: 'personal', environment: env });
+        const pNotif = personalDb.notifications?.find(n => n.id === req.params.id && (n.userId === req.user!.id || isSuperAdmin));
+        if (pNotif) {
+            pNotif.read = true;
+            writeDbSync(personalDb, { tenantId: 'personal', environment: env });
+            if (!notification) notification = pNotif;
+        }
+    } catch {}
 
     if (!notification) {
         throw new NotFoundError('Notification not found');

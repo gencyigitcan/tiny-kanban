@@ -98,6 +98,13 @@ async function boot() {
 }
 
 function switchView(viewName) {
+    const canManage = currentUser?.role === 'superadmin' || currentUser?.role === 'admin';
+    const adminViews = ['workspaces', 'epics', 'sprints', 'labels', 'team', 'audit'];
+    if (adminViews.includes(viewName) && !canManage) {
+        if (typeof showToast === 'function') showToast('Bu yönetim ekranına erişim yetkiniz bulunmamaktadır', 'warn');
+        viewName = 'board';
+    }
+
     currentView = viewName;
     document.querySelectorAll('.view-tab').forEach(t => {
         t.classList.toggle('active', t.dataset.view === viewName);
@@ -114,6 +121,7 @@ function switchView(viewName) {
         'dashboard': 'Dashboard & Metrikler',
         'reports': 'Çevik Raporlar',
         'my-tasks': 'Görevlerim',
+        'workspaces': 'Çalışma Alanları & Takım Yönetimi',
         'epics': 'Epics Yönetimi',
         'sprints': 'Sprint Yönetimi',
         'labels': 'Etiket Yönetimi',
@@ -157,6 +165,7 @@ function renderAll() {
     if (currentView === 'gantt') renderGantt(cards);
     if (currentView === 'reports') renderReports(cards, epics, sprints);
     if (currentView === 'my-tasks') renderMyTasksView(cards, epics);
+    if (currentView === 'workspaces') renderWorkspacesView();
     if (currentView === 'epics') renderEpicsView(cards, epics);
     if (currentView === 'sprints') renderSprintsView(cards, sprints);
     if (currentView === 'labels') renderLabelsView(cards, labels);
@@ -341,6 +350,9 @@ function renderCommentsList() {
         const hue = [...authorName].reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360;
         const avatarBg = `hsl(${hue}, 60%, 50%)`;
         
+        const rawEscaped = escHtml(c.text);
+        const withMentions = rawEscaped.replace(/@([a-zA-Z0-9_.@+-]+)/g, '<span class="mention-tag">@$1</span>');
+
         return `
             <div class="comment-row">
                 <div class="comment-avatar" style="background:${avatarBg}">${escHtml(init)}</div>
@@ -349,7 +361,7 @@ function renderCommentsList() {
                         <span class="comment-author">${escHtml(authorName)}</span>
                         <span class="comment-time">${new Date(c.createdAt).toLocaleString('tr-TR')}</span>
                     </div>
-                    <div class="comment-body">${escHtml(c.text)}</div>
+                    <div class="comment-body">${withMentions}</div>
                 </div>
             </div>`;
     }).join('');
@@ -812,20 +824,51 @@ function updateUserHeader() {
         badge.style.backgroundColor = currentUser.avatarColor || '#0052cc';
     }
 
-    const manageUsersBtn = document.getElementById('manageUsersBtn');
     const canManage = currentUser.role === 'superadmin' || currentUser.role === 'admin';
-    if (manageUsersBtn) {
-        manageUsersBtn.style.display = canManage ? 'inline-flex' : 'none';
+
+    // ── RBAC: Top Navigation "Yönetim" Menu ────────────────────
+    const wrapManageMenu = document.getElementById('wrapManageMenu');
+    if (wrapManageMenu) {
+        wrapManageMenu.style.display = canManage ? 'block' : 'none';
     }
+
+    const manageWorkspacesBtn = document.getElementById('manageWorkspacesBtn');
+    if (manageWorkspacesBtn) manageWorkspacesBtn.style.display = canManage ? 'inline-flex' : 'none';
+
+    const manageUsersBtn = document.getElementById('manageUsersBtn');
+    if (manageUsersBtn) manageUsersBtn.style.display = canManage ? 'inline-flex' : 'none';
 
     const tabNavAudit = document.getElementById('tabNavAudit');
-    if (tabNavAudit) {
-        tabNavAudit.style.display = canManage ? 'inline-block' : 'none';
+    if (tabNavAudit) tabNavAudit.style.display = canManage ? 'inline-block' : 'none';
+
+    // ── RBAC: Sidebar "PROJE AYARLARI" Section ─────────────────
+    const sidebarProjectSettingsTitle = document.getElementById('sidebarProjectSettingsTitle');
+    if (sidebarProjectSettingsTitle) {
+        sidebarProjectSettingsTitle.style.display = canManage ? 'block' : 'none';
     }
 
+    const sidebarWorkspacesBtn = document.getElementById('sidebarWorkspacesBtn');
+    if (sidebarWorkspacesBtn) sidebarWorkspacesBtn.style.display = canManage ? 'inline-flex' : 'none';
+
+    const sidebarEpicsBtn = document.getElementById('sidebarEpicsBtn');
+    if (sidebarEpicsBtn) sidebarEpicsBtn.style.display = canManage ? 'inline-flex' : 'none';
+
+    const sidebarSprintsBtn = document.getElementById('sidebarSprintsBtn');
+    if (sidebarSprintsBtn) sidebarSprintsBtn.style.display = canManage ? 'inline-flex' : 'none';
+
+    const sidebarLabelsBtn = document.getElementById('sidebarLabelsBtn');
+    if (sidebarLabelsBtn) sidebarLabelsBtn.style.display = canManage ? 'inline-flex' : 'none';
+
+    const sidebarTeamBtn = document.getElementById('sidebarTeamBtn');
+    if (sidebarTeamBtn) sidebarTeamBtn.style.display = canManage ? 'inline-flex' : 'none';
+
     const sidebarAuditBtn = document.getElementById('sidebarAuditBtn');
-    if (sidebarAuditBtn) {
-        sidebarAuditBtn.style.display = canManage ? 'inline-flex' : 'none';
+    if (sidebarAuditBtn) sidebarAuditBtn.style.display = canManage ? 'inline-flex' : 'none';
+
+    // ── RBAC: Workspace Switcher Prompt ───────────────────────
+    const createWorkspacePromptBtn = document.getElementById('createWorkspacePromptBtn');
+    if (createWorkspacePromptBtn) {
+        createWorkspacePromptBtn.style.display = canManage ? 'block' : 'none';
     }
 
     const isDemo = currentUser.tenantId === 'demo';
@@ -1364,13 +1407,462 @@ document.addEventListener('click', (e) => {
 // Prompt to create team from switcher footer
 safeAddListener('createWorkspacePromptBtn', 'click', () => {
     document.getElementById('workspaceDropdown').style.display = 'none';
-    const manageBtn = document.getElementById('manageUsersBtn');
-    if (manageBtn) {
-        manageBtn.click();
-        const tabTeams = document.getElementById('tabTeamsList');
-        if (tabTeams) tabTeams.click();
+    switchView('workspaces');
+    if (typeof window.openCreateWorkspaceModal === 'function') {
+        window.openCreateWorkspaceModal();
     }
 });
+
+// ── Workspaces & Project Management Controller ─────────────
+async function renderWorkspacesView() {
+    const grid = document.getElementById('workspacesGrid');
+    if (!grid) return;
+
+    grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 40px; color:var(--text-muted);">Çalışma alanları yükleniyor…</div>';
+
+    try {
+        const [wsData, usersData] = await Promise.all([
+            API.getWorkspaces().catch(() => ({ workspaces: [] })),
+            API.getDetailedUsers().catch(() => ({ users: [] }))
+        ]);
+
+        const workspaces = wsData.workspaces || [];
+        const activeId = wsData.activeWorkspaceId || currentUser?.tenantId || 'personal';
+
+        // Update KPI Counters
+        const kpiTotal = document.getElementById('kpiTotalWorkspaces');
+        if (kpiTotal) kpiTotal.textContent = workspaces.length;
+
+        const kpiTeam = document.getElementById('kpiTeamWorkspaces');
+        if (kpiTeam) kpiTeam.textContent = workspaces.filter(w => w.type === 'team').length;
+
+        const kpiPersonal = document.getElementById('kpiPersonalWorkspaces');
+        if (kpiPersonal) kpiPersonal.textContent = workspaces.filter(w => w.type !== 'team').length;
+
+        const kpiActive = document.getElementById('kpiActiveWsName');
+        const activeWsObj = workspaces.find(w => w.id === activeId);
+        if (kpiActive) kpiActive.textContent = activeWsObj ? activeWsObj.name : activeId;
+
+        if (workspaces.length === 0) {
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 40px; color:var(--text-muted);">Henüz çalışma alanı bulunmuyor.</div>';
+            return;
+        }
+
+        grid.innerHTML = workspaces.map(w => {
+            const isActive = w.id === activeId;
+            const icon = w.type === 'personal' ? '🛡️' : (w.type === 'user' ? '👤' : '🏢');
+            const typeLabel = w.type === 'personal' ? 'Kişisel Pano' : (w.type === 'user' ? 'Bireysel Pano' : 'Takım Çalışma Alanı');
+            const typeClass = w.type === 'team' ? 'status-doing' : 'status-todo';
+            const canDelete = w.id !== 'personal' && w.id !== 'demo';
+            const members = w.members || [];
+            const desc = w.description || 'Bu çalışma alanı için henüz açıklama girilmemiş.';
+
+            const avatarStackHtml = members.slice(0, 5).map(m => `
+                <div class="ws-avatar-stack-item" style="background:${m.avatarColor || '#0052cc'}" title="${escHtml(m.name)} (@${escHtml(m.username)})">
+                    ${initials(m.name || m.username)}
+                </div>
+            `).join('') + (members.length > 5 ? `<div class="ws-avatar-stack-item" style="background:#64748b">+${members.length - 5}</div>` : '');
+
+            return `
+                <div class="workspace-card ${isActive ? 'active-workspace' : ''}">
+                    <div class="ws-card-header">
+                        <div class="ws-card-title-group">
+                            <span class="ws-card-icon">${icon}</span>
+                            <div>
+                                <div class="ws-card-name">${escHtml(w.name)}</div>
+                                <span class="status-pill ${typeClass}" style="margin-top: 4px;">${typeLabel}</span>
+                            </div>
+                        </div>
+                        ${isActive ? '<span class="status-pill text-success" style="background: rgba(16, 185, 129, 0.12); font-weight: 700;">🟢 Aktif Pano</span>' : ''}
+                    </div>
+
+                    <div class="ws-card-desc">${escHtml(desc)}</div>
+
+                    <div class="ws-card-members-section">
+                        <div>
+                            <strong>${members.length}</strong> Takım Üyesi
+                        </div>
+                        <div class="ws-avatar-stack">
+                            ${avatarStackHtml || '<span style="color:var(--text-muted); font-size:11px;">Üye atanmamış</span>'}
+                        </div>
+                    </div>
+
+                    <div class="ws-card-actions">
+                        ${!isActive ? `<button class="btn btn-primary btn-sm" onclick="window.switchToWorkspaceDirect('${escHtml(w.id)}')">🔀 Panoya Geç</button>` : `<button class="btn btn-secondary btn-sm" disabled style="opacity: 0.7;">Şu Anki Pano</button>`}
+                        <button class="btn btn-secondary btn-sm" onclick="window.openEditWorkspaceModal('${escHtml(w.id)}')">✏️ Düzenle</button>
+                        <button class="btn btn-secondary btn-sm" onclick="window.openWorkspaceMembersModal('${escHtml(w.id)}')">👥 Üyeleri Ata</button>
+                        ${canDelete ? `<button class="btn btn-danger btn-sm" onclick="window.deleteWorkspaceAction('${escHtml(w.id)}')">🗑 Sil</button>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        console.error('Workspaces load error:', e);
+        grid.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 40px; color:var(--danger);">Çalışma alanları yüklenirken hata oluştu: ${escHtml(e.message)}</div>`;
+    }
+}
+window.renderWorkspacesView = renderWorkspacesView;
+
+window.openCreateWorkspaceModal = async function() {
+    document.getElementById('editWorkspaceId').value = '';
+    document.getElementById('workspaceModalTitle').textContent = '🏢 Yeni Çalışma Alanı Oluştur';
+    document.getElementById('wsInputName').value = '';
+    document.getElementById('wsInputDesc').value = '';
+    const err = document.getElementById('workspaceModalError');
+    if (err) err.style.display = 'none';
+
+    const initialList = document.getElementById('wsInitialMembersList');
+    const group = document.getElementById('wsInitialMembersGroup');
+    if (group) group.style.display = 'block';
+
+    if (initialList) {
+        try {
+            const res = await API.getDetailedUsers();
+            const allUsers = res.users || [];
+            initialList.innerHTML = allUsers.map(u => `
+                <label style="display:flex; align-items:center; gap:8px; padding:6px 4px; font-size:12px; cursor:pointer; border-bottom: 1px solid rgba(0,0,0,0.03);">
+                    <input type="checkbox" name="wsInitialMember" value="${escHtml(u.id)}">
+                    <span style="display:inline-block; width:22px; height:22px; border-radius:50%; background:${u.avatarColor || '#0052cc'}; color:#fff; text-align:center; line-height:22px; font-size:10px; font-weight:700;">${initials(u.name)}</span>
+                    <span style="font-weight: 500;">${escHtml(u.name)}</span>
+                    <span style="color:var(--text-muted); font-size:11px;">(@${escHtml(u.username)})</span>
+                </label>
+            `).join('') || '<div style="color:var(--text-muted); font-size:12px;">Kullanıcı bulunamadı.</div>';
+        } catch {
+            initialList.innerHTML = '';
+        }
+    }
+
+    openModal('workspaceModal');
+};
+
+window.openEditWorkspaceModal = async function(wsId) {
+    const err = document.getElementById('workspaceModalError');
+    if (err) err.style.display = 'none';
+
+    try {
+        const res = await API.getWorkspaces();
+        const ws = (res.workspaces || []).find(w => w.id === wsId);
+        if (!ws) {
+            showToast('Çalışma alanı bulunamadı', 'error');
+            return;
+        }
+        document.getElementById('editWorkspaceId').value = wsId;
+        document.getElementById('workspaceModalTitle').textContent = `✏️ '${ws.name}' Düzenle`;
+        document.getElementById('wsInputName').value = ws.name;
+        document.getElementById('wsInputDesc').value = ws.description || '';
+
+        const group = document.getElementById('wsInitialMembersGroup');
+        if (group) group.style.display = 'none';
+
+        openModal('workspaceModal');
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+};
+
+window.saveWorkspaceSubmit = async function() {
+    const id = document.getElementById('editWorkspaceId').value;
+    const name = document.getElementById('wsInputName').value.trim();
+    const description = document.getElementById('wsInputDesc').value.trim();
+    const err = document.getElementById('workspaceModalError');
+
+    if (!name) {
+        if (err) {
+            err.textContent = 'Lütfen çalışma alanı adını giriniz.';
+            err.style.display = 'block';
+        }
+        return;
+    }
+
+    try {
+        if (id) {
+            await API.updateWorkspace(id, { name, description });
+            showToast('Çalışma alanı başarıyla güncellendi');
+        } else {
+            const selectedMemberIds = Array.from(document.querySelectorAll('input[name="wsInitialMember"]:checked')).map(cb => cb.value);
+            await API.createWorkspace(name, description, selectedMemberIds);
+            showToast('Yeni çalışma alanı başarıyla oluşturuldu');
+        }
+        closeModal('workspaceModal');
+        await renderWorkspacesView();
+        await renderWorkspaceSwitcher();
+    } catch (e) {
+        if (err) {
+            err.textContent = e.message || 'Kayıt başarısız oldu';
+            err.style.display = 'block';
+        }
+    }
+};
+
+window.deleteWorkspaceAction = async function(wsId) {
+    if (!confirm('Bu çalışma alanını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
+    try {
+        await API.deleteWorkspace(wsId);
+        showToast('Çalışma alanı silindi');
+        await renderWorkspacesView();
+        await renderWorkspaceSwitcher();
+    } catch (e) {
+        showToast(e.message || 'Silme işlemi başarısız', 'error');
+    }
+};
+
+window.switchToWorkspaceDirect = async function(targetId) {
+    try {
+        showToast('Çalışma alanı değiştiriliyor…', 'info');
+        await API.switchWorkspace(targetId);
+        await boot();
+        showToast('Çalışma alanına geçildi');
+    } catch (e) {
+        showToast(e.message || 'Geçiş başarısız', 'error');
+    }
+};
+
+let _currentWsMembersData = null;
+
+window.openWorkspaceMembersModal = async function(wsId) {
+    document.getElementById('manageMembersWsId').value = wsId;
+    const listEl = document.getElementById('wsMembersAssignmentList');
+    listEl.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-muted);">Üye bilgileri getiriliyor…</div>';
+    document.getElementById('searchWsMembersInput').value = '';
+
+    openModal('workspaceMembersModal');
+
+    try {
+        const res = await API.getWorkspaceMembers(wsId);
+        _currentWsMembersData = res;
+        document.getElementById('wsMembersModalSubtitle').textContent = `Çalışma Alanı: ${res.workspaceName || wsId}`;
+        renderWorkspaceMembersList();
+    } catch (e) {
+        listEl.innerHTML = `<div style="padding: 24px; text-align: center; color: var(--danger);">Yükleme hatası: ${escHtml(e.message)}</div>`;
+    }
+};
+
+function renderWorkspaceMembersList() {
+    if (!_currentWsMembersData) return;
+    const listEl = document.getElementById('wsMembersAssignmentList');
+    const searchVal = (document.getElementById('searchWsMembersInput')?.value || '').toLowerCase().trim();
+    const countBadge = document.getElementById('wsMembersCountBadge');
+
+    const assignedMap = new Map((_currentWsMembersData.members || []).map(m => [m.id || m.userId, m]));
+    const allUsers = _currentWsMembersData.allUsers || [];
+
+    const filtered = allUsers.filter(u =>
+        u.name.toLowerCase().includes(searchVal) ||
+        u.username.toLowerCase().includes(searchVal)
+    );
+
+    if (countBadge) {
+        countBadge.textContent = `${assignedMap.size} üye seçili`;
+    }
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">Aramanıza uygun kullanıcı bulunamadı.</div>';
+        return;
+    }
+
+    listEl.innerHTML = filtered.map(u => {
+        const isAssigned = assignedMap.has(u.id);
+        const memberRole = assignedMap.get(u.id)?.role || 'member';
+
+        return `
+            <div class="ws-member-item ${isAssigned ? 'selected' : ''}" data-uid="${escHtml(u.id)}">
+                <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                    <input type="checkbox" class="ws-member-check" ${isAssigned ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px;">
+                    <div style="width: 32px; height: 32px; border-radius: 50%; background: ${escHtml(u.avatarColor || '#0052cc')}; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;">
+                        ${initials(u.name)}
+                    </div>
+                    <div>
+                        <div style="font-weight: 600; font-size: 13px; color: var(--text-primary);">${escHtml(u.name)}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">@${escHtml(u.username)}</div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <select class="form-select ws-member-role-select" style="font-size: 11px; padding: 4px 8px; height: 28px;" ${!isAssigned ? 'disabled' : ''}>
+                        <option value="member" ${memberRole === 'member' ? 'selected' : ''}>Üye</option>
+                        <option value="admin" ${memberRole === 'admin' ? 'selected' : ''}>Yönetici</option>
+                    </select>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    listEl.querySelectorAll('.ws-member-item').forEach(row => {
+        const uid = row.dataset.uid;
+        const check = row.querySelector('.ws-member-check');
+        const roleSel = row.querySelector('.ws-member-role-select');
+
+        check.addEventListener('change', (e) => {
+            e.stopPropagation();
+            if (check.checked) {
+                row.classList.add('selected');
+                roleSel.disabled = false;
+                const uObj = allUsers.find(x => x.id === uid);
+                assignedMap.set(uid, { id: uid, userId: uid, username: uObj?.username || '', name: uObj?.name || '', role: roleSel.value });
+            } else {
+                row.classList.remove('selected');
+                roleSel.disabled = true;
+                assignedMap.delete(uid);
+            }
+            _currentWsMembersData.members = Array.from(assignedMap.values());
+            if (countBadge) countBadge.textContent = `${assignedMap.size} üye seçili`;
+        });
+
+        roleSel.addEventListener('change', () => {
+            if (assignedMap.has(uid)) {
+                assignedMap.get(uid).role = roleSel.value;
+            }
+        });
+    });
+}
+
+safeAddListener('searchWsMembersInput', 'input', () => {
+    renderWorkspaceMembersList();
+});
+
+safeAddListener('btnSaveWorkspaceMembers', 'click', async () => {
+    const wsId = document.getElementById('manageMembersWsId').value;
+    if (!wsId || !_currentWsMembersData) return;
+
+    const payload = (_currentWsMembersData.members || []).map(m => ({
+        userId: m.id || m.userId,
+        role: m.role || 'member'
+    }));
+
+    try {
+        await API.updateWorkspaceMembers(wsId, payload);
+        showToast('Takım üyeleri başarıyla güncellendi');
+        closeModal('workspaceMembersModal');
+        await renderWorkspacesView();
+        await renderWorkspaceSwitcher();
+    } catch (e) {
+        showToast(e.message || 'Üyeler kaydedilemedi', 'error');
+    }
+});
+
+safeAddListener('btnOpenCreateWorkspaceModal', 'click', () => window.openCreateWorkspaceModal());
+safeAddListener('btnRefreshWorkspaces', 'click', () => renderWorkspacesView());
+safeAddListener('btnSaveWorkspace', 'click', () => window.saveWorkspaceSubmit());
+safeAddListener('manageWorkspacesBtn', 'click', () => switchView('workspaces'));
+safeAddListener('sidebarWorkspacesBtn', 'click', () => switchView('workspaces'));
+
+// ── Comment Mention Autocomplete Controller ───────────────
+function setupCommentMentionAutocomplete() {
+    const textarea = document.getElementById('newComment');
+    const suggestionsBox = document.getElementById('mentionSuggestions');
+    if (!textarea || !suggestionsBox) return;
+
+    let activeMentionIndex = -1;
+    let filteredUsers = [];
+
+    function hideSuggestions() {
+        suggestionsBox.style.display = 'none';
+        suggestionsBox.innerHTML = '';
+        activeMentionIndex = -1;
+        filteredUsers = [];
+    }
+
+    textarea.addEventListener('input', () => {
+        const cursor = textarea.selectionStart;
+        const textBeforeCursor = textarea.value.slice(0, cursor);
+        const match = textBeforeCursor.match(/@([a-zA-Z0-9_.]*)$/);
+
+        if (!match) {
+            hideSuggestions();
+            return;
+        }
+
+        const query = match[1].toLowerCase();
+        const candidateUsers = (users && users.length > 0) ? users : (window.users || []);
+        filteredUsers = candidateUsers.filter(u =>
+            (u.username && u.username.toLowerCase().includes(query)) ||
+            (u.name && u.name.toLowerCase().includes(query))
+        );
+
+        if (filteredUsers.length === 0) {
+            hideSuggestions();
+            return;
+        }
+
+        activeMentionIndex = 0;
+        renderSuggestions();
+    });
+
+    function renderSuggestions() {
+        suggestionsBox.style.display = 'flex';
+        suggestionsBox.innerHTML = filteredUsers.map((u, idx) => {
+            const isAct = idx === activeMentionIndex ? 'active' : '';
+            return `
+                <div class="mention-item ${isAct}" data-idx="${idx}">
+                    <div class="mention-item-avatar" style="background:${u.avatarColor || '#0052cc'}">
+                        ${initials(u.name || u.username)}
+                    </div>
+                    <div>
+                        <div class="mention-item-name">${escHtml(u.name)}</div>
+                        <div class="mention-item-handle">@${escHtml(u.username)}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        suggestionsBox.querySelectorAll('.mention-item').forEach(item => {
+            item.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                const idx = Number(item.dataset.idx);
+                selectMentionUser(filteredUsers[idx]);
+            });
+        });
+    }
+
+    function selectMentionUser(user) {
+        if (!user) return;
+        const cursor = textarea.selectionStart;
+        const textBeforeCursor = textarea.value.slice(0, cursor);
+        const textAfterCursor = textarea.value.slice(cursor);
+        const match = textBeforeCursor.match(/@([a-zA-Z0-9_.]*)$/);
+        if (!match) return;
+
+        const beforeMatch = textBeforeCursor.slice(0, match.index);
+        const handle = user.username || user.name.replace(/\s+/g, '_');
+        const inserted = `@${handle} `;
+        textarea.value = beforeMatch + inserted + textAfterCursor;
+        const newCursorPos = beforeMatch.length + inserted.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+        textarea.focus();
+        hideSuggestions();
+    }
+
+    textarea.addEventListener('keydown', (e) => {
+        if (suggestionsBox.style.display !== 'none' && filteredUsers.length > 0) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                activeMentionIndex = (activeMentionIndex + 1) % filteredUsers.length;
+                renderSuggestions();
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                activeMentionIndex = (activeMentionIndex - 1 + filteredUsers.length) % filteredUsers.length;
+                renderSuggestions();
+                return;
+            }
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                selectMentionUser(filteredUsers[activeMentionIndex]);
+                return;
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                hideSuggestions();
+                return;
+            }
+        }
+    });
+
+    textarea.addEventListener('blur', () => {
+        setTimeout(hideSuggestions, 200);
+    });
+}
+setupCommentMentionAutocomplete();
 
 // ── User & Team Management Controller ─────────────────────
 async function loadAdminData() {

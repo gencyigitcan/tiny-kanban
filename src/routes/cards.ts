@@ -10,7 +10,26 @@ import type { Card } from '../types/index.js';
 
 export const cardRouter = Router();
 
-function notifyAssignee(db: any, cardId: string, cardTitle: string, assigneeName: string, sender: any) {
+function addNotification(db: any, notif: any, req: any) {
+    db.notifications = db.notifications || [];
+    db.notifications.push(notif);
+    const env = req?.environment || getEnvironment(req);
+    const currentTenant = req?.tenantId || 'personal';
+    if (currentTenant !== 'personal') {
+        try {
+            const personalDb = readDb({ tenantId: 'personal', environment: env });
+            if (personalDb && personalDb !== db) {
+                personalDb.notifications = personalDb.notifications || [];
+                if (!personalDb.notifications.some((n: any) => n.id === notif.id)) {
+                    personalDb.notifications.push(notif);
+                    writeDbSync(personalDb, { tenantId: 'personal', environment: env });
+                }
+            }
+        } catch {}
+    }
+}
+
+function notifyAssignee(db: any, cardId: string, cardTitle: string, assigneeName: string, sender: any, req?: any) {
     if (!assigneeName || !sender) return;
     const recipient = db.users.find((u: any) => u.name.toLowerCase() === assigneeName.toLowerCase());
     if (recipient && recipient.id !== sender.id) {
@@ -25,8 +44,7 @@ function notifyAssignee(db: any, cardId: string, cardTitle: string, assigneeName
             read: false,
             createdAt: Date.now()
         };
-        db.notifications = db.notifications || [];
-        db.notifications.push(notification);
+        addNotification(db, notification, req);
     }
 }
 
@@ -87,7 +105,7 @@ cardRouter.get('/:id/activity', (req, res) => {
     res.json({ activity: card.activity || [] });
 });
 
-/** POST /api/cards/:id/comments - Add comment directly with activity logging */
+/** POST /api/cards/:id/comments - Add comment directly with activity logging & mention notifications */
 cardRouter.post('/:id/comments', (req, res) => {
     const db = readDb(req);
     const card = db.cards.find(c => c.id === req.params.id);
@@ -109,6 +127,73 @@ cardRouter.post('/:id/comments', (req, res) => {
 
     card.comments = card.comments || [];
     card.comments.push(newComment);
+
+    const textSnippet = text.length > 50 ? text.slice(0, 47) + '…' : text;
+    const notifiedUserIds = new Set<string>();
+    if (authorId) notifiedUserIds.add(authorId);
+    if (req.user?.id) notifiedUserIds.add(req.user.id);
+
+    // 1. Detect mentions (@username or @name)
+    const mentionRegex = /@([a-zA-Z0-9_.@+-]+)/g;
+    let match;
+    const mentionedKeys = new Set<string>();
+    while ((match = mentionRegex.exec(text)) !== null) {
+        mentionedKeys.add(match[1].toLowerCase());
+    }
+
+    const candidateUsers = (db.users && db.users.length > 0) ? db.users : [];
+
+    for (const u of candidateUsers) {
+        const uName = (u.username || '').toLowerCase();
+        const fName = (u.name || '').toLowerCase();
+        const isMentioned = mentionedKeys.has(uName) || 
+                            mentionedKeys.has(fName) || 
+                            text.toLowerCase().includes(`@${uName}`) || 
+                            text.toLowerCase().includes(`@${fName}`);
+
+        if (isMentioned && !notifiedUserIds.has(u.id)) {
+            notifiedUserIds.add(u.id);
+            const notif = {
+                id: 'ntf-' + uid(),
+                userId: u.id,
+                senderId: req.user?.id || authorId || 'system',
+                senderName: authorName,
+                cardId: card.id,
+                cardTitle: card.title,
+                text: `${authorName}, '${card.title}' (${card.key}) biletinde sizden bahsetti: "${textSnippet}"`,
+                type: 'mention',
+                read: false,
+                createdAt: Date.now()
+            };
+            addNotification(db, notif, req);
+        }
+    }
+
+    // 2. Notify assignee if not the commenter and not already notified
+    if (card.assignee && card.assignee.trim()) {
+        const assigneeLower = card.assignee.trim().toLowerCase();
+        const assigneeUser = candidateUsers.find((u: any) =>
+            (u.name && u.name.toLowerCase() === assigneeLower) ||
+            (u.username && u.username.toLowerCase() === assigneeLower)
+        );
+        if (assigneeUser && !notifiedUserIds.has(assigneeUser.id)) {
+            notifiedUserIds.add(assigneeUser.id);
+            const notif = {
+                id: 'ntf-' + uid(),
+                userId: assigneeUser.id,
+                senderId: req.user?.id || authorId || 'system',
+                senderName: authorName,
+                cardId: card.id,
+                cardTitle: card.title,
+                text: `${authorName}, size ait '${card.title}' (${card.key}) biletine yorum ekledi: "${textSnippet}"`,
+                type: 'comment',
+                read: false,
+                createdAt: Date.now()
+            };
+            addNotification(db, notif, req);
+        }
+    }
+
     writeDbSync(db, req);
 
     logActivity({
@@ -169,7 +254,7 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
         activity: []
     };
     db.cards.push(card);
-    notifyAssignee(db, card.id, card.title, card.assignee, req.user);
+    notifyAssignee(db, card.id, card.title, card.assignee, req.user, req);
     writeDbSync(db, req);
 
     logActivity({
@@ -229,7 +314,7 @@ cardRouter.put('/:id', validate(updateCardSchema), (req, res) => {
     }
 
     if (newAssignee && newAssignee !== oldAssignee) {
-        notifyAssignee(db, db.cards[idx].id, title, newAssignee, req.user);
+        notifyAssignee(db, db.cards[idx].id, title, newAssignee, req.user, req);
     }
 
     writeDbSync(db, req);

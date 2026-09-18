@@ -106,6 +106,9 @@
                     </button>
                     <div class="jira-nav-dropdown" id="topNavManageDropdown" style="display: none;">
                         <div class="jira-dropdown-header">Proje ve Takım Yapılandırması</div>
+                        <button class="jira-dropdown-item view-tab" data-view="workspaces" id="manageWorkspacesBtn" type="button">
+                            <span class="menu-icon">🏢</span> <span>Çalışma Alanları (Projeler)</span>
+                        </button>
                         <button class="jira-dropdown-item view-tab" data-view="epics" id="manageEpicsBtn" type="button">
                             <span class="menu-icon">🏷️</span> <span>Epics &amp; Hedefler</span>
                         </button>
@@ -228,7 +231,10 @@
                     <span class="nav-icon">👤</span> <span>Görevlerim</span>
                 </button>
 
-                <div class="sidebar-section-title">PROJE AYARLARI</div>
+                <div class="sidebar-section-title" id="sidebarProjectSettingsTitle">PROJE AYARLARI</div>
+                <button class="view-tab" data-view="workspaces" id="sidebarWorkspacesBtn">
+                    <span class="nav-icon">🏢</span> <span>Çalışma Alanları</span>
+                </button>
                 <button class="view-tab" data-view="epics" id="sidebarEpicsBtn">
                     <span class="nav-icon">🏷️</span> <span>Epics</span>
                 </button>
@@ -476,6 +482,47 @@
         </div>
     </div>
 
+    <!-- WORKSPACES VIEW -->
+    <div class="view-container" id="view-workspaces">
+        <div class="manager-view-wrap">
+            <div class="manager-view-header">
+                <div>
+                    <h2 class="manager-view-title">🏢 Çalışma Alanları &amp; Proje Yönetimi</h2>
+                    <p class="manager-view-subtitle">Takımlar, departman çalışma alanları ve kullanıcı yetkilendirme merkezi.</p>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button class="btn btn-secondary btn-sm" id="btnRefreshWorkspaces" type="button">🔄 Yenile</button>
+                    <button class="btn btn-primary btn-sm" id="btnOpenCreateWorkspaceModal" type="button">✚ Yeni Çalışma Alanı Oluştur</button>
+                </div>
+            </div>
+
+            <!-- KPI Cards -->
+            <div class="manager-kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-label">Toplam Çalışma Alanı</div>
+                    <div class="kpi-value" id="kpiTotalWorkspaces">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Takım Panoları</div>
+                    <div class="kpi-value text-primary" id="kpiTeamWorkspaces">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Bireysel / Kişisel Panolar</div>
+                    <div class="kpi-value" id="kpiPersonalWorkspaces">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Aktif Çalışma Alanı</div>
+                    <div class="kpi-value text-success" id="kpiActiveWsName" style="font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">—</div>
+                </div>
+            </div>
+
+            <!-- Workspaces Cards Grid -->
+            <div class="workspaces-grid" id="workspacesGrid">
+                <!-- Populated dynamically by renderWorkspacesView() -->
+            </div>
+        </div>
+    </div>
+
     <!-- EPICS VIEW -->
     <div class="view-container" id="view-epics">
         <div id="epicsView"></div>
@@ -677,9 +724,10 @@
                         <!-- Sub-tab 1: Comments -->
                         <div id="cardSubTabComments">
                             <div class="comments-list" id="commentsList"></div>
-                            <div class="add-comment-row" style="margin-top:12px;">
+                            <div class="add-comment-row" style="margin-top:12px; position:relative;">
                                 <textarea class="add-comment-input" id="newComment" rows="2"
-                                    placeholder="Yorum ekle…"></textarea>
+                                    placeholder="Yorum ekle… (Takım arkadaşını etiketlemek için @ yazın)"></textarea>
+                                <div class="mention-suggestions" id="mentionSuggestions" style="display:none;"></div>
                                 <button type="button" class="btn btn-primary btn-sm" id="addCommentBtn"
                                     style="align-self:flex-end">Gönder</button>
                             </div>
@@ -770,6 +818,74 @@
                     <button class="btn btn-primary btn-sm" id="addSprintBtn" style="align-self:flex-start">Sprint
                         Ekle</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+     WORKSPACE CREATE / EDIT MODAL
+     ============================================================ -->
+    <div class="modal-overlay" id="workspaceModal">
+        <div class="modal" style="max-width: 520px;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="workspaceModalTitle">🏢 Yeni Çalışma Alanı Oluştur</h2>
+                <button class="modal-close" onclick="closeModal('workspaceModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="workspaceForm" autocomplete="off">
+                    <input type="hidden" id="editWorkspaceId">
+                    <div class="form-group">
+                        <label class="form-label">Çalışma Alanı Adı <span style="color:var(--danger)">*</span></label>
+                        <input class="form-input" type="text" id="wsInputName" placeholder="ör. Mobil Uygulama Takımı" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Açıklama</label>
+                        <textarea class="form-textarea" id="wsInputDesc" rows="3" placeholder="Bu çalışma alanının veya projenin amacı, kapsamı…"></textarea>
+                    </div>
+                    <div class="form-group" id="wsInitialMembersGroup">
+                        <label class="form-label">İlk Takım Üyelerini Ata (İsteğe Bağlı)</label>
+                        <div style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--surface);" id="wsInitialMembersList">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                    <div class="auth-error" id="workspaceModalError" style="display: none;"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('workspaceModal')">İptal</button>
+                <button type="button" class="btn btn-primary" id="btnSaveWorkspace">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+     WORKSPACE MEMBERS MANAGEMENT MODAL
+     ============================================================ -->
+    <div class="modal-overlay" id="workspaceMembersModal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <div>
+                    <h2 class="modal-title" id="wsMembersModalTitle">👥 Takım Üyelerini Ata &amp; Yönet</h2>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;" id="wsMembersModalSubtitle">Çalışma Alanı: —</div>
+                </div>
+                <button class="modal-close" onclick="closeModal('workspaceMembersModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="manageMembersWsId">
+                <div style="margin-bottom: 12px;">
+                    <input class="form-input" type="text" id="searchWsMembersInput" placeholder="🔍 Üye ara (isim veya kullanıcı adı)…">
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; color: var(--text-muted);">
+                    <span id="wsMembersCountBadge">0 üye seçili</span>
+                    <span>Tıklayarak ekleyin veya çıkarın</span>
+                </div>
+                <div class="ws-members-assignment-list" id="wsMembersAssignmentList" style="max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('workspaceMembersModal')">İptal</button>
+                <button type="button" class="btn btn-primary" id="btnSaveWorkspaceMembers">Üye Değişikliklerini Kaydet</button>
             </div>
         </div>
     </div>

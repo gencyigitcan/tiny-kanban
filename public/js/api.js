@@ -199,11 +199,33 @@ const API = {
     async getWorkspaces() {
         return await request('/api/admin/workspaces');
     },
-    async createWorkspace(name, description) {
+    async createWorkspace(name, description, memberIds) {
         return await request('/api/admin/workspaces', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, description })
+            body: JSON.stringify({ name, description, memberIds })
+        });
+    },
+    async updateWorkspace(workspaceId, data) {
+        return await request(`/api/admin/workspaces/${workspaceId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    },
+    async deleteWorkspace(workspaceId) {
+        return await request(`/api/admin/workspaces/${workspaceId}`, {
+            method: 'DELETE'
+        });
+    },
+    async getWorkspaceMembers(workspaceId) {
+        return await request(`/api/admin/workspaces/${workspaceId}/members`);
+    },
+    async updateWorkspaceMembers(workspaceId, members) {
+        return await request(`/api/admin/workspaces/${workspaceId}/members`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ members })
         });
     },
     async getAdminUsers() {
