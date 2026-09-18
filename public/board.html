@@ -583,6 +583,17 @@
             <div class="modal-body">
                 <form id="cardForm" autocomplete="off">
                     <input type="hidden" id="editCardId">
+                    <!-- Template Picker Row -->
+                    <div class="form-row" id="cardTemplateRow" style="margin-bottom:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;align-items:center;">
+                        <div style="display:flex;align-items:center;gap:6px;flex:1;">
+                            <span style="font-size:12px;font-weight:600;color:var(--text);">📋 Şablon:</span>
+                            <select class="form-select" id="cardTemplateSelect" onchange="onSelectCardTemplate(this.value)" style="font-size:12px;padding:4px 8px;max-width:280px;">
+                                <option value="">— Boş Şablon (Manuel) —</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-ghost btn-xs" onclick="saveCurrentFormAsTemplate()" style="font-size:11px;color:var(--accent);" title="Mevcut kart bilgilerini yeni bir şablon olarak kaydeder">💾 Şablon Olarak Kaydet</button>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group" style="flex: 0 0 160px;">
                             <label class="form-label">Bilet Tipi</label>
@@ -680,6 +691,27 @@
                                 <option value="72">📅 72 Saat (3 İş Günü)</option>
                                 <option value="0">❌ SLA Takibi Yok</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- Recurring Task (Monday.com Style) -->
+                    <div class="form-row" style="margin-bottom:12px;">
+                        <div class="form-group" style="flex:1;margin-bottom:0;">
+                            <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">
+                                <span>🔄 Tekrarlayan Görev (Recurring Task)</span>
+                                <span style="font-size:10.5px;color:var(--text-muted);">Tamamlandığında yeni döngü oluşturur</span>
+                            </label>
+                            <div style="display:flex;align-items:center;gap:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;">
+                                <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;user-select:none;">
+                                    <input type="checkbox" id="cardIsRecurring" onchange="toggleCardRecurrenceOptions(this.checked)">
+                                    <span style="font-weight:600;">Otomatik Tekrarla</span>
+                                </label>
+                                <select class="form-select" id="cardRecurrenceInterval" style="display:none;flex:1;font-size:12px;padding:4px 8px;">
+                                    <option value="daily">📅 Günlük (Daily)</option>
+                                    <option value="weekly" selected>🗓️ Haftalık (Weekly)</option>
+                                    <option value="monthly">📆 Aylık (Monthly)</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 

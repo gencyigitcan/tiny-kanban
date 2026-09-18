@@ -229,6 +229,7 @@ function cardHTML(card, epics = [], readonly = false) {
         ${card.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="background:${getAssigneeColor(card.assignee)}" title="${escHtml(card.assignee)}">${escHtml(initials(card.assignee))}</span>${escHtml(card.assignee)}</span>` : '<span class="card-assignee unassigned" style="color:var(--text-muted);font-size:11px;">👤 Atanmamış</span>'}
         ${dueBadge(card.dueDate)}
         ${formatSlaBadge(card)}
+        ${card.recurrence?.interval ? `<span class="badge-recurring" style="font-size:10.5px;background:rgba(99,102,241,0.12);color:var(--accent);padding:1px 6px;border-radius:4px;font-weight:600;display:inline-flex;align-items:center;gap:3px;" title="Tekrarlayan Görev (${card.recurrence.interval})">🔄 ${card.recurrence.interval}</span>` : ''}
         ${depBadge}
       </div>
       <div class="card-footer-right">

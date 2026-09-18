@@ -453,7 +453,8 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
             return (typeof hours === 'number' && hours > 0) ? (Date.now() + hours * 3600 * 1000) : null;
         })(),
         slaCompletedAt: null,
-        slaBreached: false
+        slaBreached: false,
+        recurrence: body.recurrence ?? null
     };
     db.cards.push(card);
     executeAutomations({ trigger: 'card_created', card, db, req });
@@ -514,7 +515,8 @@ cardRouter.put('/:id', validate(updateCardSchema), asyncHandler(async (req, res)
         'estimatedEffort', 'spentEffort',
         'subtasks', 'comments', 'epicId', 'sprintId',
         'blockedBy', 'blocks', 'customFields',
-        'slaTargetHours', 'slaDueAt', 'slaCompletedAt', 'slaBreached'
+        'slaTargetHours', 'slaDueAt', 'slaCompletedAt', 'slaBreached',
+        'recurrence'
     ];
     for (const key of allowed) {
         if (req.body[key] !== undefined) {
@@ -542,6 +544,77 @@ cardRouter.put('/:id', validate(updateCardSchema), asyncHandler(async (req, res)
                 currentCard.slaCompletedAt = Date.now();
                 if (currentCard.slaDueAt) {
                     currentCard.slaBreached = currentCard.slaCompletedAt > currentCard.slaDueAt;
+                }
+            }
+            // Recurring task auto-schedule on completion
+            if (currentCard.recurrence && currentCard.recurrence.interval) {
+                const interval = currentCard.recurrence.interval;
+                const msMap: Record<string, number> = {
+                    daily: 24 * 3600 * 1000,
+                    weekly: 7 * 24 * 3600 * 1000,
+                    monthly: 30 * 24 * 3600 * 1000
+                };
+                const deltaMs = msMap[interval] || (24 * 3600 * 1000);
+                const nextRunAt = Date.now() + deltaMs;
+                
+                let nextDueDate: string | null = null;
+                if (currentCard.dueDate) {
+                    const prevDue = new Date(currentCard.dueDate).getTime();
+                    if (!isNaN(prevDue)) {
+                        nextDueDate = new Date(prevDue + deltaMs).toISOString().slice(0, 10);
+                    }
+                }
+
+                const nextCard: Card = {
+                    id: uid(),
+                    key: `TK-${++db.taskCounter}`,
+                    title: currentCard.title,
+                    desc: currentCard.desc,
+                    issueType: currentCard.issueType || 'task',
+                    assignee: currentCard.assignee,
+                    priority: currentCard.priority,
+                    col: (db.columns && db.columns[0]?.id) || 'todo',
+                    startDate: new Date().toISOString().slice(0, 10),
+                    dueDate: nextDueDate,
+                    labels: [...(currentCard.labels || [])],
+                    storyPoints: currentCard.storyPoints,
+                    estimatedEffort: currentCard.estimatedEffort,
+                    spentEffort: 0,
+                    subtasks: (currentCard.subtasks || []).map(s => ({ ...s, id: uid(), done: false })),
+                    comments: [],
+                    epicId: currentCard.epicId,
+                    sprintId: currentCard.sprintId,
+                    createdAt: Date.now(),
+                    activity: [],
+                    blockedBy: [],
+                    blocks: [],
+                    customFields: { ...(currentCard.customFields || {}) },
+                    recurrence: {
+                        interval,
+                        nextRunAt
+                    },
+                    slaTargetHours: currentCard.slaTargetHours,
+                    slaDueAt: currentCard.slaTargetHours ? (Date.now() + currentCard.slaTargetHours * 3600 * 1000) : null,
+                    slaCompletedAt: null,
+                    slaBreached: false
+                };
+
+                db.cards.push(nextCard);
+                logActivity({
+                    userId: req.user?.id || 'unknown',
+                    username: req.user?.username || 'unknown',
+                    name: req.user?.name || 'Kullanıcı',
+                    userRole: req.user?.role || 'user',
+                    action: 'CARD_CREATE',
+                    entityType: 'card',
+                    entityId: nextCard.id,
+                    details: `Tekrarlayan görev döngüsü başlatıldı: '${nextCard.title}' (${nextCard.key}) [${interval}]`,
+                    workspaceId: req.tenantId || 'personal',
+                    environment: req.environment || getEnvironment(req)
+                }, req);
+
+                if (nextCard.assignee) {
+                    notifyAssignee(db, nextCard.id, nextCard.title, nextCard.assignee, req.user, req);
                 }
             }
         } else {

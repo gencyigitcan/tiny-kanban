@@ -44,6 +44,10 @@ export const createCardSchema = z.object({
     blocks: z.array(z.string()).optional().default([]),
     customFields: z.record(z.string(), z.any()).optional().default({}),
     slaTargetHours: z.number().min(0).max(8760).nullable().optional(),
+    recurrence: z.object({
+        interval: z.enum(['daily', 'weekly', 'monthly']),
+        nextRunAt: z.number().nullable().optional()
+    }).nullable().optional(),
 });
 
 export const updateCardSchema = z.object({
@@ -71,7 +75,24 @@ export const updateCardSchema = z.object({
     slaDueAt: z.number().nullable().optional(),
     slaCompletedAt: z.number().nullable().optional(),
     slaBreached: z.boolean().optional(),
+    recurrence: z.object({
+        interval: z.enum(['daily', 'weekly', 'monthly']),
+        nextRunAt: z.number().nullable().optional()
+    }).nullable().optional(),
 });
+
+export const createTemplateSchema = z.object({
+    name: z.string().min(1, 'Şablon adı boş olamaz').max(100).trim(),
+    description: z.string().max(500).optional(),
+    issueType: issueType.optional(),
+    titleTemplate: z.string().max(200).trim().default(''),
+    descTemplate: z.string().max(5000).trim().default(''),
+    priority: priority.optional().default('medium'),
+    labels: z.array(z.string().max(50)).max(10).optional().default([]),
+    subtasks: z.array(z.string().max(200)).max(50).optional().default([])
+});
+
+export const updateTemplateSchema = createTemplateSchema.partial();
 
 export const createCustomFieldSchema = z.object({
     name: z.string().min(1, 'Alan adı boş olamaz').max(50).trim(),

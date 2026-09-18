@@ -412,5 +412,20 @@ const API = {
     },
     async getClosedSprints() {
         return await request('/api/reports/closed-sprints');
+    },
+
+    // ── Issue Templates ──────────────────────────────────────
+    async getTemplates() {
+        return await request('/api/templates');
+    },
+    async createTemplate(payload) {
+        return await request('/api/templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    },
+    async deleteTemplate(id) {
+        return await request(`/api/templates/${id}`, { method: 'DELETE' });
     }
 };

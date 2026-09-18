@@ -34,6 +34,7 @@ import { columnRouter } from './routes/columns.js';
 import { reportsRouter } from './routes/reports.js';
 import { customFieldsRouter } from './routes/custom_fields.js';
 import { automationsRouter } from './routes/automations.js';
+import { templatesRouter } from './routes/templates.js';
 import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/error.js';
 
@@ -106,6 +107,7 @@ app.use('/api/cards', requireAuth, cardRouter);
 app.use('/api/columns', requireAuth, columnRouter);
 app.use('/api/custom-fields', requireAuth, customFieldsRouter);
 app.use('/api/automations', requireAuth, automationsRouter);
+app.use('/api/templates', requireAuth, templatesRouter);
 app.use('/api/epics', requireAuth, epicRouter);
 app.use('/api/sprints', requireAuth, sprintRouter);
 app.use('/api/reports', requireAuth, reportsRouter);

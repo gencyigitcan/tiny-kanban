@@ -251,6 +251,94 @@ let _editSubtasks = [];
 let _editComments = [];
 let _editActivity = [];
 
+function toggleCardRecurrenceOptions(checked) {
+    const sel = document.getElementById('cardRecurrenceInterval');
+    if (sel) sel.style.display = checked ? 'block' : 'none';
+}
+window.toggleCardRecurrenceOptions = toggleCardRecurrenceOptions;
+
+async function loadCardTemplates() {
+    const select = document.getElementById('cardTemplateSelect');
+    if (!select) return;
+    try {
+        const tpls = await API.getTemplates();
+        window.cardTemplates = Array.isArray(tpls) ? tpls : [];
+        select.innerHTML = '<option value="">— Boş Şablon (Manuel) —</option>' +
+            window.cardTemplates.map(t => `<option value="${t.id}">${escHtml(t.name)}</option>`).join('');
+    } catch (e) {
+        console.error('Failed to load templates:', e);
+    }
+}
+window.loadCardTemplates = loadCardTemplates;
+
+function onSelectCardTemplate(templateId) {
+    if (!templateId) return;
+    const tpl = (window.cardTemplates || []).find(t => t.id === templateId);
+    if (!tpl) return;
+
+    if (tpl.titleTemplate) {
+        document.getElementById('cardTitle').value = tpl.titleTemplate;
+    }
+    if (tpl.descTemplate) {
+        document.getElementById('cardDesc').value = tpl.descTemplate;
+    }
+    if (tpl.issueType && document.getElementById('cardIssueType')) {
+        document.getElementById('cardIssueType').value = tpl.issueType;
+    }
+    if (tpl.priority) {
+        document.getElementById('cardPriority').value = tpl.priority;
+    }
+    if (Array.isArray(tpl.subtasks) && tpl.subtasks.length > 0) {
+        _editSubtasks = tpl.subtasks.map((s, idx) => ({
+            id: Date.now().toString(36) + idx,
+            text: typeof s === 'string' ? s : (s.text || s.title || ''),
+            done: false
+        }));
+        renderSubtasksList();
+    }
+    if (Array.isArray(tpl.labels) && tpl.labels.length > 0) {
+        const labelPills = document.querySelectorAll('#labelsGrid .label-chip');
+        labelPills.forEach(pill => {
+            const lid = pill.dataset.lid;
+            const labelObj = (labels || []).find(l => l.id === lid);
+            if (labelObj && tpl.labels.includes(labelObj.name.toLowerCase())) {
+                pill.classList.add('selected');
+            }
+        });
+    }
+    showToast(`'${tpl.name}' şablonu yüklendi ✓`);
+}
+window.onSelectCardTemplate = onSelectCardTemplate;
+
+async function saveCurrentFormAsTemplate() {
+    const title = document.getElementById('cardTitle')?.value.trim() || '';
+    const name = prompt('Bu şablon için bir ad girin:', title || 'Özel Bilet Şablonu');
+    if (!name) return;
+
+    const desc = document.getElementById('cardDesc')?.value || '';
+    const issueType = document.getElementById('cardIssueType')?.value || 'task';
+    const priority = document.getElementById('cardPriority')?.value || 'medium';
+    const subtaskTitles = (_editSubtasks || []).map(s => s.text || s.title);
+
+    try {
+        const newTpl = await API.createTemplate({
+            name,
+            issueType,
+            titleTemplate: title,
+            descTemplate: desc,
+            priority,
+            subtasks: subtaskTitles
+        });
+        showToast('Şablon başarıyla kaydedildi ✓');
+        await loadCardTemplates();
+        const select = document.getElementById('cardTemplateSelect');
+        if (select) select.value = newTpl.id;
+    } catch (e) {
+        showToast('Şablon kaydedilemedi: ' + (e.message || 'Hata'), 'error');
+    }
+}
+window.saveCurrentFormAsTemplate = saveCurrentFormAsTemplate;
+
 function openCardDetail(id, defaultCol) {
     const isNew = !id;
     const card = isNew ? null : cards.find(c => c.id === id);
@@ -262,6 +350,25 @@ function openCardDetail(id, defaultCol) {
     document.getElementById('cardPriority').value = card?.priority || 'medium';
     if (document.getElementById('cardIssueType')) {
         document.getElementById('cardIssueType').value = card?.issueType || 'task';
+    }
+
+    // Template row visibility and loading
+    const tplRow = document.getElementById('cardTemplateRow');
+    if (tplRow) {
+        tplRow.style.display = isNew ? 'flex' : 'none';
+        const tplSelect = document.getElementById('cardTemplateSelect');
+        if (tplSelect) tplSelect.value = '';
+        loadCardTemplates();
+    }
+
+    // Recurring task setup
+    const isRecurring = !!(card?.recurrence && card.recurrence.interval);
+    const recCheck = document.getElementById('cardIsRecurring');
+    const recInterval = document.getElementById('cardRecurrenceInterval');
+    if (recCheck) recCheck.checked = isRecurring;
+    if (recInterval) {
+        recInterval.value = card?.recurrence?.interval || 'weekly';
+        recInterval.style.display = isRecurring ? 'block' : 'none';
     }
 
     // Populate dynamic columns dropdown
@@ -706,7 +813,10 @@ safeAddListener('cardSaveBtn', 'click', async () => {
         subtasks: _editSubtasks,
         comments: _editComments,
         customFields: customFieldsPayload,
-        slaTargetHours: document.getElementById('cardSlaTarget')?.value !== '' ? Number(document.getElementById('cardSlaTarget').value) : null
+        slaTargetHours: document.getElementById('cardSlaTarget')?.value !== '' ? Number(document.getElementById('cardSlaTarget').value) : null,
+        recurrence: document.getElementById('cardIsRecurring')?.checked ? {
+            interval: document.getElementById('cardRecurrenceInterval')?.value || 'weekly'
+        } : null
     };
 
     try {

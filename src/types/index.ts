@@ -70,6 +70,10 @@ export interface Card {
     slaDueAt?: number | null;
     slaCompletedAt?: number | null;
     slaBreached?: boolean;
+    recurrence?: {
+        interval: 'daily' | 'weekly' | 'monthly';
+        nextRunAt?: number | null;
+    } | null;
 }
 
 export interface CardActivity {
@@ -302,6 +306,20 @@ export interface DbSchema {
     logs?: ActivityLog[];
     customFields?: CustomFieldDefinition[];
     automations?: AutomationRule[];
+    templates?: CardTemplate[];
+}
+
+export interface CardTemplate {
+    id: string;
+    name: string;
+    description?: string;
+    issueType?: IssueType;
+    titleTemplate: string;
+    descTemplate: string;
+    priority?: Priority;
+    labels?: string[];
+    subtasks?: string[];
+    createdAt: number;
 }
 
 export type AutomationTrigger = 
