@@ -1193,6 +1193,57 @@ function renderDashboard(cards, epics = [], sprints = []) {
   const totalSpent = cards.reduce((sum, c) => sum + (c.spentEffort || 0), 0);
   const effortPct = totalEst ? Math.round((totalSpent / totalEst) * 100) : 0;
 
+  // Monday.com Status Battery Data
+  const cols = (window.boardColumns && window.boardColumns.length > 0) ? window.boardColumns : (window.DEFAULT_COLUMNS || []);
+  const colStats = cols.map(c => {
+    const count = cards.filter(card => card.col === c.id).length;
+    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+    return { ...c, count, pct };
+  });
+
+  const batterySegments = colStats.map(c => {
+    if (c.count === 0) return '';
+    return `
+      <div class="monday-battery-segment" style="width:${c.pct}%;background:${c.color || '#6366f1'};" title="${escHtml(c.name)}: ${c.count} bilet (%${c.pct})">
+        ${c.pct >= 8 ? `${c.pct}%` : ''}
+      </div>
+    `;
+  }).join('') || '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-muted);">Pano boş</div>';
+
+  const columnPills = colStats.map(c => `
+    <div class="monday-status-pill">
+      <span class="monday-status-dot" style="background:${c.color || '#6366f1'};"></span>
+      <span>${escHtml(c.name)}</span>
+      <span style="color:var(--text-secondary);font-size:11px;">(${c.count} · %${c.pct})</span>
+    </div>
+  `).join('');
+
+  // SLA Metrics
+  const isDoneCol = (colId) => {
+    const c = cols.find(col => col.id === colId);
+    return c ? !!c.isDone : colId === 'done';
+  };
+  const slaCards = cards.filter(c => c.slaDueAt || c.slaTargetHours);
+  const slaMetCount = slaCards.filter(c => isDoneCol(c.col) && !c.slaBreached).length;
+  const slaBreachedCount = slaCards.filter(c => c.slaBreached || (!isDoneCol(c.col) && c.slaDueAt && Date.now() > c.slaDueAt)).length;
+  const slaActiveCount = slaCards.filter(c => !isDoneCol(c.col) && (!c.slaDueAt || Date.now() <= c.slaDueAt)).length;
+  const slaResolvedTotal = slaMetCount + slaBreachedCount;
+  const slaCompliancePct = slaResolvedTotal > 0 ? Math.round((slaMetCount / slaResolvedTotal) * 100) : (slaCards.length > 0 ? 100 : null);
+
+  // Jira Issue Types
+  const typeDefs = [
+    { type: 'bug', name: 'Hata (Bug)', icon: '🐛', color: '#ef4444' },
+    { type: 'story', name: 'Hikaye (Story)', icon: '📖', color: '#10b981' },
+    { type: 'task', name: 'Görev (Task)', icon: '📝', color: '#3b82f6' },
+    { type: 'incident', name: 'Acil (Incident)', icon: '🚨', color: '#dc2626' },
+    { type: 'improvement', name: 'İyileştirme', icon: '💡', color: '#8b5cf6' }
+  ];
+  const typeStats = typeDefs.map(t => {
+    const cnt = cards.filter(c => (t.type === 'task' ? (!c.issueType || c.issueType === 'task') : c.issueType === t.type)).length;
+    const pct = total > 0 ? Math.round((cnt / total) * 100) : 0;
+    return { ...t, cnt, pct };
+  });
+
   // overdue rows
   const overdueRows = overdue.slice(0, 6).map(c => {
     const diff = Math.abs(Math.floor((new Date(c.dueDate) - now) / 86400000));
@@ -1216,7 +1267,7 @@ function renderDashboard(cards, epics = [], sprints = []) {
   const activeSprint = sprints.find(s => s.active);
   const sprintHTML = activeSprint ? (() => {
     const sc = cards.filter(c => c.sprintId === activeSprint.id);
-    const sdone = sc.filter(c => c.col === 'done').length;
+    const sdone = sc.filter(c => isDoneCol(c.col)).length;
     const spct = sc.length ? Math.round((sdone / sc.length) * 100) : 0;
     return `<div>
       <div style="display:flex;justify-content:space-between;margin-bottom:8px">
@@ -1231,6 +1282,32 @@ function renderDashboard(cards, epics = [], sprints = []) {
   })() : '<p style="color:var(--text-muted);font-size:13px">Aktif sprint yok</p>';
 
   container.innerHTML = `<div class="dashboard-view">
+    <!-- Monday.com Segmented Status Battery Widget -->
+    <div class="monday-battery-card">
+      <div class="monday-battery-header">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">🔋</span>
+          <div>
+            <h3 style="margin:0;font-size:14px;font-weight:700;color:var(--text-primary);">Durum Dağılım Pili (Monday.com Status Battery)</h3>
+            <span style="font-size:11.5px;color:var(--text-secondary);">İş akışı kolonları ve bilet durumlarının oransal dağılımı</span>
+          </div>
+        </div>
+        <span style="font-size:12px;font-weight:700;background:rgba(99,102,241,0.1);color:var(--accent);padding:3px 10px;border-radius:12px;">
+          ${total} Toplam Bilet · %${donePct} Tamamlandı
+        </span>
+      </div>
+      <div class="monday-battery-bar-wrap">
+        <div class="monday-battery-bar">
+          ${batterySegments}
+        </div>
+        <div class="monday-battery-tip"></div>
+      </div>
+      <div class="monday-battery-pills">
+        ${columnPills}
+      </div>
+    </div>
+
+    <!-- Top KPI Cards -->
     <div class="dash-stats">
       <div class="stat-card accent">
         <div class="stat-label">Toplam Görev</div>
@@ -1253,6 +1330,8 @@ function renderDashboard(cards, epics = [], sprints = []) {
         <div class="stat-sub">%${effortPct} tüketildi</div>
       </div>
     </div>
+
+    <!-- Row 1: Priority & Overdue -->
     <div class="dash-row">
       <div class="dash-panel">
         <div class="dash-panel-title">🔥 Öncelik Dağılımı</div>
@@ -1265,6 +1344,48 @@ function renderDashboard(cards, epics = [], sprints = []) {
         ${overdueRows}
       </div>
     </div>
+
+    <!-- Row 2: SLA Compliance & Issue Types Breakdown -->
+    <div class="dash-row">
+      <div class="dash-panel">
+        <div class="dash-panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>⏱️ SLA Çözüm & Uyum Performansı</span>
+          ${slaCompliancePct !== null ? `<span style="font-size:12px;font-weight:700;color:${slaCompliancePct >= 90 ? 'var(--success)' : 'var(--danger)'}">%${slaCompliancePct} Uyum</span>` : ''}
+        </div>
+        ${slaCards.length === 0 ? '<p style="color:var(--text-muted);font-size:13px">SLA takipli bilet bulunmuyor</p>' : `
+          <div style="display:flex;align-items:center;gap:18px;margin-bottom:12px;">
+            <div style="width:70px;height:70px;border-radius:50%;background:conic-gradient(var(--success) ${slaCompliancePct || 0}%, var(--danger) 0);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.1);">
+              <div style="width:52px;height:52px;background:var(--surface);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--text-primary);">
+                %${slaCompliancePct || 0}
+              </div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:5px;font-size:12px;">
+              <div style="display:flex;justify-content:space-between;"><span>✅ Zamanında Çözülen:</span><strong>${slaMetCount} bilet</strong></div>
+              <div style="display:flex;justify-content:space-between;"><span>🚨 SLA Aşan (Breached):</span><strong style="color:var(--danger);">${slaBreachedCount} bilet</strong></div>
+              <div style="display:flex;justify-content:space-between;"><span>⏱️ Aktif SLA Süren:</span><strong style="color:var(--accent);">${slaActiveCount} bilet</strong></div>
+            </div>
+          </div>
+        `}
+      </div>
+      <div class="dash-panel">
+        <div class="dash-panel-title">🏷️ Jira Bilet Tipleri Dağılımı</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${typeStats.map(t => `
+            <div class="pri-bar-row">
+              <div class="pri-bar-label" style="width:110px;display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-primary);">
+                <span>${t.icon}</span> <span>${escHtml(t.name)}</span>
+              </div>
+              <div class="pri-bar-track">
+                <div class="pri-bar-fill" style="width:${t.pct}%;background:${t.color};"></div>
+              </div>
+              <div class="pri-bar-count">${t.cnt}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Sprint & Epic -->
     <div class="dash-row">
       <div class="dash-panel">
         <div class="dash-panel-title">🚀 Aktif Sprint</div>
