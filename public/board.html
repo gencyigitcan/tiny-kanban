@@ -340,6 +340,13 @@
                         <option value="incident">🚨 Acil</option>
                         <option value="improvement">💡 İyileştirme</option>
                     </select>
+                    <select class="jira-filter-select" id="filterSla" title="SLA Durumu">
+                        <option value="">⏱️ Tüm SLA'lar</option>
+                        <option value="breached">🚨 SLA Aşıldı (Breached)</option>
+                        <option value="at_risk">⚠️ Risk Altında (&lt; 4s)</option>
+                        <option value="on_track">🟢 Süre Var (&gt; 4s)</option>
+                        <option value="met">✅ Karşılandı</option>
+                    </select>
                     <select class="jira-filter-select" id="filterAssignee" title="Kişi" style="display: none;">
                         <option value="">👤 Kişiler</option>
                     </select>
@@ -649,11 +656,28 @@
                             </select>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Sprint</label>
-                        <select class="form-select" id="cardSprint">
-                            <option value="">— Sprint seç —</option>
-                        </select>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <label class="form-label">Sprint</label>
+                            <select class="form-select" id="cardSprint">
+                                <option value="">— Sprint seç —</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">
+                                <span>⏱️ SLA Çözüm Hedefi</span>
+                                <span id="cardSlaCountdownPreview" style="font-size:10.5px;font-weight:600;"></span>
+                            </label>
+                            <select class="form-select" id="cardSlaTarget">
+                                <option value="">— Otomatik (Öncelik / Tip) —</option>
+                                <option value="4">🚨 4 Saat (Kritik / Incident)</option>
+                                <option value="8">⚡ 8 Saat (Aynı Gün)</option>
+                                <option value="24">⏱️ 24 Saat (1 Gün - Yüksek)</option>
+                                <option value="48">📅 48 Saat (2 İş Günü)</option>
+                                <option value="72">📅 72 Saat (3 İş Günü)</option>
+                                <option value="0">❌ SLA Takibi Yok</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Dependencies (Blocked by) -->

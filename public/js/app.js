@@ -278,6 +278,35 @@ function openCardDetail(id, defaultCol) {
     document.getElementById('cardStart').value = card?.startDate || '';
     document.getElementById('cardDue').value = card?.dueDate || '';
 
+    // SLA Target & Countdown Preview
+    const slaTargetSel = document.getElementById('cardSlaTarget');
+    const slaPreview = document.getElementById('cardSlaCountdownPreview');
+    if (slaTargetSel) {
+        slaTargetSel.value = card?.slaTargetHours != null ? String(card.slaTargetHours) : '';
+    }
+    if (slaPreview) {
+        if (!card?.slaDueAt) {
+            slaPreview.textContent = '';
+        } else {
+            const isDone = typeof isCardDone === 'function' ? isCardDone(card) : card.col === 'done';
+            if (isDone) {
+                slaPreview.textContent = card.slaBreached ? '❌ SLA Kaçırıldı' : '✅ SLA Karşılandı';
+                slaPreview.style.color = card.slaBreached ? 'var(--danger)' : 'var(--success)';
+            } else {
+                const diff = card.slaDueAt - Date.now();
+                if (diff <= 0 || card.slaBreached) {
+                    slaPreview.textContent = '🚨 SLA Aşıldı!';
+                    slaPreview.style.color = 'var(--danger)';
+                } else {
+                    const h = Math.floor(diff / 3600000);
+                    const m = Math.floor((diff % 3600000) / 60000);
+                    slaPreview.textContent = `⏱️ Kalan: ${h}s ${m}dk`;
+                    slaPreview.style.color = diff < 4 * 3600000 ? 'var(--warning)' : 'var(--accent)';
+                }
+            }
+        }
+    }
+
     // Render Custom Fields in Modal
     const cfGroup = document.getElementById('cardCustomFieldsGroup');
     const cfContainer = document.getElementById('cardCustomFieldsContainer');
@@ -676,7 +705,8 @@ safeAddListener('cardSaveBtn', 'click', async () => {
         blockedBy,
         subtasks: _editSubtasks,
         comments: _editComments,
-        customFields: customFieldsPayload
+        customFields: customFieldsPayload,
+        slaTargetHours: document.getElementById('cardSlaTarget')?.value !== '' ? Number(document.getElementById('cardSlaTarget').value) : null
     };
 
     try {
@@ -751,6 +781,7 @@ safeAddListener('filterEpic', 'change', () => renderAll());
 safeAddListener('filterAssignee', 'change', () => renderAll());
 safeAddListener('filterPriority', 'change', () => renderAll());
 safeAddListener('filterIssueType', 'change', () => renderAll());
+safeAddListener('filterSla', 'change', () => renderAll());
 
 // ── Header buttons ────────────────────────────────────────
 safeAddListener('addTaskBtn', 'click', () => openCardDetail(null));

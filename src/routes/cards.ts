@@ -445,7 +445,14 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
         activity: [],
         blockedBy: body.blockedBy ?? [],
         blocks: body.blocks ?? [],
-        customFields: body.customFields ?? {}
+        customFields: body.customFields ?? {},
+        slaTargetHours: body.slaTargetHours !== undefined ? body.slaTargetHours : (body.issueType === 'incident' ? 4 : (body.priority === 'high' ? 24 : null)),
+        slaDueAt: (() => {
+            const hours = body.slaTargetHours !== undefined ? body.slaTargetHours : (body.issueType === 'incident' ? 4 : (body.priority === 'high' ? 24 : null));
+            return (typeof hours === 'number' && hours > 0) ? (Date.now() + hours * 3600 * 1000) : null;
+        })(),
+        slaCompletedAt: null,
+        slaBreached: false
     };
     db.cards.push(card);
     syncCardDependencies(db.cards);
@@ -501,11 +508,42 @@ cardRouter.put('/:id', validate(updateCardSchema), asyncHandler(async (req, res)
         'startDate', 'dueDate', 'labels', 'storyPoints',
         'estimatedEffort', 'spentEffort',
         'subtasks', 'comments', 'epicId', 'sprintId',
-        'blockedBy', 'blocks', 'customFields'
+        'blockedBy', 'blocks', 'customFields',
+        'slaTargetHours', 'slaDueAt', 'slaCompletedAt', 'slaBreached'
     ];
     for (const key of allowed) {
         if (req.body[key] !== undefined) {
             (db.cards[idx] as unknown as Record<string, unknown>)[key] = req.body[key];
+        }
+    }
+
+    const currentCard = db.cards[idx];
+    const isDoneCol = (colId: string) => {
+        if (colId === 'done') return true;
+        const colDef = (db.columns || []).find(c => c.id === colId);
+        return !!colDef?.isDone;
+    };
+
+    if (req.body.slaTargetHours !== undefined) {
+        currentCard.slaTargetHours = req.body.slaTargetHours;
+        currentCard.slaDueAt = (typeof currentCard.slaTargetHours === 'number' && currentCard.slaTargetHours > 0)
+            ? (currentCard.createdAt + currentCard.slaTargetHours * 3600 * 1000)
+            : null;
+    }
+
+    if (req.body.col && req.body.col !== oldCol) {
+        if (isDoneCol(req.body.col)) {
+            if (!currentCard.slaCompletedAt) {
+                currentCard.slaCompletedAt = Date.now();
+                if (currentCard.slaDueAt) {
+                    currentCard.slaBreached = currentCard.slaCompletedAt > currentCard.slaDueAt;
+                }
+            }
+        } else {
+            currentCard.slaCompletedAt = null;
+            if (currentCard.slaDueAt) {
+                currentCard.slaBreached = Date.now() > currentCard.slaDueAt;
+            }
         }
     }
 

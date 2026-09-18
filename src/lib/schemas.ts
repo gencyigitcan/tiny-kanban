@@ -43,6 +43,7 @@ export const createCardSchema = z.object({
     blockedBy: z.array(z.string()).optional().default([]),
     blocks: z.array(z.string()).optional().default([]),
     customFields: z.record(z.string(), z.any()).optional().default({}),
+    slaTargetHours: z.number().min(0).max(8760).nullable().optional(),
 });
 
 export const updateCardSchema = z.object({
@@ -65,6 +66,10 @@ export const updateCardSchema = z.object({
     blockedBy: z.array(z.string()).optional(),
     blocks: z.array(z.string()).optional(),
     customFields: z.record(z.string(), z.any()).optional(),
+    slaTargetHours: z.number().min(0).max(8760).nullable().optional(),
+    slaDueAt: z.number().nullable().optional(),
+    slaCompletedAt: z.number().nullable().optional(),
+    slaBreached: z.boolean().optional(),
 });
 
 export const createCustomFieldSchema = z.object({

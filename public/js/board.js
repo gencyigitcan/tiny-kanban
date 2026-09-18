@@ -91,6 +91,32 @@ function getIssueTypeInfo(type) {
 }
 window.getIssueTypeInfo = getIssueTypeInfo;
 
+// ── SLA Formatting (Jira Service Management) ──────────────
+function formatSlaBadge(card) {
+  if (!card.slaDueAt) return '';
+  const isDone = typeof isCardDone === 'function' ? isCardDone(card) : card.col === 'done';
+  if (isDone) {
+    if (card.slaBreached) {
+      return `<span class="sla-badge sla-missed" title="SLA Tamamlanma Süresi Aşıldı">❌ SLA Kaçırıldı</span>`;
+    }
+    return `<span class="sla-badge sla-met" title="SLA Zamanında Karşılandı">✅ SLA Karşılandı</span>`;
+  }
+  const now = Date.now();
+  const diff = card.slaDueAt - now;
+  if (diff <= 0 || card.slaBreached) {
+    const overdueHours = Math.abs(Math.floor(diff / 3600000));
+    const overdueMinutes = Math.abs(Math.floor((diff % 3600000) / 60000));
+    return `<span class="sla-badge sla-breached" title="SLA Çözüm Süresi ${overdueHours}s ${overdueMinutes}dk Aşıldı!">🚨 SLA Aşıldı (${overdueHours}s ${overdueMinutes}dk)</span>`;
+  }
+  const remHours = Math.floor(diff / 3600000);
+  const remMinutes = Math.floor((diff % 3600000) / 60000);
+  const isAtRisk = diff < 4 * 3600000;
+  const badgeClass = isAtRisk ? 'sla-at-risk' : 'sla-on-track';
+  const icon = isAtRisk ? '⚠️' : '⏱️';
+  return `<span class="sla-badge ${badgeClass}" title="Kalan SLA Çözüm Süresi">${icon} SLA: ${remHours}s ${remMinutes}dk</span>`;
+}
+window.formatSlaBadge = formatSlaBadge;
+
 // ── Card HTML ────────────────────────────────────────────
 function cardHTML(card, epics = [], readonly = false) {
   const epic = epics.find(e => e.id === card.epicId);
@@ -202,6 +228,7 @@ function cardHTML(card, epics = [], readonly = false) {
         ${card.key ? `<span class="jira-card-key">${card.key}</span>` : ''}
         ${card.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="background:${getAssigneeColor(card.assignee)}" title="${escHtml(card.assignee)}">${escHtml(initials(card.assignee))}</span>${escHtml(card.assignee)}</span>` : '<span class="card-assignee unassigned" style="color:var(--text-muted);font-size:11px;">👤 Atanmamış</span>'}
         ${dueBadge(card.dueDate)}
+        ${formatSlaBadge(card)}
         ${depBadge}
       </div>
       <div class="card-footer-right">
@@ -274,6 +301,23 @@ function cardMatchesGlobalFilters(c, options = { checkSprint: true }) {
   // 4b. Issue Type check
   const fit = (document.getElementById('filterIssueType')?.value || '').trim();
   if (fit && (c.issueType || 'task') !== fit) return false;
+
+  // 4c. SLA check
+  const fsla = (document.getElementById('filterSla')?.value || '').trim();
+  if (fsla) {
+    const isDone = typeof isCardDone === 'function' ? isCardDone(c) : c.col === 'done';
+    const now = Date.now();
+    const diff = (c.slaDueAt || 0) - now;
+    if (fsla === 'breached') {
+      if (!c.slaDueAt || (!c.slaBreached && diff > 0)) return false;
+    } else if (fsla === 'at_risk') {
+      if (isDone || !c.slaDueAt || diff <= 0 || diff >= 4 * 3600000) return false;
+    } else if (fsla === 'on_track') {
+      if (isDone || !c.slaDueAt || diff < 4 * 3600000) return false;
+    } else if (fsla === 'met') {
+      if (!isDone || !c.slaDueAt || c.slaBreached) return false;
+    }
+  }
 
   // 5. Search query
   if (q) {
@@ -602,12 +646,13 @@ function renderBoard(cards, epics = [], readonly = false) {
   const fe = (document.getElementById('filterEpic')?.value || '').trim();
   const fp = (document.getElementById('filterPriority')?.value || '').trim();
   const fit = (document.getElementById('filterIssueType')?.value || '').trim();
+  const fsla = (document.getElementById('filterSla')?.value || '').trim();
   const q = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
   const fs = document.getElementById('filterSprint')?.value || 'active';
   const allSprints = window.sprints || [];
   const activeSprint = allSprints.find(s => s.active);
 
-  const hasFilter = !!(fa || fe || fp || fit || q);
+  const hasFilter = !!(fa || fe || fp || fit || fsla || q);
 
   cols.forEach(col => {
     const body = document.getElementById('col-' + col.id);

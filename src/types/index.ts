@@ -66,6 +66,10 @@ export interface Card {
     blocks?: string[];
     dueNotificationSentAt?: number;
     customFields?: Record<string, any>;
+    slaTargetHours?: number | null;
+    slaDueAt?: number | null;
+    slaCompletedAt?: number | null;
+    slaBreached?: boolean;
 }
 
 export interface CardActivity {
