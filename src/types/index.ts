@@ -301,6 +301,46 @@ export interface DbSchema {
     workspaces?: Workspace[];
     logs?: ActivityLog[];
     customFields?: CustomFieldDefinition[];
+    automations?: AutomationRule[];
+}
+
+export type AutomationTrigger = 
+    | 'card_created'
+    | 'status_changed'
+    | 'priority_changed'
+    | 'assignee_changed';
+
+export type AutomationAction =
+    | 'set_priority'
+    | 'set_column'
+    | 'add_label'
+    | 'assign_user'
+    | 'send_notification'
+    | 'set_sla';
+
+export interface AutomationRule {
+    id: string;
+    name: string;
+    active: boolean;
+    trigger: AutomationTrigger;
+    triggerCondition?: {
+        field?: string;
+        operator?: 'equals' | 'not_equals' | 'contains';
+        value?: any;
+    };
+    action: AutomationAction;
+    actionConfig: {
+        priority?: Priority;
+        column?: string;
+        labelId?: string;
+        assignee?: string;
+        notifyMessage?: string;
+        message?: string;
+        slaHours?: number;
+        [key: string]: any;
+    };
+    createdAt: number;
+    executionCount?: number;
 }
 
 export interface TenantMeta {

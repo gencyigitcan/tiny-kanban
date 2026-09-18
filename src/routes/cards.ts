@@ -6,6 +6,7 @@ import { readDb, writeDbSync, uid, logActivity, getEnvironment, getTenantIndex }
 import { validate } from '../middleware/validate.js';
 import { NotFoundError, AppError, asyncHandler } from '../middleware/error.js';
 import { createCardSchema, updateCardSchema } from '../lib/schemas.js';
+import { executeAutomations } from '../lib/automations_engine.js';
 import type { Card } from '../types/index.js';
 
 export const cardRouter = Router();
@@ -455,6 +456,7 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
         slaBreached: false
     };
     db.cards.push(card);
+    executeAutomations({ trigger: 'card_created', card, db, req });
     syncCardDependencies(db.cards);
     notifyAssignee(db, card.id, card.title, card.assignee, req.user, req);
     writeDbSync(db, req);
@@ -502,6 +504,9 @@ cardRouter.put('/:id', validate(updateCardSchema), asyncHandler(async (req, res)
     const oldSpent = target.spentEffort;
     const newAssignee = req.body.assignee;
     const title = req.body.title || target.title;
+    if (req.body.column && !req.body.col) {
+        req.body.col = req.body.column;
+    }
 
     const allowed: (keyof Card)[] = [
         'title', 'desc', 'issueType', 'assignee', 'priority', 'col',
@@ -549,6 +554,16 @@ cardRouter.put('/:id', validate(updateCardSchema), asyncHandler(async (req, res)
 
     if (newAssignee && newAssignee !== oldAssignee) {
         notifyAssignee(db, db.cards[idx].id, title, newAssignee, req.user, req);
+    }
+
+    if (req.body.col && req.body.col !== oldCol) {
+        executeAutomations({ trigger: 'status_changed', card: currentCard, previousCard: { col: oldCol }, db, req });
+    }
+    if (req.body.priority && req.body.priority !== oldPriority) {
+        executeAutomations({ trigger: 'priority_changed', card: currentCard, previousCard: { priority: oldPriority }, db, req });
+    }
+    if (newAssignee && newAssignee !== oldAssignee) {
+        executeAutomations({ trigger: 'assignee_changed', card: currentCard, previousCard: { assignee: oldAssignee }, db, req });
     }
 
     syncCardDependencies(db.cards);

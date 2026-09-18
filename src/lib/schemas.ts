@@ -53,6 +53,7 @@ export const updateCardSchema = z.object({
     assignee: z.string().max(100).optional(),
     priority: priority.optional(),
     col: column.optional(),
+    column: column.optional(),
     startDate: dateStr,
     dueDate: dateStr,
     labels: z.array(z.string().max(50)).max(10).optional(),
@@ -86,6 +87,50 @@ export const updateCustomFieldSchema = z.object({
     options: z.array(z.string().max(100)).max(50).optional(),
     unit: z.string().max(20).optional(),
     required: z.boolean().optional()
+});
+
+export const createAutomationSchema = z.object({
+    name: z.string().min(1, 'Kural adı boş olamaz').max(100).trim(),
+    active: z.boolean().optional(),
+    isActive: z.boolean().optional(),
+    trigger: z.enum(['card_created', 'status_changed', 'priority_changed', 'assignee_changed']),
+    triggerCondition: z.object({
+        field: z.string().max(50).optional(),
+        operator: z.enum(['equals', 'not_equals', 'contains']).optional(),
+        value: z.any().optional()
+    }).optional(),
+    action: z.enum(['set_priority', 'set_column', 'add_label', 'assign_user', 'send_notification', 'set_sla']),
+    actionConfig: z.object({
+        priority: priority.optional(),
+        column: z.string().max(50).optional(),
+        labelId: z.string().max(50).optional(),
+        assignee: z.string().max(100).optional(),
+        notifyMessage: z.string().max(500).optional(),
+        message: z.string().max(500).optional(),
+        slaHours: z.number().min(1).max(8760).optional()
+    }).passthrough().optional()
+});
+
+export const updateAutomationSchema = z.object({
+    name: z.string().min(1).max(100).trim().optional(),
+    active: z.boolean().optional(),
+    isActive: z.boolean().optional(),
+    trigger: z.enum(['card_created', 'status_changed', 'priority_changed', 'assignee_changed']).optional(),
+    triggerCondition: z.object({
+        field: z.string().max(50).optional(),
+        operator: z.enum(['equals', 'not_equals', 'contains']).optional(),
+        value: z.any().optional()
+    }).optional(),
+    action: z.enum(['set_priority', 'set_column', 'add_label', 'assign_user', 'send_notification', 'set_sla']).optional(),
+    actionConfig: z.object({
+        priority: priority.optional(),
+        column: z.string().max(50).optional(),
+        labelId: z.string().max(50).optional(),
+        assignee: z.string().max(100).optional(),
+        notifyMessage: z.string().max(500).optional(),
+        message: z.string().max(500).optional(),
+        slaHours: z.number().min(1).max(8760).optional()
+    }).passthrough().optional()
 });
 
 // ── Columns ──────────────────────────────────────────────────

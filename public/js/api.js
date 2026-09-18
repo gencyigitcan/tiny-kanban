@@ -270,6 +270,28 @@ const API = {
             method: 'DELETE'
         });
     },
+    async getAutomations() {
+        return await request('/api/automations');
+    },
+    async createAutomation(data) {
+        return await request('/api/automations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    },
+    async updateAutomation(ruleId, data) {
+        return await request(`/api/automations/${ruleId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    },
+    async deleteAutomation(ruleId) {
+        return await request(`/api/automations/${ruleId}`, {
+            method: 'DELETE'
+        });
+    },
     async updateWorkspace(workspaceId, data) {
         return await request(`/api/admin/workspaces/${workspaceId}`, {
             method: 'PUT',

@@ -669,7 +669,8 @@ export function readTenantDbFileSync(tenantId: string, env: Environment): DbSche
             taskCounter: typeof parsed.taskCounter === 'number' ? parsed.taskCounter : 0,
             workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : [],
             logs: Array.isArray(parsed.logs) ? parsed.logs : [],
-            customFields: Array.isArray(parsed.customFields) ? parsed.customFields : []
+            customFields: Array.isArray(parsed.customFields) ? parsed.customFields : [],
+            automations: Array.isArray(parsed.automations) ? parsed.automations : []
         };
         if (tenantId === 'demo') {
             const { db: alignedDb, changed } = alignDemoDbToCurrentDate(db);
@@ -725,7 +726,8 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                 taskCounter: typeof parsed.taskCounter === 'number' ? parsed.taskCounter : 0,
                 workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : [],
                 logs: Array.isArray(parsed.logs) ? parsed.logs : [],
-                customFields: Array.isArray(parsed.customFields) ? parsed.customFields : []
+                customFields: Array.isArray(parsed.customFields) ? parsed.customFields : [],
+                automations: Array.isArray(parsed.automations) ? parsed.automations : []
             };
 
             // In production personal DB, ensure integrity and workspace linking

@@ -569,6 +569,189 @@ async function deleteCustomField(id) {
 }
 window.deleteCustomField = deleteCustomField;
 
+async function openAutomationsModal() {
+  const canManage = window.currentUser?.role === 'superadmin' || window.currentUser?.role === 'admin';
+  if (!canManage) {
+    showToast('Otomasyonları yönetmek için yönetici yetkisi gereklidir', 'warn');
+    return;
+  }
+  await refreshAutomationsList();
+  openModal('automationsModal');
+}
+window.openAutomationsModal = openAutomationsModal;
+
+async function refreshAutomationsList() {
+  try {
+    const rules = await API.getAutomations();
+    window.automationsList = Array.isArray(rules) ? rules : [];
+    renderAutomationsList();
+  } catch (err) {
+    console.error('Failed to load automations:', err);
+  }
+}
+window.refreshAutomationsList = refreshAutomationsList;
+
+function renderAutomationsList() {
+  const container = document.getElementById('automationsList');
+  const countBadge = document.getElementById('automationsCountBadge');
+  if (!container) return;
+  const list = window.automationsList || [];
+  if (countBadge) countBadge.textContent = `${list.length} Kural`;
+
+  if (list.length === 0) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:12px;text-align:center;">Henüz tanımlanmış otomasyon kuralı bulunmuyor. Yukarıdaki hızlı şablonlardan ekleyebilirsiniz.</div>';
+    return;
+  }
+
+  const triggerNames = {
+    card_created: '⚡ Yeni Bilet Oluştuğunda',
+    status_changed: '🔄 Durum Değiştiğinde',
+    priority_changed: '🔺 Öncelik Değiştiğinde',
+    assignee_changed: '👤 Atanan Değiştiğinde'
+  };
+
+  const actionNames = {
+    set_priority: '🎯 Öncelik Ata',
+    set_column: '📂 Kolona Taşı',
+    add_label: '🏷️ Etiket Ekle',
+    assign_user: '👤 Kişiye Ata',
+    send_notification: '🔔 Bildirim Gönder',
+    set_sla: '⏱️ SLA Ata'
+  };
+
+  container.innerHTML = list.map(rule => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--border);gap:8px;background:${rule.isActive ? 'transparent' : 'var(--surface-2)'};opacity:${rule.isActive ? '1' : '0.6'};">
+      <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-weight:600;font-size:12px;color:var(--text);">${escHtml(rule.name)}</span>
+          <span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(99,102,241,0.1);color:var(--accent);">${triggerNames[rule.trigger] || rule.trigger}</span>
+          <span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(16,185,129,0.1);color:var(--success);">${actionNames[rule.action] || rule.action}</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="display:inline-flex;align-items:center;cursor:pointer;font-size:11px;gap:4px;">
+          <input type="checkbox" ${rule.isActive ? 'checked' : ''} onchange="toggleAutomationRule('${rule.id}', this.checked)">
+          <span>${rule.isActive ? 'Aktif' : 'Pasif'}</span>
+        </label>
+        <button type="button" class="btn btn-danger btn-xs" onclick="deleteAutomationRule('${rule.id}')" title="Kuralı Sil">Sil</button>
+      </div>
+    </div>
+  `).join('');
+}
+window.renderAutomationsList = renderAutomationsList;
+
+async function toggleAutomationRule(id, active) {
+  try {
+    await API.updateAutomation(id, { isActive: active });
+    showToast(`Kural ${active ? 'aktif edildi' : 'devre dışı bırakıldı'}`);
+    await refreshAutomationsList();
+  } catch (err) {
+    showToast('Kural güncellenemedi: ' + (err.message || 'Hata'), 'error');
+  }
+}
+window.toggleAutomationRule = toggleAutomationRule;
+
+async function deleteAutomationRule(id) {
+  if (!confirm('Bu otomasyon kuralını silmek istediğinize emin misiniz?')) return;
+  try {
+    await API.deleteAutomation(id);
+    showToast('Otomasyon kuralı silindi');
+    await refreshAutomationsList();
+  } catch (err) {
+    showToast('Silinemedi: ' + (err.message || 'Hata'), 'error');
+  }
+}
+window.deleteAutomationRule = deleteAutomationRule;
+
+function onAutomationActionChange() {
+  const action = document.getElementById('newRuleAction')?.value;
+  const pConf = document.getElementById('rulePriorityConfig');
+  const slaConf = document.getElementById('ruleSlaConfig');
+  const notConf = document.getElementById('ruleNotifyConfig');
+
+  if (pConf) pConf.style.display = (action === 'set_priority') ? 'block' : 'none';
+  if (slaConf) slaConf.style.display = (action === 'set_sla') ? 'block' : 'none';
+  if (notConf) notConf.style.display = (action === 'send_notification') ? 'block' : 'none';
+}
+window.onAutomationActionChange = onAutomationActionChange;
+
+async function applyAutomationRecipe(recipeKey) {
+  try {
+    let payload = null;
+    if (recipeKey === 'bug_high') {
+      payload = {
+        name: '🐛 Hata Biletlerini Yüksek Önceliğe Al',
+        trigger: 'card_created',
+        action: 'set_priority',
+        actionConfig: { priority: 'high' },
+        isActive: true
+      };
+    } else if (recipeKey === 'incident_sla') {
+      payload = {
+        name: '🚨 Incident Biletlerine 4 Saat SLA Ata',
+        trigger: 'card_created',
+        action: 'set_sla',
+        actionConfig: { slaHours: 4 },
+        isActive: true
+      };
+    } else if (recipeKey === 'done_notify') {
+      payload = {
+        name: '✅ Bilet Tamamlandığında Bildirim Gönder',
+        trigger: 'status_changed',
+        action: 'send_notification',
+        actionConfig: { message: 'Bilet tamamlandı kolona taşındı!' },
+        isActive: true
+      };
+    }
+
+    if (payload) {
+      await API.createAutomation(payload);
+      showToast('Otomasyon şablonu başarıyla eklendi ✓');
+      await refreshAutomationsList();
+    }
+  } catch (err) {
+    showToast('Şablon eklenemedi: ' + (err.message || 'Hata'), 'error');
+  }
+}
+window.applyAutomationRecipe = applyAutomationRecipe;
+
+async function addAutomationSubmit(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const name = document.getElementById('newRuleName')?.value.trim();
+  const trigger = document.getElementById('newRuleTrigger')?.value;
+  const action = document.getElementById('newRuleAction')?.value;
+
+  if (!name) {
+    showToast('Kural adı gereklidir', 'warn');
+    return;
+  }
+
+  const actionConfig = {};
+  if (action === 'set_priority') {
+    actionConfig.priority = document.getElementById('newRulePriority')?.value || 'high';
+  } else if (action === 'set_sla') {
+    actionConfig.slaHours = Number(document.getElementById('newRuleSlaHours')?.value) || 4;
+  } else if (action === 'send_notification') {
+    actionConfig.message = document.getElementById('newRuleNotifyMsg')?.value.trim() || 'Otomatik bildirim';
+  }
+
+  try {
+    await API.createAutomation({
+      name,
+      trigger,
+      action,
+      actionConfig,
+      isActive: true
+    });
+    showToast('Otomasyon kuralı kaydedildi ✓');
+    document.getElementById('newRuleName').value = '';
+    await refreshAutomationsList();
+  } catch (err) {
+    showToast('Kural eklenemedi: ' + (err.message || 'Hata'), 'error');
+  }
+}
+window.addAutomationSubmit = addAutomationSubmit;
+
 function renderBoard(cards, epics = [], readonly = false) {
   const container = document.getElementById('boardColumnsContainer');
   if (!container) return;
@@ -588,6 +771,8 @@ function renderBoard(cards, epics = [], readonly = false) {
   if (btnAddCol) btnAddCol.style.display = canManage ? 'inline-flex' : 'none';
   const btnManageCf = document.getElementById('btnManageCustomFields');
   if (btnManageCf) btnManageCf.style.display = canManage ? 'inline-flex' : 'none';
+  const btnManageAuto = document.getElementById('btnManageAutomations');
+  if (btnManageAuto) btnManageAuto.style.display = canManage ? 'inline-flex' : 'none';
 
   // Check if container structure matches current columns
   const existingColIds = Array.from(container.querySelectorAll('.column')).map(el => el.dataset.col);

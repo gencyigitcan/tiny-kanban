@@ -369,6 +369,9 @@
                 <span class="board-col-count-badge" id="boardColCountBadge" style="font-size: 12px; font-weight: 600; color: var(--text-muted); background: var(--bg-secondary); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);">3 Kolon</span>
             </div>
             <div class="board-toolbar-right" id="boardToolbarActions" style="display: flex; gap: 8px; align-items: center;">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnManageAutomations" onclick="openAutomationsModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                    ⚡ Otomasyonlar
+                </button>
                 <button type="button" class="btn btn-secondary btn-sm" id="btnManageCustomFields" onclick="openCustomFieldsModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
                     ✨ Özel Alanlar
                 </button>
@@ -930,6 +933,97 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('customFieldsModal')">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+     AUTOMATIONS MANAGER MODAL (Monday.com No-Code Automations)
+     ============================================================ -->
+    <div class="modal-overlay" id="automationsModal" role="dialog" aria-modal="true">
+        <div class="modal" style="max-width: 650px;">
+            <div class="modal-header">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <h3 class="modal-title">⚡ Otomasyon Motoru (No-Code Rules)</h3>
+                    <span style="font-size:11px;background:rgba(99,102,241,0.12);color:var(--accent);padding:2px 8px;border-radius:12px;font-weight:600;">Monday.com Stili</span>
+                </div>
+                <button type="button" class="modal-close" onclick="closeModal('automationsModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
+                    Bilet oluşturulduğunda veya durumu/önceliği değiştiğinde otomatik tetiklenen kurallar belirleyin.
+                </p>
+
+                <!-- Quick Recipes -->
+                <div style="margin-bottom:16px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;">
+                    <span style="font-size:11px;font-weight:700;color:var(--text);display:block;margin-bottom:8px;">✨ Hızlı Şablonlar (Tek Tıkla Ekle):</span>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <button type="button" class="btn btn-secondary btn-xs" onclick="applyAutomationRecipe('bug_high')">🐛 Hata (Bug) ➔ Yüksek Öncelik</button>
+                        <button type="button" class="btn btn-secondary btn-xs" onclick="applyAutomationRecipe('incident_sla')">🚨 Incident ➔ 4 Saat SLA</button>
+                        <button type="button" class="btn btn-secondary btn-xs" onclick="applyAutomationRecipe('done_notify')">✅ Tamamlandı ➔ Bildirim Gönder</button>
+                    </div>
+                </div>
+
+                <!-- Active Rules List -->
+                <h4 style="font-size:13px;font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                    <span>Aktif Kurallar</span>
+                    <span id="automationsCountBadge" style="font-size:11px;color:var(--text-muted);">0 Kural</span>
+                </h4>
+                <div class="manager-list" id="automationsList" style="max-height:220px;overflow-y:auto;margin-bottom:16px;border:1px solid var(--border);border-radius:6px;padding:8px;background:var(--surface);">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- Custom Rule Creator -->
+                <div style="border-top:1px solid var(--border);padding-top:14px;">
+                    <h4 style="font-size:13px;font-weight:600;margin-bottom:10px;">➕ Özel Kural Oluştur</h4>
+                    <form id="addAutomationForm" onsubmit="addAutomationSubmit(event)" style="display:flex;flex-direction:column;gap:10px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label" style="font-size:11px;">Kural Adı <span style="color:var(--danger)">*</span></label>
+                            <input type="text" id="newRuleName" class="form-input" placeholder="ör. Kritik Hataları Otomatik Yüksek Öncelik Yap" required maxlength="100">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;margin-bottom:0;">
+                                <label class="form-label" style="font-size:11px;">⚡ Tetikleyici (Trigger)</label>
+                                <select id="newRuleTrigger">
+                                    <option value="card_created">Yeni Bilet Oluşturulduğunda</option>
+                                    <option value="status_changed">Bilet Durumu (Kolon) Değiştiğinde</option>
+                                    <option value="priority_changed">Öncelik Değiştiğinde</option>
+                                    <option value="assignee_changed">Atanan Kişi Değiştiğinde</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex:1;margin-bottom:0;">
+                                <label class="form-label" style="font-size:11px;">🎯 Aksiyon (Action)</label>
+                                <select id="newRuleAction" onchange="onAutomationActionChange()">
+                                    <option value="set_priority">Önceliği Değiştir</option>
+                                    <option value="send_notification">Kullanıcıya Bildirim Gönder</option>
+                                    <option value="set_sla">SLA Çözüm Hedefi Ata</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row" id="ruleActionConfigRow">
+                            <div class="form-group" style="flex:1;margin-bottom:0;" id="rulePriorityConfig">
+                                <label class="form-label" style="font-size:11px;">Hedef Öncelik</label>
+                                <select id="newRulePriority" class="form-select">
+                                    <option value="high">🔴 Yüksek</option>
+                                    <option value="medium">🟠 Orta</option>
+                                    <option value="low">🟢 Düşük</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex:1;margin-bottom:0;display:none;" id="ruleSlaConfig">
+                                <label class="form-label" style="font-size:11px;">SLA Hedefi (Saat)</label>
+                                <input type="number" id="newRuleSlaHours" class="form-input" min="1" max="720" value="4" placeholder="4">
+                            </div>
+                            <div class="form-group" style="flex:1;margin-bottom:0;display:none;" id="ruleNotifyConfig">
+                                <label class="form-label" style="font-size:11px;">Bildirim Metni</label>
+                                <input type="text" id="newRuleNotifyMsg" class="form-input" placeholder="Bilet durumu güncellendi!">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-start;">+ Kuralı Kaydet</button>
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('automationsModal')">Kapat</button>
             </div>
         </div>
     </div>
