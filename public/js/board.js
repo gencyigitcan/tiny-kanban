@@ -933,14 +933,11 @@ function setGanttRange(range) {
 window.setGanttRange = setGanttRange;
 
 function scrollGanttToToday() {
-  const scrollWrap = document.querySelector('.gantt-wrap');
   const line = document.getElementById('ganttTodayLine');
-  if (scrollWrap && line) {
-    const parent = scrollWrap.parentElement;
-    if (parent) {
-      const scrollPos = line.offsetLeft - (parent.clientWidth / 2);
-      parent.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
-    }
+  const view = document.querySelector('.gantt-view') || document.querySelector('.gantt-wrap')?.parentElement;
+  if (line && view) {
+    const scrollPos = line.offsetLeft - (view.clientWidth / 2);
+    view.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
   }
 }
 window.scrollGanttToToday = scrollGanttToToday;
@@ -950,6 +947,7 @@ function renderGantt(cards) {
   if (!container) return;
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayLabel = today.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' });
 
   const fa = (document.getElementById('filterAssignee')?.value || '').trim();
   const fe = (document.getElementById('filterEpic')?.value || '').trim();
@@ -964,9 +962,11 @@ function renderGantt(cards) {
   let rangeFilteredCards = filterMatchedCards;
 
   if (window._ganttRange === 'current') {
-    // Current Period: Aug 1, 2026 to Nov 30, 2026 (centered around Sep 17, 2026)
+    // Current Period: 1 month before to ~2.5 months after (centered around today)
     minD = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    maxD = new Date(today.getFullYear(), today.getMonth() + 2, 28);
+    maxD = new Date(today.getFullYear(), today.getMonth() + 3, 0);
+    minD.setHours(0, 0, 0, 0);
+    maxD.setHours(23, 59, 59, 999);
     rangeFilteredCards = filterMatchedCards.filter(c => {
       if (!c.dueDate && !c.startDate) return false;
       const dStart = c.startDate ? new Date(c.startDate) : new Date(c.createdAt || today);
@@ -974,16 +974,16 @@ function renderGantt(cards) {
       return dEnd >= minD && dStart <= maxD;
     });
   } else if (window._ganttRange === '2026') {
-    minD = new Date(2026, 0, 1);
-    maxD = new Date(2026, 11, 31);
+    minD = new Date(2026, 0, 1, 0, 0, 0, 0);
+    maxD = new Date(2026, 11, 31, 23, 59, 59, 999);
     rangeFilteredCards = filterMatchedCards.filter(c => {
       if (!c.dueDate && !c.startDate) return false;
       const d = new Date(c.dueDate || c.startDate);
       return d.getFullYear() === 2026;
     });
   } else if (window._ganttRange === '2027') {
-    minD = new Date(2027, 0, 1);
-    maxD = new Date(2027, 11, 31);
+    minD = new Date(2027, 0, 1, 0, 0, 0, 0);
+    maxD = new Date(2027, 11, 31, 23, 59, 59, 999);
     rangeFilteredCards = filterMatchedCards.filter(c => {
       if (!c.dueDate && !c.startDate) return false;
       const d = new Date(c.dueDate || c.startDate);
@@ -995,21 +995,18 @@ function renderGantt(cards) {
     const allDates = withDates.map(c => new Date(c.dueDate));
     minD = new Date(Math.min(...allDates, today));
     maxD = new Date(Math.max(...allDates, today));
-    minD.setDate(minD.getDate() - 2);
-    maxD.setDate(maxD.getDate() + 4);
+    minD.setDate(minD.getDate() - 3);
+    maxD.setDate(maxD.getDate() + 7);
+    minD.setHours(0, 0, 0, 0);
+    maxD.setHours(23, 59, 59, 999);
     rangeFilteredCards = filterMatchedCards;
   }
 
-  const withDates = rangeFilteredCards.filter(c => c.dueDate);
-  const totalDays = Math.max(1, Math.round((maxD - minD) / 86400000));
-  const pct = d => (Math.max(0, (new Date(d) - minD)) / ((maxD - minD) || 1)) * 100;
-  const todayPct = pct(today);
-
-  // Build timeline header days
+  // Timeline slots & percentage function
   let timelineHeaders = '';
-  let curD = new Date(minD);
-  const totalSlots = window._ganttRange === 'all' ? 24 : (window._ganttRange === '2026' || window._ganttRange === '2027' ? 12 : 16);
-  
+  let pct;
+  let todayPct;
+
   if (window._ganttRange === 'all' || window._ganttRange === '2026' || window._ganttRange === '2027') {
     // Month-based columns for long ranges
     const startYear = minD.getFullYear();
@@ -1025,16 +1022,43 @@ function renderGantt(cards) {
         </div>
       `;
     }
+    const totalSpan = Math.max(1, maxD - minD);
+    pct = d => {
+      const target = new Date(d);
+      return Math.max(0, Math.min(100, ((target - minD) / totalSpan) * 100));
+    };
+    todayPct = pct(today);
   } else {
     // 3-day steps for the ~4 month range
+    const slotStepDays = 3;
+    const slots = [];
+    let curD = new Date(minD);
     while (curD <= maxD) {
-      const isToday = curD.toDateString() === today.toDateString();
-      const d = new Date(curD);
-      timelineHeaders += `
-        <div class="gantt-day${isToday ? ' today' : ''}" style="min-width:32px;">${d.getDate()}<br><span style="font-size:9px">${d.toLocaleDateString('tr-TR', { month: 'short' })}</span></div>
-      `;
-      curD.setDate(curD.getDate() + 3);
+      slots.push(new Date(curD));
+      curD.setDate(curD.getDate() + slotStepDays);
     }
+    const totalSlots = Math.max(1, slots.length);
+    const timelineTotalMs = totalSlots * slotStepDays * 86400000;
+    const slotWidthPct = (100 / totalSlots).toFixed(3);
+
+    slots.forEach(slotStart => {
+      const slotEnd = new Date(slotStart.getTime() + slotStepDays * 86400000);
+      const isSlotToday = today >= slotStart && today < slotEnd;
+      timelineHeaders += `
+        <div class="gantt-day${isSlotToday ? ' today' : ''}" style="flex: 0 0 ${slotWidthPct}%; min-width: 36px; text-align:center;">
+          <strong>${slotStart.getDate()}</strong><br>
+          <span style="font-size:9px">${slotStart.toLocaleDateString('tr-TR', { month: 'short' })}</span>
+        </div>
+      `;
+    });
+
+    pct = d => {
+      const target = new Date(d);
+      target.setHours(0, 0, 0, 0);
+      const diff = target - minD;
+      return Math.max(0, Math.min(100, (diff / timelineTotalMs) * 100));
+    };
+    todayPct = pct(today);
   }
 
   const priColor = { high: 'var(--pri-high)', medium: 'var(--pri-med)', low: 'var(--pri-low)' };
@@ -1042,6 +1066,23 @@ function renderGantt(cards) {
   const rows = rangeFilteredCards.map(c => {
     const colInfo = getColumnInfo(c.col);
     const isDone = isCardDone(c);
+    const isTodo = !isDone && (
+      c.col === 'todo' ||
+      (colInfo.name && colInfo.name.toLowerCase().includes('yapılacak')) ||
+      (colInfo.name && colInfo.name.toLowerCase().includes('backlog')) ||
+      colInfo.order === 0
+    );
+    const isDoing = !isDone && !isTodo;
+
+    let rowStatusClass = 'gantt-row-doing';
+    let statusIcon = '⚡';
+    if (isDone) {
+      rowStatusClass = 'gantt-row-done';
+      statusIcon = '✅';
+    } else if (isTodo) {
+      rowStatusClass = 'gantt-row-todo';
+      statusIcon = '📋';
+    }
 
     let depBadges = '';
     if (c.blockedBy && c.blockedBy.length > 0) {
@@ -1051,12 +1092,13 @@ function renderGantt(cards) {
       depBadges += `<span class="gantt-dep-badge" style="background:#fef3c7;color:#d97706;" title="${c.blocks.length} kartı bekletiyor">⚡ ${c.blocks.length}</span>`;
     }
 
-    if (!c.dueDate) return `<div class="gantt-row">
+    if (!c.dueDate) return `<div class="gantt-row ${rowStatusClass}">
       <div class="gantt-row-label" onclick="openCardDetail('${c.id}')" title="${escHtml(c.title)}">
+        <span class="gantt-status-icon" title="${isDone ? 'Tamamlandı' : (isTodo ? 'Yapılacak' : 'Yapılıyor')}">${statusIcon}</span>
         <span class="gantt-col-pill" style="background:${colInfo.color}22;color:${colInfo.color};">${escHtml(colInfo.name)}</span>
         <span class="card-key-badge">${c.key || ''}</span>
         ${c.assignee ? `<span class="assignee-avatar" style="width:16px;height:16px;font-size:8px;background:${getAssigneeColor(c.assignee)}">${escHtml(initials(c.assignee))}</span>` : ''}
-        <span>${escHtml(c.title.slice(0, 22))}${c.title.length > 22 ? '…' : ''}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${isDone ? '✓ ' : ''}${escHtml(c.title.slice(0, 22))}${c.title.length > 22 ? '…' : ''}</span>
         ${depBadges}
       </div>
       <div class="gantt-row-timeline"><div class="gantt-no-date">Tarih belirlenmemiş</div></div>
@@ -1064,20 +1106,23 @@ function renderGantt(cards) {
 
     const dStart = c.startDate ? new Date(c.startDate) : new Date(c.createdAt || today);
     const dEnd = new Date(c.dueDate);
-    const barStart = Math.max(0, Math.min(95, pct(dStart)));
+    const barStart = Math.max(0, Math.min(96, pct(dStart)));
     const barEnd = Math.max(barStart + 3, Math.min(100, pct(dEnd)));
     const barW = Math.max(3, barEnd - barStart);
 
-    return `<div class="gantt-row">
+    const barBg = isDone ? '#10b981' : (isTodo ? '#64748b' : (priColor[c.priority] || '#3b82f6'));
+
+    return `<div class="gantt-row ${rowStatusClass}">
       <div class="gantt-row-label" onclick="openCardDetail('${c.id}')" title="${escHtml(c.title)}">
+        <span class="gantt-status-icon" title="${isDone ? 'Tamamlandı' : (isTodo ? 'Yapılacak' : 'Yapılıyor')}">${statusIcon}</span>
         <span class="gantt-col-pill" style="background:${colInfo.color}22;color:${colInfo.color};">${escHtml(colInfo.name)}</span>
         <span class="card-key-badge">${c.key || ''}</span>
         ${c.assignee ? `<span class="assignee-avatar" style="width:16px;height:16px;font-size:8px;background:${getAssigneeColor(c.assignee)}">${escHtml(initials(c.assignee))}</span>` : ''}
-        <span>${escHtml(c.title.slice(0, 22))}${c.title.length > 22 ? '…' : ''}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${isDone ? '✓ ' : ''}${escHtml(c.title.slice(0, 22))}${c.title.length > 22 ? '…' : ''}</span>
         ${depBadges}
       </div>
       <div class="gantt-row-timeline" style="position:relative">
-        <div class="gantt-bar${isDone ? ' done' : ''}" style="left:${barStart.toFixed(1)}%;width:${barW.toFixed(1)}%;background:${isDone ? '#10b981' : priColor[c.priority]};z-index:2;${isDone ? 'opacity:0.85;border:1px solid #059669;' : ''}"
+        <div class="gantt-bar${isDone ? ' done' : ''}${isTodo ? ' todo' : ''}" style="left:${barStart.toFixed(1)}%;width:${barW.toFixed(1)}%;background:${barBg};z-index:2;${isDone ? 'opacity:0.95;border:1px solid #059669;box-shadow:0 1px 3px rgba(16,185,129,0.3);' : ''}"
              title="${escHtml(c.title)} (${c.startDate || ''} → ${c.dueDate}) [Durum: ${escHtml(colInfo.name)}]${c.blockedBy?.length ? ` [⛔ ${c.blockedBy.length} bağımlılık]` : ''}">
           <span>${isDone ? '✓ ' : ''}${escHtml(c.title.slice(0, 18))}</span>
         </div>
@@ -1093,9 +1138,15 @@ function renderGantt(cards) {
         <button type="button" class="gantt-btn ${window._ganttRange === '2027' ? 'active' : ''}" onclick="setGanttRange('2027')">📅 2027 Yılı</button>
         <button type="button" class="gantt-btn ${window._ganttRange === 'all' ? 'active' : ''}" onclick="setGanttRange('all')">🌐 Tüm 2 Yıl (104 Hafta)</button>
       </div>
+      <div class="gantt-legend" style="display:flex;align-items:center;gap:12px;font-size:11px;font-weight:600;color:var(--text-secondary);flex-wrap:wrap;">
+        <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#f0fdf4;border:2px solid #10b981;"></span> Tamamlandı (Yeşil)</span>
+        <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#ffffff;border:2px solid #3b82f6;"></span> Yapılıyor</span>
+        <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#f8fafc;border:2px solid #94a3b8;"></span> Yapılacak (Gri)</span>
+        <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;"></span> Bugün Çizgisi</span>
+      </div>
       <div style="display:flex;align-items:center;gap:8px;">
         ${hasFilter ? `<span style="font-size:12px;font-weight:600;color:var(--accent);">🎯 Filtrelendi: ${rangeFilteredCards.length} / ${cards.length}</span>` : ''}
-        <button type="button" class="btn btn-sm btn-secondary" onclick="scrollGanttToToday()" style="font-size:12px;">📍 Bugüne Git (17 Eyl 2026)</button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="scrollGanttToToday()" style="font-size:12px;">📍 Bugüne Git (${todayLabel})</button>
         <button type="button" class="btn btn-sm btn-primary" onclick="openCardDetail(null)" style="font-size:12px;">✚ Yeni Ticket Ekle</button>
       </div>
     </div>
@@ -1105,8 +1156,8 @@ function renderGantt(cards) {
     ${controlsHTML}
     <div class="gantt-wrap" style="position:relative;">
       ${(todayPct >= 0 && todayPct <= 100) ? `
-        <div id="ganttTodayLine" style="position:absolute;top:0;bottom:0;left:calc(180px + (100% - 180px) * ${todayPct / 100});width:2px;background:#ef4444;box-shadow:0 0 10px rgba(239,68,68,0.8);z-index:5;pointer-events:none;">
-          <span class="gantt-today-badge">📍 Bugün (17 Eyl 2026)</span>
+        <div id="ganttTodayLine" style="position:absolute;top:0;bottom:0;left:calc(240px + (100% - 240px) * ${todayPct / 100});width:2px;background:#ef4444;box-shadow:0 0 10px rgba(239,68,68,0.8);z-index:5;pointer-events:none;">
+          <span class="gantt-today-badge">📍 Bugün (${todayLabel})</span>
         </div>` : ''}
       <div class="gantt-header">
         <div class="gantt-label-col">Görev</div>

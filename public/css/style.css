@@ -2223,6 +2223,8 @@ a {
 .gantt-row {
   display: flex;
   border-bottom: 1px solid var(--border);
+  transition: all 0.15s ease;
+  position: relative;
 }
 
 .gantt-row:last-child {
@@ -2231,6 +2233,77 @@ a {
 
 .gantt-row:hover {
   background: var(--surface-2);
+}
+
+/* Tamamlanmış Görevler - Yeşil Satır Vurgusu */
+.gantt-row.gantt-row-done {
+  background: #f0fdf4 !important;
+  border-left: 4px solid #10b981;
+}
+
+.gantt-row.gantt-row-done:hover {
+  background: #dcfce7 !important;
+}
+
+.gantt-row.gantt-row-done .gantt-row-label {
+  color: #065f46;
+  font-weight: 600;
+}
+
+.gantt-row.gantt-row-done .gantt-col-pill {
+  background: #d1fae5 !important;
+  color: #059669 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+
+.gantt-row.gantt-row-done .gantt-bar {
+  background: #10b981 !important;
+  box-shadow: 0 1px 4px rgba(16, 185, 129, 0.4);
+}
+
+/* Yapılacak Görevler - Belirgin Özel Arka Plan (Cool Slate / Nötr Gri) */
+.gantt-row.gantt-row-todo {
+  background: #f8fafc !important;
+  border-left: 4px solid #94a3b8;
+}
+
+.gantt-row.gantt-row-todo:hover {
+  background: #f1f5f9 !important;
+}
+
+.gantt-row.gantt-row-todo .gantt-row-label {
+  color: #475569;
+}
+
+.gantt-row.gantt-row-todo .gantt-col-pill {
+  background: #e2e8f0 !important;
+  color: #475569 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+/* Yapılıyor Görevler - Canlı Mavi Sol Vurgu */
+.gantt-row.gantt-row-doing {
+  background: #ffffff !important;
+  border-left: 4px solid #3b82f6;
+}
+
+.gantt-row.gantt-row-doing:hover {
+  background: #eff6ff !important;
+}
+
+.gantt-row.gantt-row-doing .gantt-col-pill {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #bfdbfe !important;
+}
+
+/* Gantt status icon */
+.gantt-status-icon {
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .gantt-row-label {
@@ -4546,18 +4619,19 @@ kbd {
 
 .gantt-today-badge {
   position: absolute;
-  top: -24px;
+  top: 4px;
   left: 50%;
   transform: translateX(-50%);
   background: #ef4444;
   color: #fff;
   font-size: 10px;
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 2px 7px;
+  border-radius: 10px;
   white-space: nowrap;
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
   pointer-events: none;
+  z-index: 10;
 }
 
 /* List View Controls */
