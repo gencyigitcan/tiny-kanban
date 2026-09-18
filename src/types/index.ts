@@ -17,7 +17,16 @@ export interface Comment {
 }
 
 export type Priority = 'high' | 'medium' | 'low';
-export type Column = 'todo' | 'doing' | 'done';
+export type Column = 'todo' | 'doing' | 'done' | string;
+
+export interface BoardColumn {
+    id: string;
+    name: string;
+    color?: string;
+    wipLimit?: number;
+    order: number;
+    isDone?: boolean;
+}
 
 export interface Card {
     id: string;
@@ -39,6 +48,9 @@ export interface Card {
     sprintId: string | null;
     createdAt: number;
     activity?: CardActivity[];
+    blockedBy?: string[];
+    blocks?: string[];
+    dueNotificationSentAt?: number;
 }
 
 export interface CardActivity {
@@ -154,7 +166,11 @@ export type ActivityAction =
     | 'WORKSPACE_CREATE'
     | 'WORKSPACE_UPDATE'
     | 'WORKSPACE_DELETE'
-    | 'WORKSPACE_MEMBER_UPDATE';
+    | 'WORKSPACE_MEMBER_UPDATE'
+    | 'COLUMN_CREATE'
+    | 'COLUMN_UPDATE'
+    | 'COLUMN_DELETE'
+    | 'COLUMN_REORDER';
 
 export interface ActivityLog {
     id: string;
@@ -178,6 +194,7 @@ export interface DbSchema {
     users: User[];
     sessions: Session[];
     labels: Label[];
+    columns?: BoardColumn[];
     notifications: Notification[];
     taskCounter: number;
     workspaces?: Workspace[];

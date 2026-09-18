@@ -2,9 +2,9 @@
 //  Card Routes
 // ============================================================
 import { Router } from 'express';
-import { readDb, writeDbSync, uid, logActivity, getEnvironment } from '../lib/db.js';
+import { readDb, writeDbSync, uid, logActivity, getEnvironment, getTenantIndex } from '../lib/db.js';
 import { validate } from '../middleware/validate.js';
-import { NotFoundError, AppError } from '../middleware/error.js';
+import { NotFoundError, AppError, asyncHandler } from '../middleware/error.js';
 import { createCardSchema, updateCardSchema } from '../lib/schemas.js';
 import type { Card } from '../types/index.js';
 
@@ -48,10 +48,197 @@ function notifyAssignee(db: any, cardId: string, cardTitle: string, assigneeName
     }
 }
 
+async function notifyWorkspaceManagers(
+    db: any,
+    card: Card,
+    actionDesc: string,
+    actor: any,
+    req: any
+) {
+    if (!actor || !actor.id) return;
+    const actorId = actor.id;
+    const env = req?.environment || getEnvironment(req);
+    const tenantId = req?.tenantId || 'personal';
+
+    // If personal workspace or demo, no manager hierarchy exists
+    if (tenantId === 'personal' || tenantId === 'demo') return;
+
+    try {
+        const index = await getTenantIndex(env);
+        const ws = index.workspaces.find(w => w.id === tenantId);
+        const managerUserIds = new Set<string>();
+
+        // 1. Workspace owner
+        if (ws?.ownerId && ws.ownerId !== actorId) {
+            managerUserIds.add(ws.ownerId);
+        }
+
+        // 2. Workspace admin members
+        for (const m of ws?.members || []) {
+            if (m.role === 'admin' && m.userId && m.userId !== actorId) {
+                managerUserIds.add(m.userId);
+            }
+        }
+
+        // 3. Super Admins
+        const personalDb = readDb({ tenantId: 'personal', environment: env });
+        for (const u of personalDb.users || []) {
+            if (u.role === 'superadmin' && u.id !== actorId) {
+                managerUserIds.add(u.id);
+            }
+        }
+
+        // Remove actor in case they are among managers
+        managerUserIds.delete(actorId);
+        if (managerUserIds.size === 0) return;
+
+        for (const mgrId of managerUserIds) {
+            const notif = {
+                id: 'ntf-' + uid(),
+                userId: mgrId,
+                senderId: actorId,
+                senderName: actor.name || 'Takım Üyesi',
+                cardId: card.id,
+                cardTitle: card.title,
+                text: `${actor.name || 'Takım üyesi'}, '${card.title}' (${card.key}) biletinde işlem yaptı: ${actionDesc}`,
+                type: 'team-action',
+                read: false,
+                createdAt: Date.now()
+            };
+            addNotification(db, notif, req);
+        }
+    } catch {}
+}
+
+export async function checkAndNotifyDueSoonCards(db: any, req?: any) {
+    if (!db || !Array.isArray(db.cards) || db.cards.length === 0) return;
+    const now = Date.now();
+    const env = req?.environment || (typeof req === 'string' ? req : 'production');
+    const tenantId = req?.tenantId || (typeof req === 'object' && req?.tenantId) || 'personal';
+
+    const doneColIds = new Set<string>(['done']);
+    if (Array.isArray(db.columns)) {
+        db.columns.forEach((c: any) => {
+            if (c.isDone || c.id === 'done') doneColIds.add(c.id);
+        });
+    }
+
+    let modified = false;
+
+    for (const card of db.cards) {
+        if (!card.dueDate || doneColIds.has(card.col)) continue;
+
+        const dueTime = card.dueDate.includes('T')
+            ? new Date(card.dueDate).getTime()
+            : new Date(`${card.dueDate}T23:59:59`).getTime();
+        if (isNaN(dueTime)) continue;
+
+        const diffMs = dueTime - now;
+        const diffHours = diffMs / (1000 * 60 * 60);
+
+        // Within 24 hours
+        if (diffHours > 0 && diffHours <= 24) {
+            if (card.dueNotificationSentAt && (now - card.dueNotificationSentAt < 24 * 60 * 60 * 1000)) {
+                continue;
+            }
+
+            card.dueNotificationSentAt = now;
+            modified = true;
+
+            const dueText = `⏰ Son 24 Saat: '${card.title}' (${card.key}) biletinin tamamlanmasına 24 saatten az süre kaldı! (Bitiş: ${card.dueDate})`;
+
+            // 1. Notify Assignee
+            if (card.assignee) {
+                const assigneeLower = card.assignee.trim().toLowerCase();
+                const assigneeUser = (db.users || []).find((u: any) =>
+                    (u.name && u.name.toLowerCase() === assigneeLower) ||
+                    (u.username && u.username.toLowerCase() === assigneeLower)
+                );
+                if (assigneeUser) {
+                    addNotification(db, {
+                        id: 'ntf-' + uid(),
+                        userId: assigneeUser.id,
+                        senderId: 'system',
+                        senderName: 'Sistem Hatırlatıcı',
+                        cardId: card.id,
+                        cardTitle: card.title,
+                        text: dueText,
+                        type: 'due-soon',
+                        read: false,
+                        createdAt: now
+                    }, req);
+                }
+            }
+
+            // 2. Notify Workspace Managers
+            if (tenantId !== 'personal' && tenantId !== 'demo') {
+                try {
+                    const index = await getTenantIndex(env);
+                    const ws = index.workspaces.find(w => w.id === tenantId);
+                    const managerUserIds = new Set<string>();
+                    if (ws?.ownerId) managerUserIds.add(ws.ownerId);
+                    for (const m of ws?.members || []) {
+                        if (m.role === 'admin' && m.userId) managerUserIds.add(m.userId);
+                    }
+                    const personalDb = readDb({ tenantId: 'personal', environment: env });
+                    for (const u of personalDb.users || []) {
+                        if (u.role === 'superadmin') managerUserIds.add(u.id);
+                    }
+
+                    for (const mgrId of managerUserIds) {
+                        addNotification(db, {
+                            id: 'ntf-' + uid(),
+                            userId: mgrId,
+                            senderId: 'system',
+                            senderName: 'Sistem Hatırlatıcı',
+                            cardId: card.id,
+                            cardTitle: card.title,
+                            text: dueText,
+                            type: 'due-soon',
+                            read: false,
+                            createdAt: now
+                        }, req);
+                    }
+                } catch {}
+            }
+        }
+    }
+
+    if (modified && req) {
+        writeDbSync(db, req);
+    }
+}
+
+export function syncCardDependencies(cards: Card[]): void {
+    const blocksMap = new Map<string, Set<string>>();
+    for (const card of cards) {
+        if (!blocksMap.has(card.id)) blocksMap.set(card.id, new Set());
+        if (Array.isArray(card.blockedBy)) {
+            for (const blockerId of card.blockedBy) {
+                if (!blocksMap.has(blockerId)) blocksMap.set(blockerId, new Set());
+                blocksMap.get(blockerId)!.add(card.id);
+            }
+        }
+    }
+    for (const card of cards) {
+        const blockingSet = blocksMap.get(card.id) || new Set();
+        if (Array.isArray(card.blocks)) {
+            for (const b of card.blocks) blockingSet.add(b);
+        }
+        card.blocks = Array.from(blockingSet);
+        if (!Array.isArray(card.blockedBy)) {
+            card.blockedBy = [];
+        }
+    }
+}
+
 /** GET /api/cards */
-cardRouter.get('/', (req, res) => {
-    res.json(readDb(req).cards);
-});
+cardRouter.get('/', asyncHandler(async (req, res) => {
+    const db = readDb(req);
+    await checkAndNotifyDueSoonCards(db, req);
+    syncCardDependencies(db.cards);
+    res.json(db.cards);
+}));
 
 /** GET /api/cards/:id */
 cardRouter.get('/:id', (req, res) => {
@@ -209,6 +396,9 @@ cardRouter.post('/:id/comments', (req, res) => {
         environment: req.environment || getEnvironment(req)
     }, req);
 
+    // Notify workspace managers when a team member adds a comment
+    notifyWorkspaceManagers(db, card, `Yorum ekledi: "${textSnippet}"`, req.user, req).catch(() => {});
+
     res.status(201).json({ comment: newComment, comments: card.comments, activity: card.activity || [] });
 });
 
@@ -251,9 +441,12 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
         epicId: body.epicId ?? null,
         sprintId: body.sprintId ?? null,
         createdAt: Date.now(),
-        activity: []
+        activity: [],
+        blockedBy: body.blockedBy ?? [],
+        blocks: body.blocks ?? []
     };
     db.cards.push(card);
+    syncCardDependencies(db.cards);
     notifyAssignee(db, card.id, card.title, card.assignee, req.user, req);
     writeDbSync(db, req);
 
@@ -274,7 +467,7 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
 });
 
 /** PUT /api/cards/:id */
-cardRouter.put('/:id', validate(updateCardSchema), (req, res) => {
+cardRouter.put('/:id', validate(updateCardSchema), asyncHandler(async (req, res) => {
     const db = readDb(req);
     const idx = db.cards.findIndex(c => c.id === req.params.id);
     if (idx === -1) throw new NotFoundError('Card not found');
@@ -306,6 +499,7 @@ cardRouter.put('/:id', validate(updateCardSchema), (req, res) => {
         'startDate', 'dueDate', 'labels', 'storyPoints',
         'estimatedEffort', 'spentEffort',
         'subtasks', 'comments', 'epicId', 'sprintId',
+        'blockedBy', 'blocks'
     ];
     for (const key of allowed) {
         if (req.body[key] !== undefined) {
@@ -317,6 +511,7 @@ cardRouter.put('/:id', validate(updateCardSchema), (req, res) => {
         notifyAssignee(db, db.cards[idx].id, title, newAssignee, req.user, req);
     }
 
+    syncCardDependencies(db.cards);
     writeDbSync(db, req);
 
     let action: any = 'CARD_UPDATE';
@@ -352,8 +547,11 @@ cardRouter.put('/:id', validate(updateCardSchema), (req, res) => {
         environment: req.environment || getEnvironment(req)
     }, req);
 
+    // Notify workspace managers when a team member takes an action on a card
+    await notifyWorkspaceManagers(db, db.cards[idx], details, req.user, req);
+
     res.json(db.cards[idx]);
-});
+}));
 
 /** DELETE /api/cards/:id */
 cardRouter.delete('/:id', (req, res) => {

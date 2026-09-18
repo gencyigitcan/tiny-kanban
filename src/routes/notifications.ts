@@ -1,10 +1,8 @@
-// ============================================================
-//  Notifications Routes
-// ============================================================
 import { Router } from 'express';
 import { readDb, writeDbSync, getEnvironment } from '../lib/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { NotFoundError } from '../middleware/error.js';
+import { checkAndNotifyDueSoonCards } from './cards.js';
 
 export const notificationsRouter = Router();
 
@@ -12,9 +10,15 @@ export const notificationsRouter = Router();
 notificationsRouter.use(requireAuth);
 
 /** GET /api/notifications */
-notificationsRouter.get('/', (req, res) => {
+notificationsRouter.get('/', async (req, res) => {
     const isSuperAdmin = req.user?.role === 'superadmin';
     const currentDb = readDb(req);
+
+    // Trigger deadline inspection for cards in current workspace
+    try {
+        await checkAndNotifyDueSoonCards(currentDb, req);
+    } catch {}
+
     let allNotifs = [...(currentDb.notifications || [])];
 
     if (req.tenantId !== 'personal') {

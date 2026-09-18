@@ -6,6 +6,35 @@
 window.LABELS = [];
 window.LABEL_MAP = {};
 
+// ── Default Columns & Workflow Helpers ─────────────────────
+const DEFAULT_COLUMNS = [
+  { id: 'todo', name: 'Yapılacak', color: '#6b7280', order: 0, isDone: false, wipLimit: 0 },
+  { id: 'doing', name: 'Yapılıyor', color: '#f59e0b', order: 1, isDone: false, wipLimit: 0 },
+  { id: 'done', name: 'Tamamlandı', color: '#10b981', order: 2, isDone: true, wipLimit: 0 }
+];
+window.DEFAULT_COLUMNS = DEFAULT_COLUMNS;
+window.boardColumns = window.boardColumns || DEFAULT_COLUMNS;
+
+function getColumnInfo(colId) {
+  const cols = (window.boardColumns && window.boardColumns.length > 0) ? window.boardColumns : DEFAULT_COLUMNS;
+  const found = cols.find(c => c.id === colId);
+  if (found) return found;
+  const fallbackMap = {
+    todo: { id: 'todo', name: 'Yapılacak', color: '#6b7280', isDone: false },
+    doing: { id: 'doing', name: 'Yapılıyor', color: '#f59e0b', isDone: false },
+    done: { id: 'done', name: 'Tamamlandı', color: '#10b981', isDone: true }
+  };
+  return fallbackMap[colId] || { id: colId, name: colId, color: '#6366f1', isDone: false };
+}
+window.getColumnInfo = getColumnInfo;
+
+function isCardDone(card) {
+  if (!card) return false;
+  const cInfo = getColumnInfo(card.col);
+  return !!cInfo.isDone;
+}
+window.isCardDone = isCardDone;
+
 // ── Utilities ────────────────────────────────────────────
 function initials(name) {
   if (!name) return '?';
@@ -110,6 +139,23 @@ function cardHTML(card, epics = [], readonly = false) {
     }
   }
 
+  // Dependencies badge
+  let depBadge = '';
+  const allCards = window.cards || [];
+  if (card.blockedBy && card.blockedBy.length > 0) {
+    const unresolved = card.blockedBy.filter(bId => {
+      const bCard = allCards.find(c => c.id === bId);
+      return bCard && !isCardDone(bCard);
+    });
+    if (unresolved.length > 0) {
+      depBadge = `<span class="badge-blocked" title="${unresolved.length} bağımlı bilet henüz tamamlanmadı!">⛔ ${unresolved.length} engel</span>`;
+    } else {
+      depBadge = `<span class="badge-unblocked" title="Tüm bağımlılıklar tamamlandı">✓ Hazır</span>`;
+    }
+  } else if (card.blocks && card.blocks.length > 0) {
+    depBadge = `<span class="badge-blocks" title="${card.blocks.length} bileti engelliyor">⚡ ${card.blocks.length} bekletiyor</span>`;
+  }
+
   return `
   <div class="card pri-${card.priority}${readonly ? ' readonly' : ''}"
        id="card-${card.id}" data-id="${card.id}"
@@ -138,6 +184,7 @@ function cardHTML(card, epics = [], readonly = false) {
         ${card.key ? `<span class="jira-card-key">${card.key}</span>` : ''}
         ${card.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="background:${getAssigneeColor(card.assignee)}" title="${escHtml(card.assignee)}">${escHtml(initials(card.assignee))}</span>${escHtml(card.assignee)}</span>` : '<span class="card-assignee unassigned" style="color:var(--text-muted);font-size:11px;">👤 Atanmamış</span>'}
         ${dueBadge(card.dueDate)}
+        ${depBadge}
       </div>
       <div class="card-footer-right">
         ${effortBadge}
@@ -220,7 +267,210 @@ function cardMatchesGlobalFilters(c, options = { checkSprint: true }) {
 window.cardMatchesGlobalFilters = cardMatchesGlobalFilters;
 
 // ── Board render ─────────────────────────────────────────
+function toggleColumnMenu(e, colId) {
+  e.stopPropagation();
+  const menu = document.getElementById('colMenu-' + colId);
+  const isOpen = menu?.classList.contains('show');
+  document.querySelectorAll('.col-dropdown-menu').forEach(m => m.classList.remove('show'));
+  if (!isOpen && menu) {
+    menu.classList.add('show');
+  }
+}
+window.toggleColumnMenu = toggleColumnMenu;
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.col-dropdown-menu').forEach(m => m.classList.remove('show'));
+});
+
+function openCreateColumnModal() {
+  const canManage = window.currentUser?.role === 'superadmin' || window.currentUser?.role === 'admin';
+  if (!canManage) {
+    showToast('Kolon yönetimi için yönetici yetkisi gereklidir', 'warn');
+    return;
+  }
+  document.getElementById('columnModalTitle').textContent = '➕ Yeni Kolon Ekle';
+  document.getElementById('columnEditId').value = '';
+  document.getElementById('columnName').value = '';
+  document.getElementById('columnColor').value = '#6366f1';
+  document.getElementById('columnWipLimit').value = '0';
+  document.getElementById('columnIsDone').checked = false;
+  openModal('columnModal');
+  document.getElementById('columnName').focus();
+}
+window.openCreateColumnModal = openCreateColumnModal;
+
+function openEditColumnModal(colId) {
+  const canManage = window.currentUser?.role === 'superadmin' || window.currentUser?.role === 'admin';
+  if (!canManage) {
+    showToast('Kolon yönetimi için yönetici yetkisi gereklidir', 'warn');
+    return;
+  }
+  const cols = window.boardColumns || DEFAULT_COLUMNS;
+  const col = cols.find(c => c.id === colId);
+  if (!col) return;
+  document.getElementById('columnModalTitle').textContent = `✏️ '${col.name}' Kolonunu Düzenle`;
+  document.getElementById('columnEditId').value = col.id;
+  document.getElementById('columnName').value = col.name;
+  document.getElementById('columnColor').value = col.color || '#6366f1';
+  document.getElementById('columnWipLimit').value = col.wipLimit || 0;
+  document.getElementById('columnIsDone').checked = !!col.isDone;
+  openModal('columnModal');
+  document.getElementById('columnName').focus();
+}
+window.openEditColumnModal = openEditColumnModal;
+
+async function saveColumnSubmit(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const id = document.getElementById('columnEditId').value;
+  const name = document.getElementById('columnName').value.trim();
+  const color = document.getElementById('columnColor').value;
+  const wipLimit = parseInt(document.getElementById('columnWipLimit').value, 10) || 0;
+  const isDone = document.getElementById('columnIsDone').checked;
+
+  if (!name) {
+    showToast('Kolon adı boş olamaz', 'warn');
+    return;
+  }
+
+  try {
+    if (id) {
+      await API.updateColumn(id, { name, color, wipLimit, isDone });
+      showToast('Kolon güncellendi ✓');
+    } else {
+      await API.createColumn({ name, color, wipLimit, isDone });
+      showToast('Yeni kolon eklendi ✓');
+    }
+    window.boardColumns = await API.getColumns();
+    closeModal('columnModal');
+    if (typeof renderAll === 'function') renderAll();
+  } catch (err) {
+    showToast(err.message || 'Kolon kaydedilemedi', 'error');
+  }
+}
+window.saveColumnSubmit = saveColumnSubmit;
+
+async function moveColumnAction(colId, direction) {
+  const cols = [...(window.boardColumns || DEFAULT_COLUMNS)];
+  const idx = cols.findIndex(c => c.id === colId);
+  if (idx === -1) return;
+  const targetIdx = idx + direction;
+  if (targetIdx < 0 || targetIdx >= cols.length) return;
+
+  const temp = cols[idx];
+  cols[idx] = cols[targetIdx];
+  cols[targetIdx] = temp;
+
+  const columnIds = cols.map(c => c.id);
+  try {
+    await API.reorderColumns(columnIds);
+    window.boardColumns = await API.getColumns();
+    if (typeof renderAll === 'function') renderAll();
+  } catch (err) {
+    showToast(err.message || 'Kolon sıralanamadı', 'error');
+  }
+}
+window.moveColumnAction = moveColumnAction;
+
+async function deleteColumnAction(colId) {
+  const cols = window.boardColumns || DEFAULT_COLUMNS;
+  if (cols.length <= 1) {
+    showToast('Panoda en az 1 kolon bulunmalıdır. Tek kolon silinemez.', 'warn');
+    return;
+  }
+  const col = cols.find(c => c.id === colId);
+  if (!col) return;
+
+  const colCards = (window.cards || []).filter(c => c.col === colId);
+  const otherCols = cols.filter(c => c.id !== colId);
+  const fallbackCol = otherCols[0];
+
+  const confirmMsg = colCards.length > 0 
+    ? `"${col.name}" kolonu silinsin mi?\n\nBu kolondaki ${colCards.length} görev "${fallbackCol.name}" kolonuna aktarılacaktır.`
+    : `"${col.name}" kolonunu silmek istediğinize emin misiniz?`;
+
+  const approved = await showConfirm(confirmMsg, 'Kolonu Sil');
+  if (!approved) return;
+
+  try {
+    await API.deleteColumn(colId, fallbackCol.id);
+    window.boardColumns = await API.getColumns();
+    window.cards = await API.getCards();
+    if (typeof cards !== 'undefined') cards = window.cards;
+    if (typeof renderAll === 'function') renderAll();
+    showToast(`"${col.name}" kolonu silindi`);
+  } catch (err) {
+    showToast(err.message || 'Kolon silinemedi', 'error');
+  }
+}
+window.deleteColumnAction = deleteColumnAction;
+
 function renderBoard(cards, epics = [], readonly = false) {
+  const container = document.getElementById('boardColumnsContainer');
+  if (!container) return;
+
+  const cols = (window.boardColumns && window.boardColumns.length > 0) ? window.boardColumns : DEFAULT_COLUMNS;
+  const canManage = window.currentUser?.role === 'superadmin' || window.currentUser?.role === 'admin';
+
+  // Update count badge & toolbar button visibility
+  const countBadge = document.getElementById('boardColCountBadge');
+  if (countBadge) countBadge.textContent = `${cols.length} Kolon`;
+
+  const btnAddCol = document.getElementById('btnAddNewColumn');
+  if (btnAddCol) btnAddCol.style.display = canManage ? 'inline-flex' : 'none';
+
+  // Check if container structure matches current columns
+  const existingColIds = Array.from(container.querySelectorAll('.column')).map(el => el.dataset.col);
+  const targetColIds = cols.map(c => c.id);
+  const needsRebuild = existingColIds.length !== targetColIds.length || !existingColIds.every((id, idx) => id === targetColIds[idx]);
+
+  if (needsRebuild) {
+    container.innerHTML = cols.map((col, idx) => {
+      const isFirst = idx === 0;
+      const isLast = idx === cols.length - 1;
+      const menuHTML = canManage ? `
+        <div class="col-header-menu-wrap" style="position:relative;">
+          <button type="button" class="col-menu-btn" onclick="toggleColumnMenu(event, '${col.id}')" title="Kolon Seçenekleri">⋮</button>
+          <div class="col-dropdown-menu" id="colMenu-${col.id}">
+            <button type="button" class="col-dropdown-item" onclick="openEditColumnModal('${col.id}')">✏️ Düzenle</button>
+            ${!isFirst ? `<button type="button" class="col-dropdown-item" onclick="moveColumnAction('${col.id}', -1)">⬅️ Sola Taşı</button>` : ''}
+            ${!isLast ? `<button type="button" class="col-dropdown-item" onclick="moveColumnAction('${col.id}', 1)">➡️ Sağa Taşı</button>` : ''}
+            <button type="button" class="col-dropdown-item danger" onclick="deleteColumnAction('${col.id}')">🗑️ Sil</button>
+          </div>
+        </div>
+      ` : '';
+
+      return `
+        <section class="column" data-col="${col.id}">
+          <div class="col-header">
+            <div class="col-header-top">
+              <div class="col-title-wrap">
+                <span class="col-dot" style="background:${col.color || '#6366f1'}"></span>
+                <span class="col-title">${escHtml(col.name).toUpperCase()}</span>
+                ${readonly ? '' : `<button type="button" class="col-quick-plus-btn" onclick="openCardDetail(null, '${col.id}')" title="Yeni ticket ekle">✚</button>`}
+              </div>
+              <div class="col-header-right">
+                <span class="col-count" data-count="${col.id}">0</span>
+                ${menuHTML}
+              </div>
+            </div>
+          </div>
+          <div class="col-body" id="col-${col.id}" data-col="${col.id}" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragleave="onDragLeave(event)">
+            <div class="empty-state">
+              <div class="empty-icon">${col.isDone ? '✅' : '📋'}</div>
+              <div>${col.isDone ? 'Tamamlanan görevler burada' : 'Görev yok'}</div>
+            </div>
+          </div>
+          ${readonly ? '' : `
+          <div class="col-footer-actions">
+            <button type="button" class="col-add-ticket-btn" onclick="openCardDetail(null, '${col.id}')">
+              ✚ Yeni Ticket Ekle
+            </button>
+          </div>`}
+        </section>
+      `;
+    }).join('');
+  }
+
   const fa = (document.getElementById('filterAssignee')?.value || '').toLowerCase().trim();
   const fe = (document.getElementById('filterEpic')?.value || '').trim();
   const fp = (document.getElementById('filterPriority')?.value || '').trim();
@@ -231,15 +481,15 @@ function renderBoard(cards, epics = [], readonly = false) {
 
   const hasFilter = !!(fa || fe || fp || q);
 
-  ['todo', 'doing', 'done'].forEach(col => {
-    const body = document.getElementById('col-' + col);
+  cols.forEach(col => {
+    const body = document.getElementById('col-' + col.id);
     if (!body) return;
     body.querySelectorAll('.card').forEach(el => el.remove());
     const emptyState = body.querySelector('.empty-state');
     
     // Total cards in this sprint & column
     const sprintColCards = cards.filter(c => {
-      if (c.col !== col) return false;
+      if (c.col !== col.id) return false;
       if (!fs || fs === 'all') return true;
       if (fs === 'active') {
         if (activeSprint) return c.sprintId === activeSprint.id;
@@ -267,17 +517,31 @@ function renderBoard(cards, epics = [], readonly = false) {
         if (visibleCards.length === 0 && hasFilter) {
           txt.textContent = 'Filtreye uygun görev yok';
         } else {
-          txt.textContent = col === 'todo' ? 'Görev yok' : (col === 'doing' ? 'Devam eden yok' : 'Tamamlanan görevler burada');
+          txt.textContent = col.isDone ? 'Tamamlanan görevler burada' : 'Görev yok';
         }
       }
     }
 
-    const cnt = document.querySelector(`[data-count="${col}"]`);
+    const cnt = document.querySelector(`[data-count="${col.id}"]`);
     if (cnt) {
-      if (hasFilter && visibleCards.length !== sprintColCards.length) {
-        cnt.innerHTML = `${visibleCards.length} <span style="font-size:11px;font-weight:400;opacity:0.65">/ ${sprintColCards.length}</span>`;
+      const wipLimit = col.wipLimit || 0;
+      const isExceeded = wipLimit > 0 && sprintColCards.length > wipLimit;
+      if (wipLimit > 0) {
+        cnt.className = `col-wip-badge ${isExceeded ? 'wip-exceeded' : ''}`;
+        cnt.title = isExceeded ? `WIP Limiti aşıldı! (${sprintColCards.length}/${wipLimit})` : `WIP Limiti: ${sprintColCards.length}/${wipLimit}`;
+        if (hasFilter && visibleCards.length !== sprintColCards.length) {
+          cnt.innerHTML = `${visibleCards.length} <span style="font-size:10px;font-weight:400;opacity:0.75">/ ${sprintColCards.length} (Max ${wipLimit})</span>`;
+        } else {
+          cnt.textContent = `${sprintColCards.length} / ${wipLimit}`;
+        }
       } else {
-        cnt.textContent = visibleCards.length;
+        cnt.className = 'col-count';
+        cnt.removeAttribute('title');
+        if (hasFilter && visibleCards.length !== sprintColCards.length) {
+          cnt.innerHTML = `${visibleCards.length} <span style="font-size:11px;font-weight:400;opacity:0.65">/ ${sprintColCards.length}</span>`;
+        } else {
+          cnt.textContent = visibleCards.length;
+        }
       }
     }
   });
@@ -296,8 +560,6 @@ window.setListFilter = setListFilter;
 function renderListView(cards, epics = []) {
   const container = document.getElementById('listView');
   if (!container) return;
-  const colLabel = { todo: 'Yapılacak', doing: 'Yapılıyor', done: 'Tamamlandı' };
-  const colBadge = { todo: 'col-badge-todo', doing: 'col-badge-doing', done: 'col-badge-done' };
   
   const allSprints = window.sprints || [];
   const activeSprintIdx = allSprints.findIndex(s => s.active);
@@ -347,17 +609,31 @@ function renderListView(cards, epics = []) {
     const labels = (c.labels || []).map(id => window.LABEL_MAP[id]).filter(Boolean);
     const subtasks = c.subtasks || [];
     const done = subtasks.filter(s => s.done).length;
+    const colInfo = getColumnInfo(c.col);
+
+    let depTag = '';
+    if (c.blockedBy && c.blockedBy.length > 0) {
+      const unresolved = c.blockedBy.filter(bId => {
+        const bCard = cards.find(x => x.id === bId);
+        return bCard && !isCardDone(bCard);
+      });
+      if (unresolved.length > 0) {
+        depTag = `<span class="badge-blocked" style="font-size:9px;" title="${unresolved.length} bilet bekliyor!">⛔ ${unresolved.length} engel</span>`;
+      }
+    }
+
     return `<tr onclick="openCardDetail('${c.id}')" style="cursor:pointer">
       <td><span class="card-key-badge">${c.key || ''}</span></td>
       <td class="list-title-cell">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
           ${epic ? `<span class="epic-pill" style="background:${epic.color}20;color:${epic.color};font-size:10px;padding:1px 6px;border-radius:20px;font-weight:600">${escHtml(epic.name)}</span>` : ''}
           ${sprintObj ? `<span class="sprint-tag" style="background:rgba(99,102,241,0.1);color:var(--accent);font-size:10px;padding:1px 6px;border-radius:12px;">${sprintObj.active ? '🟢 ' : ''}${escHtml(sprintObj.name)}</span>` : '<span style="font-size:10px;color:var(--text-muted)">Backlog</span>'}
+          ${depTag}
         </div>
         ${escHtml(c.title)}
         ${labels.length ? `<div style="margin-top:4px;display:flex;gap:3px;flex-wrap:wrap">${labels.map(l => `<span class="label-tag" style="background:${l.bg};color:${l.color}">${escHtml(l.name)}</span>`).join('')}</div>` : ''}
       </td>
-      <td><span class="col-badge ${colBadge[c.col]}">${colLabel[c.col]}</span></td>
+      <td><span class="col-badge" style="background:${colInfo.color}22;color:${colInfo.color};border:1px solid ${colInfo.color}55;font-weight:600;padding:2px 8px;border-radius:12px;font-size:11px;">${escHtml(colInfo.name)}</span></td>
       <td>${c.assignee ? `<span class="card-assignee"><span class="assignee-avatar" style="background:${getAssigneeColor(c.assignee)}">${escHtml(initials(c.assignee))}</span>${escHtml(c.assignee)}</span>` : '—'}</td>
       <td><span class="card-priority-tag pri-${c.priority}" style="display:inline-block;background:${c.priority === 'high' ? 'var(--pri-high-bg)' : c.priority === 'low' ? 'var(--pri-low-bg)' : 'var(--pri-med-bg)'};color:${c.priority === 'high' ? 'var(--pri-high)' : c.priority === 'low' ? 'var(--pri-low)' : 'var(--pri-med)'}">${c.priority === 'high' ? 'Yüksek' : c.priority === 'low' ? 'Düşük' : 'Orta'}</span></td>
       <td>${c.dueDate ? dueBadge(c.dueDate) : '—'}</td>
@@ -760,8 +1036,25 @@ function renderGantt(cards) {
   const priColor = { high: 'var(--pri-high)', medium: 'var(--pri-med)', low: 'var(--pri-low)' };
 
   const rows = rangeFilteredCards.map(c => {
+    const colInfo = getColumnInfo(c.col);
+    const isDone = isCardDone(c);
+
+    let depBadges = '';
+    if (c.blockedBy && c.blockedBy.length > 0) {
+      depBadges += `<span class="gantt-dep-badge" style="background:#fee2e2;color:#dc2626;" title="${c.blockedBy.length} kartın bitmesi bekleniyor">⛔ ${c.blockedBy.length}</span>`;
+    }
+    if (c.blocks && c.blocks.length > 0) {
+      depBadges += `<span class="gantt-dep-badge" style="background:#fef3c7;color:#d97706;" title="${c.blocks.length} kartı bekletiyor">⚡ ${c.blocks.length}</span>`;
+    }
+
     if (!c.dueDate) return `<div class="gantt-row">
-      <div class="gantt-row-label" onclick="openCardDetail('${c.id}')">${escHtml(c.title.slice(0, 30))}${c.title.length > 30 ? '…' : ''}</div>
+      <div class="gantt-row-label" onclick="openCardDetail('${c.id}')" title="${escHtml(c.title)}">
+        <span class="gantt-col-pill" style="background:${colInfo.color}22;color:${colInfo.color};">${escHtml(colInfo.name)}</span>
+        <span class="card-key-badge">${c.key || ''}</span>
+        ${c.assignee ? `<span class="assignee-avatar" style="width:16px;height:16px;font-size:8px;background:${getAssigneeColor(c.assignee)}">${escHtml(initials(c.assignee))}</span>` : ''}
+        <span>${escHtml(c.title.slice(0, 22))}${c.title.length > 22 ? '…' : ''}</span>
+        ${depBadges}
+      </div>
       <div class="gantt-row-timeline"><div class="gantt-no-date">Tarih belirlenmemiş</div></div>
     </div>`;
 
@@ -773,14 +1066,16 @@ function renderGantt(cards) {
 
     return `<div class="gantt-row">
       <div class="gantt-row-label" onclick="openCardDetail('${c.id}')" title="${escHtml(c.title)}">
+        <span class="gantt-col-pill" style="background:${colInfo.color}22;color:${colInfo.color};">${escHtml(colInfo.name)}</span>
         <span class="card-key-badge">${c.key || ''}</span>
         ${c.assignee ? `<span class="assignee-avatar" style="width:16px;height:16px;font-size:8px;background:${getAssigneeColor(c.assignee)}">${escHtml(initials(c.assignee))}</span>` : ''}
-        <span>${escHtml(c.title.slice(0, 24))}${c.title.length > 24 ? '…' : ''}</span>
+        <span>${escHtml(c.title.slice(0, 22))}${c.title.length > 22 ? '…' : ''}</span>
+        ${depBadges}
       </div>
       <div class="gantt-row-timeline" style="position:relative">
-        <div class="gantt-bar" style="left:${barStart.toFixed(1)}%;width:${barW.toFixed(1)}%;background:${priColor[c.priority]};z-index:2"
-             title="${escHtml(c.title)} (${c.startDate || ''} → ${c.dueDate})">
-          <span>${escHtml(c.title.slice(0, 20))}</span>
+        <div class="gantt-bar${isDone ? ' done' : ''}" style="left:${barStart.toFixed(1)}%;width:${barW.toFixed(1)}%;background:${isDone ? '#10b981' : priColor[c.priority]};z-index:2;${isDone ? 'opacity:0.85;border:1px solid #059669;' : ''}"
+             title="${escHtml(c.title)} (${c.startDate || ''} → ${c.dueDate}) [Durum: ${escHtml(colInfo.name)}]${c.blockedBy?.length ? ` [⛔ ${c.blockedBy.length} bağımlılık]` : ''}">
+          <span>${isDone ? '✓ ' : ''}${escHtml(c.title.slice(0, 18))}</span>
         </div>
       </div>
     </div>`;

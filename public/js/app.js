@@ -56,13 +56,15 @@ async function boot() {
         }
 
         // Fetch core data directly from Server DB
-        [cards, epics, sprints, users, labels, notifications] = await Promise.all([
+        let columns = [];
+        [cards, epics, sprints, users, labels, notifications, columns] = await Promise.all([
             API.getCards(),
             API.getEpics(),
             API.getSprints(),
             API.getUsers(),
             API.getLabels(),
-            API.getNotifications()
+            API.getNotifications(),
+            API.getColumns().catch(() => [])
         ]);
         window.cards = cards;
         window.epics = epics;
@@ -71,6 +73,7 @@ async function boot() {
         window.labels = labels;
         window.LABELS = labels;
         window.LABEL_MAP = Object.fromEntries(labels.map(l => [l.id, l]));
+        window.boardColumns = Array.isArray(columns) && columns.length > 0 ? columns : (window.DEFAULT_COLUMNS || []);
         
         // Setup dropdown elements with registered users, epics, and sprints list
         populateAssigneeSelects();
@@ -240,7 +243,15 @@ function openCardDetail(id, defaultCol) {
     document.getElementById('cardDesc').value = card?.desc || '';
     document.getElementById('cardAssignee').value = card?.assignee || '';
     document.getElementById('cardPriority').value = card?.priority || 'medium';
-    document.getElementById('cardColumn').value = card?.col || defaultCol || 'todo';
+
+    // Populate dynamic columns dropdown
+    const colSel = document.getElementById('cardColumn');
+    const cols = (window.boardColumns && window.boardColumns.length > 0) ? window.boardColumns : (window.DEFAULT_COLUMNS || []);
+    const targetCol = card?.col || defaultCol || (cols[0]?.id || 'todo');
+    if (colSel) {
+        colSel.innerHTML = cols.map(c => `<option value="${c.id}" ${targetCol === c.id ? 'selected' : ''}>${escHtml(c.name)}${c.isDone ? ' (Tamamlandı)' : ''}</option>`).join('');
+    }
+
     document.getElementById('cardSP').value = card?.storyPoints ?? '';
     document.getElementById('cardEstimatedEffort').value = card?.estimatedEffort ?? '';
     document.getElementById('cardSpentEffort').value = card?.spentEffort ?? '';
@@ -275,6 +286,30 @@ function openCardDetail(id, defaultCol) {
             const dateText = s.startDate && s.endDate ? ` · ${s.startDate} → ${s.endDate}` : '';
             return `<option value="${s.id}" ${isSel ? 'selected' : ''}>${activeMark}${escHtml(s.name)}${activeText}${dateText}</option>`;
         }).join('');
+
+    // Dependencies (Blocked By other cards)
+    const depContainer = document.getElementById('cardBlockedByContainer');
+    if (depContainer) {
+        const otherCards = (cards || []).filter(c => c.id !== id);
+        if (otherCards.length === 0) {
+            depContainer.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:4px;">Bağımlılık seçilebilecek başka kart bulunmuyor.</div>';
+        } else {
+            const blockedBySet = new Set(card?.blockedBy || []);
+            depContainer.innerHTML = otherCards.map(oc => {
+                const checked = blockedBySet.has(oc.id) ? 'checked' : '';
+                const done = typeof isCardDone === 'function' ? isCardDone(oc) : oc.col === 'done';
+                const statusTag = done ? '✅' : '⏳';
+                return `
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;cursor:pointer;border-bottom:1px solid rgba(0,0,0,0.03);">
+                        <input type="checkbox" name="cardBlockedBy" value="${oc.id}" ${checked}>
+                        <span style="font-weight:600;color:var(--accent);">${escHtml(oc.key || '')}</span>
+                        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(oc.title)}</span>
+                        <span style="font-size:11px;color:var(--text-muted);">${statusTag}</span>
+                    </label>
+                `;
+            }).join('');
+        }
+    }
 
     // Labels
     const selectedLabels = new Set(card?.labels || []);
@@ -536,6 +571,7 @@ safeAddListener('cardSaveBtn', 'click', async () => {
     const title = document.getElementById('cardTitle').value.trim();
     if (!title) { showToast('Başlık boş olamaz', 'warn'); return; }
     const selectedLabels = [...document.querySelectorAll('#labelsGrid .label-chip.selected')].map(el => el.dataset.lid);
+    const blockedBy = Array.from(document.querySelectorAll('#cardBlockedByContainer input[name="cardBlockedBy"]:checked')).map(cb => cb.value);
     
     const payload = {
         title,
@@ -551,6 +587,7 @@ safeAddListener('cardSaveBtn', 'click', async () => {
         epicId: document.getElementById('cardEpic').value || null,
         sprintId: document.getElementById('cardSprint').value || null,
         labels: selectedLabels,
+        blockedBy,
         subtasks: _editSubtasks,
         comments: _editComments,
     };
@@ -997,12 +1034,13 @@ function setupBackgroundSync() {
         
         if (!modalOpen && !isFocusInput && (typeof dragId === 'undefined' || !dragId)) {
             try {
-                const [newCards, newEpics, newSprints, newLabels, newNotifications] = await Promise.all([
+                const [newCards, newEpics, newSprints, newLabels, newNotifications, newColumns] = await Promise.all([
                     API.getCards(),
                     API.getEpics(),
                     API.getSprints(),
                     API.getLabels(),
-                    API.getNotifications()
+                    API.getNotifications(),
+                    API.getColumns().catch(() => window.boardColumns || [])
                 ]);
                 
                 // Compare and notify if new unread notifications are received
@@ -1019,7 +1057,8 @@ function setupBackgroundSync() {
                     JSON.stringify(newEpics) !== JSON.stringify(epics) ||
                     JSON.stringify(newSprints) !== JSON.stringify(sprints) ||
                     JSON.stringify(newLabels) !== JSON.stringify(labels) ||
-                    JSON.stringify(newNotifications) !== JSON.stringify(notifications)) {
+                    JSON.stringify(newNotifications) !== JSON.stringify(notifications) ||
+                    JSON.stringify(newColumns) !== JSON.stringify(window.boardColumns)) {
                     changed = true;
                 }
                 
@@ -1032,6 +1071,7 @@ function setupBackgroundSync() {
                     notifications = newNotifications;
                     window.LABELS = labels;
                     window.LABEL_MAP = Object.fromEntries(labels.map(l => [l.id, l]));
+                    window.boardColumns = Array.isArray(newColumns) && newColumns.length > 0 ? newColumns : window.boardColumns;
                     
                     populateSprintFilter();
                     renderNotifications();
@@ -1515,6 +1555,9 @@ window.openCreateWorkspaceModal = async function() {
     const group = document.getElementById('wsInitialMembersGroup');
     if (group) group.style.display = 'block';
 
+    const templateGroup = document.getElementById('wsColumnTemplateGroup');
+    if (templateGroup) templateGroup.style.display = 'block';
+
     if (initialList) {
         try {
             const res = await API.getDetailedUsers();
@@ -1554,6 +1597,9 @@ window.openEditWorkspaceModal = async function(wsId) {
         const group = document.getElementById('wsInitialMembersGroup');
         if (group) group.style.display = 'none';
 
+        const templateGroup = document.getElementById('wsColumnTemplateGroup');
+        if (templateGroup) templateGroup.style.display = 'none';
+
         openModal('workspaceModal');
     } catch (e) {
         showToast(e.message, 'error');
@@ -1580,7 +1626,8 @@ window.saveWorkspaceSubmit = async function() {
             showToast('Çalışma alanı başarıyla güncellendi');
         } else {
             const selectedMemberIds = Array.from(document.querySelectorAll('input[name="wsInitialMember"]:checked')).map(cb => cb.value);
-            await API.createWorkspace(name, description, selectedMemberIds);
+            const template = document.getElementById('wsTemplateSelect')?.value || 'standard';
+            await API.createWorkspace(name, description, selectedMemberIds, template);
             showToast('Yeni çalışma alanı başarıyla oluşturuldu');
         }
         closeModal('workspaceModal');

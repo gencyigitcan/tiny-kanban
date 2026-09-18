@@ -16,6 +16,8 @@ import {
     logActivity,
     resolveFilePath,
     isNodeRuntime,
+    DEFAULT_COLUMNS,
+    SOFTWARE_TEAM_COLUMNS,
     type Environment
 } from '../lib/db.js';
 import { validate } from '../middleware/validate.js';
@@ -207,19 +209,31 @@ adminRouter.get('/workspaces', asyncHandler(async (req, res) => {
 const createWorkspaceSchema = z.object({
     name: z.string().min(2, 'Takım/Çalışma alanı adı en az 2 karakter olmalıdır').max(100).trim(),
     description: z.string().max(500).optional(),
-    memberIds: z.array(z.string()).optional()
+    memberIds: z.array(z.string()).optional(),
+    template: z.enum(['standard', 'software', 'custom']).optional(),
+    columns: z.array(z.any()).optional()
 });
 
 adminRouter.post('/workspaces', validate(createWorkspaceSchema), asyncHandler(async (req, res) => {
     checkAdminPermission(req);
     const env = req.environment || getEnvironment(req);
-    const { name, description, memberIds } = req.body;
+    const { name, description, memberIds, template, columns } = req.body;
+
+    let initialCols = DEFAULT_COLUMNS;
+    if (template === 'software') {
+        initialCols = SOFTWARE_TEAM_COLUMNS;
+    } else if (Array.isArray(columns) && columns.length > 0) {
+        initialCols = columns;
+    }
 
     const workspace = await createWorkspace(
         name,
         'team',
         { id: req.user!.id, username: req.user!.username },
-        env
+        env,
+        undefined,
+        undefined,
+        initialCols
     );
     if (description) {
         workspace.description = description;

@@ -4,8 +4,8 @@
 import { z } from 'zod';
 
 const priority = z.enum(['high', 'medium', 'low']);
-const column = z.enum(['todo', 'doing', 'done']);
-const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional();
+const column = z.string().min(1).max(50);
+const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}(T.*)?$/).nullable().optional();
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/).optional();
 
 const subtaskSchema = z.object({
@@ -38,6 +38,8 @@ export const createCardSchema = z.object({
     subtasks: z.array(subtaskSchema).max(100).optional().default([]),
     epicId: z.string().nullable().optional(),
     sprintId: z.string().nullable().optional(),
+    blockedBy: z.array(z.string()).optional().default([]),
+    blocks: z.array(z.string()).optional().default([]),
 });
 
 export const updateCardSchema = z.object({
@@ -56,6 +58,30 @@ export const updateCardSchema = z.object({
     comments: z.array(commentSchema).max(500).optional(),
     epicId: z.string().nullable().optional(),
     sprintId: z.string().nullable().optional(),
+    blockedBy: z.array(z.string()).optional(),
+    blocks: z.array(z.string()).optional(),
+});
+
+// ── Columns ──────────────────────────────────────────────────
+export const createColumnSchema = z.object({
+    id: z.string().min(1).max(50).optional(),
+    name: z.string().min(1, 'Kolon adı boş olamaz').max(100).trim(),
+    color: hexColor.optional().default('#6366f1'),
+    wipLimit: z.number().int().min(0).max(999).optional().default(0),
+    order: z.number().int().min(0).optional(),
+    isDone: z.boolean().optional().default(false)
+});
+
+export const updateColumnSchema = z.object({
+    name: z.string().min(1, 'Kolon adı boş olamaz').max(100).trim().optional(),
+    color: hexColor.optional(),
+    wipLimit: z.number().int().min(0).max(999).optional(),
+    order: z.number().int().min(0).optional(),
+    isDone: z.boolean().optional()
+});
+
+export const reorderColumnsSchema = z.object({
+    columnIds: z.array(z.string().min(1))
 });
 
 // ── Epics ────────────────────────────────────────────────────

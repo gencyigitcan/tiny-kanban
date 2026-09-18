@@ -345,79 +345,19 @@
 
     <!-- BOARD VIEW -->
     <div class="view-container active" id="view-board">
-        <main class="board-wrap">
-            <section class="column" data-col="todo">
-                <div class="col-header">
-                    <div class="col-header-top">
-                        <div class="col-title-wrap">
-                            <span class="col-dot"></span>
-                            <span class="col-title">YAPILACAK</span>
-                            <button type="button" class="col-quick-plus-btn" onclick="openCardDetail(null, 'todo')" title="Yeni ticket ekle">✚</button>
-                        </div>
-                        <span class="col-count" data-count="todo">0</span>
-                    </div>
-                </div>
-                <div class="col-body" id="col-todo" data-col="todo" ondragover="onDragOver(event)"
-                    ondrop="onDrop(event)" ondragleave="onDragLeave(event)">
-                    <div class="empty-state">
-                        <div class="empty-icon">📋</div>
-                        <div>Görev yok — <kbd>N</kbd> ile ekle</div>
-                    </div>
-                </div>
-                <div class="col-footer-actions">
-                    <button type="button" class="col-add-ticket-btn" onclick="openCardDetail(null, 'todo')">
-                        ✚ Yeni Ticket Ekle
-                    </button>
-                </div>
-            </section>
-            <section class="column" data-col="doing">
-                <div class="col-header">
-                    <div class="col-header-top">
-                        <div class="col-title-wrap">
-                            <span class="col-dot"></span>
-                            <span class="col-title">İŞLEMDE</span>
-                            <button type="button" class="col-quick-plus-btn" onclick="openCardDetail(null, 'doing')" title="Yeni ticket ekle">✚</button>
-                        </div>
-                        <span class="col-count" data-count="doing">0</span>
-                    </div>
-                </div>
-                <div class="col-body" id="col-doing" data-col="doing" ondragover="onDragOver(event)"
-                    ondrop="onDrop(event)" ondragleave="onDragLeave(event)">
-                    <div class="empty-state">
-                        <div class="empty-icon">⚡</div>
-                        <div>Devam eden görev yok</div>
-                    </div>
-                </div>
-                <div class="col-footer-actions">
-                    <button type="button" class="col-add-ticket-btn" onclick="openCardDetail(null, 'doing')">
-                        ✚ Yeni Ticket Ekle
-                    </button>
-                </div>
-            </section>
-            <section class="column" data-col="done">
-                <div class="col-header">
-                    <div class="col-header-top">
-                        <div class="col-title-wrap">
-                            <span class="col-dot"></span>
-                            <span class="col-title">TAMAMLANDI</span>
-                            <button type="button" class="col-quick-plus-btn" onclick="openCardDetail(null, 'done')" title="Yeni ticket ekle">✚</button>
-                        </div>
-                        <span class="col-count" data-count="done">0</span>
-                    </div>
-                </div>
-                <div class="col-body" id="col-done" data-col="done" ondragover="onDragOver(event)"
-                    ondrop="onDrop(event)" ondragleave="onDragLeave(event)">
-                    <div class="empty-state">
-                        <div class="empty-icon">✅</div>
-                        <div>Tamamlanan görevler burada</div>
-                    </div>
-                </div>
-                <div class="col-footer-actions">
-                    <button type="button" class="col-add-ticket-btn" onclick="openCardDetail(null, 'done')">
-                        ✚ Yeni Ticket Ekle
-                    </button>
-                </div>
-            </section>
+        <!-- Board dynamic column actions toolbar -->
+        <div class="board-toolbar" id="boardToolbar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 4px 6px;">
+            <div class="board-toolbar-left" style="display: flex; align-items: center; gap: 8px;">
+                <span class="board-col-count-badge" id="boardColCountBadge" style="font-size: 12px; font-weight: 600; color: var(--text-muted); background: var(--bg-secondary); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);">3 Kolon</span>
+            </div>
+            <div class="board-toolbar-right" id="boardToolbarActions">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnAddNewColumn" onclick="openCreateColumnModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                    ✚ Yeni Kolon Ekle
+                </button>
+            </div>
+        </div>
+        <main class="board-wrap" id="boardColumnsContainer">
+            <!-- Dynamically populated by renderBoard() -->
         </main>
     </div>
 
@@ -691,6 +631,17 @@
                         </select>
                     </div>
 
+                    <!-- Dependencies (Blocked by) -->
+                    <div class="form-group" id="cardDependenciesGroup">
+                        <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>⛔ Bağımlılıklar (Bu kartı engelleyen biletler)</span>
+                            <span style="font-size:11px; color:var(--text-muted);">Blocks / Blocked by</span>
+                        </label>
+                        <div id="cardBlockedByContainer" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; background: var(--surface);">
+                            <!-- Populated with other cards in workspace -->
+                        </div>
+                    </div>
+
                     <!-- Labels -->
                     <div class="form-group">
                         <label class="form-label">Etiketler</label>
@@ -823,6 +774,47 @@
     </div>
 
     <!-- ============================================================
+     COLUMN CREATE / EDIT MODAL
+     ============================================================ -->
+    <div class="modal-overlay" id="columnModal" role="dialog" aria-modal="true">
+        <div class="modal" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 id="columnModalTitle">Kolon Ekle</h3>
+                <button type="button" class="modal-close" onclick="closeModal('columnModal')">✕</button>
+            </div>
+            <form id="columnForm" onsubmit="saveColumnSubmit(event)">
+                <input type="hidden" id="columnEditId" value="">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label" for="columnName">Kolon Adı <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="columnName" class="form-input" placeholder="Örn: Analiz, Geliştirme, Test & QA" required maxlength="100">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="columnColor">Kolon Rengi</label>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="color" id="columnColor" value="#6366f1" style="width: 44px; height: 38px; border: none; border-radius: 6px; cursor: pointer;">
+                            <span style="font-size: 12px; color: var(--text-muted);">Pano üzerindeki kolon vurgu ve durum rengi</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="columnWipLimit">WIP Limiti (Aynı Anda En Fazla Görev Sayısı)</label>
+                        <input type="number" id="columnWipLimit" class="form-input" min="0" max="999" value="0" placeholder="0: Limitsiz">
+                        <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">0 bırakılırsa bu kolonda görev sayısı sınırlandırılmaz.</span>
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 14px;">
+                        <input type="checkbox" id="columnIsDone" style="width: 18px; height: 18px; cursor: pointer;">
+                        <label for="columnIsDone" style="margin-bottom: 0; cursor: pointer; font-size: 13px;">Bu kolondaki işler <strong>Tamamlandı</strong> sayılsın</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('columnModal')">İptal</button>
+                    <button type="submit" class="btn btn-primary" id="saveColumnBtn">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================================
      WORKSPACE CREATE / EDIT MODAL
      ============================================================ -->
     <div class="modal-overlay" id="workspaceModal">
@@ -847,6 +839,16 @@
                         <div style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--surface);" id="wsInitialMembersList">
                             <!-- Populated dynamically -->
                         </div>
+                    </div>
+                    <div class="form-group" id="wsColumnTemplateGroup">
+                        <label class="form-label">Varsayılan Kolon ve İş Akışı Şablonu</label>
+                        <select class="form-select" id="wsTemplateSelect">
+                            <option value="standard">Standart Çevik Pano (3 Kolon: Yapılacak, Yapılıyor, Tamamlandı)</option>
+                            <option value="software">Yazılım & Ürün Takımı (5 Kolon: Backlog, Tasarım, Geliştirme, Test/QA, Canlıda)</option>
+                        </select>
+                        <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">
+                            Çalışma alanı açıldıktan sonra pano üzerinden istediğiniz sayıda yeni kolon ekleyebilir veya düzenleyebilirsiniz.
+                        </span>
                     </div>
                     <div class="auth-error" id="workspaceModalError" style="display: none;"></div>
                 </form>

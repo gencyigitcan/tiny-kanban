@@ -199,11 +199,43 @@ const API = {
     async getWorkspaces() {
         return await request('/api/admin/workspaces');
     },
-    async createWorkspace(name, description, memberIds) {
+    async createWorkspace(name, description, memberIds, template, columns) {
         return await request('/api/admin/workspaces', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, description, memberIds })
+            body: JSON.stringify({ name, description, memberIds, template, columns })
+        });
+    },
+
+    // ── Dynamic Workflow Columns ───────────────────────────
+    async getColumns() {
+        return await request('/api/columns');
+    },
+    async createColumn(payload) {
+        return await request('/api/columns', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    },
+    async updateColumn(columnId, payload) {
+        return await request(`/api/columns/${columnId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    },
+    async reorderColumns(columnIds) {
+        return await request('/api/columns/reorder', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ columnIds })
+        });
+    },
+    async deleteColumn(columnId, fallbackCol) {
+        const query = fallbackCol ? `?fallbackCol=${encodeURIComponent(fallbackCol)}` : '';
+        return await request(`/api/columns/${columnId}${query}`, {
+            method: 'DELETE'
         });
     },
     async updateWorkspace(workspaceId, data) {

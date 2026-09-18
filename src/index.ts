@@ -23,13 +23,14 @@ import {
     RequestContext
 } from './lib/db.js';
 import { createDefaultDemoDb } from './lib/demo_data.js';
-import { cardRouter } from './routes/cards.js';
+import { cardRouter, checkAndNotifyDueSoonCards } from './routes/cards.js';
 import { epicRouter } from './routes/epics.js';
 import { sprintRouter } from './routes/sprints.js';
 import { authRouter } from './routes/auth.js';
 import { adminRouter } from './routes/admin.js';
 import { labelsRouter } from './routes/labels.js';
 import { notificationsRouter } from './routes/notifications.js';
+import { columnRouter } from './routes/columns.js';
 import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/error.js';
 
@@ -99,6 +100,7 @@ app.use('/api/labels', requireAuth, labelsRouter);
 app.use('/api/notifications', requireAuth, notificationsRouter);
 
 app.use('/api/cards', requireAuth, cardRouter);
+app.use('/api/columns', requireAuth, columnRouter);
 app.use('/api/epics', requireAuth, epicRouter);
 app.use('/api/sprints', requireAuth, sprintRouter);
 
@@ -300,6 +302,23 @@ if (!isRunningTests) {
         console.log(`     Demo      → http://localhost:${PORT}/demo.html`);
         console.log(`     API       → http://localhost:${PORT}/api/cards\n`);
     });
+
+    if (isNode) {
+        // Schedule periodic 24-hour deadline inspections every 10 minutes
+        setInterval(async () => {
+            try {
+                const env = 'production';
+                const index = await getTenantIndex(env);
+                const tenants = ['personal', ...index.workspaces.map(w => w.id).filter(id => id !== 'personal')];
+                for (const tId of tenants) {
+                    try {
+                        const wsDb = readDb({ tenantId: tId, environment: env });
+                        await checkAndNotifyDueSoonCards(wsDb, { tenantId: tId, environment: env });
+                    } catch {}
+                }
+            } catch {}
+        }, 10 * 60 * 1000).unref();
+    }
 }
 
 export { app };

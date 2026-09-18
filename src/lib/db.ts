@@ -6,12 +6,26 @@ import path from 'path';
 import crypto from 'crypto';
 import writeFileAtomic from 'write-file-atomic';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { DbSchema, Workspace, TenantIndex, ActivityLog } from '../types/index.js';
+import type { DbSchema, Workspace, TenantIndex, ActivityLog, BoardColumn } from '../types/index.js';
 import { createDefaultDemoDb, DEFAULT_PERSONAL_CARDS } from './demo_data.js';
 import { alignDemoDbToCurrentDate } from './demo_timeline.js';
 
 export type Environment = 'production' | 'test' | 'development';
 export type DbScope = 'personal' | 'demo' | string;
+
+export const DEFAULT_COLUMNS: BoardColumn[] = [
+    { id: 'todo', name: 'Yapılacak', color: '#94a3b8', wipLimit: 0, order: 0, isDone: false },
+    { id: 'doing', name: 'Yapılıyor', color: '#3b82f6', wipLimit: 0, order: 1, isDone: false },
+    { id: 'done', name: 'Tamamlandı', color: '#10b981', wipLimit: 0, order: 2, isDone: true }
+];
+
+export const SOFTWARE_TEAM_COLUMNS: BoardColumn[] = [
+    { id: 'backlog', name: 'Backlog / Yapılacak', color: '#94a3b8', wipLimit: 0, order: 0, isDone: false },
+    { id: 'design', name: 'Analiz & Tasarım', color: '#8b5cf6', wipLimit: 5, order: 1, isDone: false },
+    { id: 'development', name: 'Geliştirme', color: '#3b82f6', wipLimit: 6, order: 2, isDone: false },
+    { id: 'qa', name: 'Test & QA', color: '#f59e0b', wipLimit: 4, order: 3, isDone: false },
+    { id: 'done', name: 'Canlıda / Tamamlandı', color: '#10b981', wipLimit: 0, order: 4, isDone: true }
+];
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const TENANTS_DIR = path.join(DATA_DIR, 'tenants');
@@ -25,6 +39,7 @@ export const EMPTY_DB: DbSchema = {
     users: [],
     sessions: [],
     labels: [],
+    columns: DEFAULT_COLUMNS,
     notifications: [],
     taskCounter: 0,
     workspaces: [],
@@ -190,6 +205,10 @@ export function ensurePersonalDbIntegrity(db: DbSchema, _env?: Environment): boo
     }
     if (!Array.isArray(db.labels)) {
         db.labels = [...DEFAULT_LABELS];
+        changed = true;
+    }
+    if (!Array.isArray(db.columns) || db.columns.length === 0) {
+        db.columns = [...DEFAULT_COLUMNS];
         changed = true;
     }
 
@@ -645,6 +664,7 @@ export function readTenantDbFileSync(tenantId: string, env: Environment): DbSche
             users: Array.isArray(parsed.users) ? parsed.users : [],
             sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
             labels: Array.isArray(parsed.labels) ? parsed.labels : DEFAULT_LABELS,
+            columns: Array.isArray(parsed.columns) && parsed.columns.length > 0 ? parsed.columns : [...DEFAULT_COLUMNS],
             notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
             taskCounter: typeof parsed.taskCounter === 'number' ? parsed.taskCounter : 0,
             workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : [],
@@ -699,6 +719,7 @@ export async function loadTenantDbFromD1(dbBinding: any, tenantId: string, env: 
                 users: Array.isArray(parsed.users) ? parsed.users : [],
                 sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
                 labels: Array.isArray(parsed.labels) ? parsed.labels : DEFAULT_LABELS,
+                columns: Array.isArray(parsed.columns) && parsed.columns.length > 0 ? parsed.columns : [...DEFAULT_COLUMNS],
                 notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
                 taskCounter: typeof parsed.taskCounter === 'number' ? parsed.taskCounter : 0,
                 workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : [],
@@ -872,7 +893,8 @@ export async function createWorkspace(
     owner: { id: string; username: string },
     env: Environment,
     d1Binding?: any,
-    customId?: string
+    customId?: string,
+    initialColumns?: BoardColumn[]
 ): Promise<Workspace> {
     const store = dbContext.getStore();
     const binding = d1Binding || store?.d1Binding;
@@ -895,6 +917,7 @@ export async function createWorkspace(
         users: [],
         sessions: [],
         labels: DEFAULT_LABELS,
+        columns: (initialColumns && initialColumns.length > 0) ? initialColumns : [...DEFAULT_COLUMNS],
         notifications: [],
         taskCounter: 0,
         workspaces: [workspace]
