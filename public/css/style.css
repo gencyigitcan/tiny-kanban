@@ -942,10 +942,10 @@ a {
 .app-views-viewport {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden !important;
+  overflow: hidden;
   position: relative;
 }
 
@@ -1254,31 +1254,48 @@ a {
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  min-height: 0;
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
+/* Specific view-board styling to guarantee strictly bounded column heights & vertical scrolling */
+#view-board.active {
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  padding: 10px 16px 14px 16px;
+  box-sizing: border-box;
+}
+
+.board-toolbar {
+  flex-shrink: 0;
+  margin-bottom: 8px !important;
+}
+
 /* ============================================================
-   BOARD VIEW (STRICT ZERO HORIZONTAL SCROLL - JIRA AESTHETICS)
+   BOARD VIEW (RESPONSIVE COLUMNS & VERTICAL SCROLL)
    ============================================================ */
 .board-wrap {
   width: 100%;
   max-width: 100%;
-  padding: 16px 20px;
+  padding: 0;
   display: flex;
   gap: 16px;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   height: 100%;
   box-sizing: border-box;
   overflow-x: auto !important;
-  overflow-y: hidden;
+  overflow-y: hidden !important;
+  align-items: stretch;
 }
 
 .column {
-  flex: 1 1 280px;
-  min-width: 280px !important;
-  max-width: 360px;
   display: flex;
   flex-direction: column;
   background: #f4f5f7;
@@ -1287,8 +1304,23 @@ a {
   border: 1px solid #dfe1e6;
   overflow: hidden;
   height: 100%;
+  min-height: 0;
   box-sizing: border-box;
   transition: background 0.15s ease;
+}
+
+/* 1-4 columns: stretch evenly to fit screen width */
+.board-wrap.cols-fit .column {
+  flex: 1 1 0;
+  min-width: 240px;
+  max-width: none;
+}
+
+/* >4 columns: keep comfortable width and allow horizontal scroll without squashing */
+.board-wrap:not(.cols-fit) .column {
+  flex: 0 0 310px;
+  min-width: 280px;
+  max-width: 360px;
 }
 
 .col-header {
@@ -1361,14 +1393,49 @@ a {
 }
 
 .col-body {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  overflow-y: auto;
+  overflow-y: auto !important;
   overflow-x: hidden !important;
-  min-height: 80px;
+}
+
+.col-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.col-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.col-body::-webkit-scrollbar-thumb {
+  background: #c1c7d0;
+  border-radius: 3px;
+}
+
+.col-body::-webkit-scrollbar-thumb:hover {
+  background: #a5b2c6;
+}
+
+.board-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+
+.board-wrap::-webkit-scrollbar-track {
+  background: rgba(9, 30, 66, 0.04);
+  border-radius: 4px;
+}
+
+.board-wrap::-webkit-scrollbar-thumb {
+  background: #c1c7d0;
+  border-radius: 4px;
+}
+
+.board-wrap::-webkit-scrollbar-thumb:hover {
+  background: #a5b2c6;
 }
 
 .col-body.drag-over {
@@ -1382,6 +1449,7 @@ a {
   padding: 8px 10px;
   border-top: 1px solid #ebecf0;
   background: #f4f5f7;
+  flex-shrink: 0;
 }
 
 .col-add-ticket-btn {
@@ -1419,6 +1487,10 @@ a {
   overflow: hidden;
   word-break: break-word;
   overflow-wrap: anywhere;
+  flex-shrink: 0 !important;
+  min-height: fit-content;
+  height: auto;
+  box-sizing: border-box;
 }
 
 .card:hover {
@@ -1556,18 +1628,23 @@ a {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 6px;
+  min-height: 24px;
 }
 
 .card-footer-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-width: 0;
 }
 
 .card-footer-right {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+  margin-left: auto;
 }
 
 .card-assignee {

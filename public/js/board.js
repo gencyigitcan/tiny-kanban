@@ -411,6 +411,10 @@ function renderBoard(cards, epics = [], readonly = false) {
   const cols = (window.boardColumns && window.boardColumns.length > 0) ? window.boardColumns : DEFAULT_COLUMNS;
   const canManage = window.currentUser?.role === 'superadmin' || window.currentUser?.role === 'admin';
 
+  // Responsive columns fit: 1-4 columns stretch to fit screen, >4 columns allow horizontal scroll without squashing
+  container.classList.toggle('cols-fit', cols.length <= 4);
+  container.setAttribute('data-col-count', cols.length);
+
   // Update count badge & toolbar button visibility
   const countBadge = document.getElementById('boardColCountBadge');
   if (countBadge) countBadge.textContent = `${cols.length} Kolon`;
