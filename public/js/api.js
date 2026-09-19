@@ -99,6 +99,21 @@ const API = {
             body: JSON.stringify({ text })
         });
     },
+    async getCardWorklogs(id) {
+        return await request(`/api/cards/${id}/worklogs`);
+    },
+    async addCardWorklog(id, payload) {
+        return await request(`/api/cards/${id}/worklogs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    },
+    async deleteCardWorklog(cardId, worklogId) {
+        return await request(`/api/cards/${cardId}/worklogs/${worklogId}`, {
+            method: 'DELETE'
+        });
+    },
 
     // ── Epics ────────────────────────────────────────────────
     async getEpics() {

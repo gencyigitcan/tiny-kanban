@@ -1,3 +1,6 @@
+process.env.APP_ENV = 'test';
+process.env.NODE_ENV = 'test';
+
 // ============================================================
 //  tests/test_workspace_rbac_mention.ts
 //  Verification of:
@@ -66,7 +69,7 @@ async function runTests() {
         console.log('🔹 Phase 1: Setup Accounts (Superadmin, Regular User, Teammate)...');
 
         // Create Super Admin in personalDb
-        const personalDb = readDb({ tenantId: 'personal', environment: 'production' });
+        const personalDb = readDb({ tenantId: 'personal', environment: 'test' });
         const superId = `usr-super-${testSuffix}`;
         const superUser: User = {
             id: superId,
@@ -117,13 +120,13 @@ async function runTests() {
         };
         personalDb.users.push(teamUser);
 
-        writeDbSync(personalDb, { tenantId: 'personal', environment: 'production' });
+        writeDbSync(personalDb, { tenantId: 'personal', environment: 'test' });
 
-        const tenantIndex = await getTenantIndex('production');
+        const tenantIndex = await getTenantIndex('test');
         tenantIndex.userToTenants[superadminEmail] = ['personal'];
         tenantIndex.userToTenants[regularEmail] = ['personal'];
         tenantIndex.userToTenants[teammateEmail] = ['personal'];
-        await saveTenantIndex(tenantIndex, 'production');
+        await saveTenantIndex(tenantIndex, 'test');
 
         // Login Superadmin
         const superLogin = await req('/api/auth/login', {
@@ -329,10 +332,10 @@ async function runTests() {
         console.log('   ✓ Workspace successfully deleted');
 
         // Cleanup test users from personalDb
-        const freshDb = readDb({ tenantId: 'personal', environment: 'production' });
+        const freshDb = readDb({ tenantId: 'personal', environment: 'test' });
         freshDb.users = freshDb.users.filter(u => u.id !== superId && u.id !== regularId && u.id !== teamId);
         freshDb.cards = freshDb.cards.filter(c => c.id !== card.id);
-        writeDbSync(freshDb, { tenantId: 'personal', environment: 'production' });
+        writeDbSync(freshDb, { tenantId: 'personal', environment: 'test' });
 
         console.log('\n🎉 ALL WORKSPACE MANAGEMENT, RBAC & COMMENT MENTION TESTS PASSED WITH 100% SUCCESS!\n');
     } finally {

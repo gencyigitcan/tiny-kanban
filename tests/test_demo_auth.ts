@@ -1,3 +1,6 @@
+process.env.APP_ENV = 'test';
+process.env.NODE_ENV = 'test';
+
 // ============================================================
 //  tests/test_demo_auth.ts – Verification for Demo Auth & Cross-Workspace Logging
 // ============================================================

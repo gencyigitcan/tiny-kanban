@@ -4,8 +4,14 @@
 //  Normal Login vs Demo Login, Database Routing, and All Features
 // ============================================================
 import assert from 'node:assert';
+import { app } from '../src/index.js';
+import type { Server } from 'node:http';
 
-const BASE_URL = 'http://localhost:3000';
+process.env.APP_ENV = 'test';
+process.env.NODE_ENV = 'test';
+
+let server: Server | undefined;
+let BASE_URL = 'http://localhost:3000';
 
 async function req(path: string, options: any = {}) {
     const res = await fetch(`${BASE_URL}${path}`, {
@@ -27,6 +33,14 @@ async function req(path: string, options: any = {}) {
 
 async function runUnifiedUXVerification() {
     console.log('🚀 Starting Comprehensive Unified UI/UX & QA Test Suite...\n');
+
+    try {
+        await fetch('http://localhost:3000/demo', { signal: AbortSignal.timeout(300) });
+    } catch {
+        server = app.listen(0);
+        const port = (server.address() as any).port;
+        BASE_URL = `http://localhost:${port}`;
+    }
 
     // ── Test 1: Page Redirections and Unified Board Serving ──
     console.log('🔹 Phase 1: Checking URL Routing & Single Unified App Delivery...');
@@ -211,4 +225,6 @@ async function runUnifiedUXVerification() {
 runUnifiedUXVerification().catch(err => {
     console.error('❌ Unified UX Verification failed:', err);
     process.exit(1);
+}).finally(() => {
+    if (server) server.close();
 });

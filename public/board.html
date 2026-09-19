@@ -650,11 +650,14 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Tahmini Efor (Saat)</label>
-                            <input class="form-input" type="number" id="cardEstimatedEffort" min="0" max="9999" placeholder="ör. 8">
+                            <input class="form-input" type="number" id="cardEstimatedEffort" min="0" max="9999" step="0.5" placeholder="ör. 8">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Harcanan Efor (Saat)</label>
-                            <input class="form-input" type="number" id="cardSpentEffort" min="0" max="9999" placeholder="ör. 5">
+                            <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">
+                                <span>Harcanan Efor (Toplam Saat)</span>
+                                <a href="javascript:void(0)" id="cardQuickWorklogLink" onclick="switchCardSubTab('worklog')" style="font-size:11px;color:var(--accent);font-weight:600;text-decoration:none;display:none;">⏱️ Günlük Efor Ekle</a>
+                            </label>
+                            <input class="form-input" type="number" id="cardSpentEffort" min="0" max="9999" step="0.5" placeholder="ör. 5">
                         </div>
                     </div>
                     <div class="form-row">
@@ -756,12 +759,15 @@
                         </div>
                     </div>
 
-                    <!-- Comments & Activity Timeline -->
+                    <!-- Comments & Activity Timeline & Worklogs -->
                     <div class="form-group" id="commentsSection" style="display:none; margin-top:20px; border-top:1px solid var(--border); padding-top:16px;">
                         <div class="card-subtabs-bar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
                             <div class="card-subtabs-group" style="display:flex; gap:6px; background:var(--bg-secondary); padding:4px; border-radius:8px; border:1px solid var(--border);">
                                 <button type="button" class="card-subtab-btn active" id="tabCardCommentsBtn" onclick="switchCardSubTab('comments')">
                                     💬 Yorumlar (<span id="cardCommentsCount">0</span>)
+                                </button>
+                                <button type="button" class="card-subtab-btn" id="tabCardWorklogBtn" onclick="switchCardSubTab('worklog')">
+                                    ⏱️ Günlük Efor (<span id="cardWorklogsCount">0</span>)
                                 </button>
                                 <button type="button" class="card-subtab-btn" id="tabCardActivityBtn" onclick="switchCardSubTab('activity')">
                                     📜 Aktivite Geçmişi (<span id="cardActivityCount">0</span>)
@@ -782,7 +788,69 @@
                             </div>
                         </div>
 
-                        <!-- Sub-tab 2: Activity Timeline -->
+                        <!-- Sub-tab 2: Daily Worklogs -->
+                        <div id="cardSubTabWorklog" style="display:none;">
+                            <!-- Worklog Overview KPI card -->
+                            <div class="worklog-overview-card" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:14px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                    <span style="font-size:12px;font-weight:600;color:var(--text-secondary);">📊 Efor Durumu</span>
+                                    <span id="worklogPctBadge" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;background:rgba(99,102,241,0.15);color:var(--accent);">%0 harcandı</span>
+                                </div>
+                                <div class="effort-progress-track" style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:10px;">
+                                    <div id="worklogProgressFill" class="effort-progress-fill" style="height:100%;width:0%;background:var(--accent);transition:width 0.3s ease;"></div>
+                                </div>
+                                <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;text-align:center;">
+                                    <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;">
+                                        <div style="font-size:10.5px;color:var(--text-muted);">Tahmini</div>
+                                        <div id="worklogStatEstimated" style="font-size:13px;font-weight:700;color:var(--text-primary);margin-top:2px;">—</div>
+                                    </div>
+                                    <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;">
+                                        <div style="font-size:10.5px;color:var(--text-muted);">Harcanan (Toplam)</div>
+                                        <div id="worklogStatSpent" style="font-size:13px;font-weight:700;color:var(--accent);margin-top:2px;">0 sa</div>
+                                    </div>
+                                    <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;">
+                                        <div style="font-size:10.5px;color:var(--text-muted);">Kalan / Sapma</div>
+                                        <div id="worklogStatRemaining" style="font-size:13px;font-weight:700;color:var(--text-primary);margin-top:2px;">—</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Quick Worklog Entry Form -->
+                            <div class="worklog-add-box" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+                                <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                                    <span>➕ Günlük Efor / İş Kaydı Ekle</span>
+                                </div>
+                                <div class="form-row" style="margin-bottom:8px;gap:8px;">
+                                    <div style="flex:1.2;">
+                                        <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:3px;">Tarih</label>
+                                        <input class="form-input" type="date" id="worklogDate" style="font-size:12px;padding:5px 8px;">
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:3px;">Süre (Saat)</label>
+                                        <input class="form-input" type="number" id="worklogHours" min="0.25" max="24" step="0.5" placeholder="ör. 1.5" style="font-size:12px;padding:5px 8px;">
+                                    </div>
+                                </div>
+                                <div style="margin-bottom:8px;">
+                                    <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:3px;">Açıklama / Yapılan İş</label>
+                                    <input class="form-input" type="text" id="worklogDesc" placeholder="Bugün neler yapıldı? (ör. API entegrasyonu)" style="font-size:12px;padding:5px 8px;">
+                                </div>
+                                <div style="display:flex;justify-content:flex-end;">
+                                    <button type="button" class="btn btn-primary btn-sm" id="addWorklogBtn" style="font-size:12px;padding:5px 14px;display:inline-flex;align-items:center;gap:4px;">
+                                        <span>⏱️ Eforu Kaydet</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Worklog Timeline List -->
+                            <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">
+                                📅 Günlük Kayıtlar
+                            </div>
+                            <div class="worklogs-list" id="worklogsList" style="display:flex;flex-direction:column;gap:8px;">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Sub-tab 3: Activity Timeline -->
                         <div id="cardSubTabActivity" style="display:none;">
                             <div class="card-activity-timeline" id="cardActivityList"></div>
                         </div>

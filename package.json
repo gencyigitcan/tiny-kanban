@@ -13,7 +13,9 @@
     "test:isolation": "tsx tests/test_tenant_isolation.ts",
     "test:activity": "tsx tests/test_activity_logging.ts",
     "test:workspaces": "tsx tests/test_workspace_rbac_mention.ts",
-    "test:sprint": "tsx tests/test_sprint_complete_and_performance.ts"
+    "test:sprint": "tsx tests/test_sprint_complete_and_performance.ts",
+    "test:worklogs": "tsx tests/test_daily_effort_worklogs.ts",
+    "test:all": "tsx tests/integration.ts && tsx tests/security_100_checks.ts && tsx tests/test_daily_effort_worklogs.ts && tsx tests/test_activity_logging.ts && tsx tests/test_automations.ts && tsx tests/test_burndown.ts && tsx tests/test_columns_timeline_notifications.ts && tsx tests/test_custom_fields.ts && tsx tests/test_demo_auth.ts && tsx tests/test_demo_timeline.ts && tsx tests/test_sla.ts && tsx tests/test_sprint_complete_and_performance.ts && tsx tests/test_templates_recurring.ts && tsx tests/test_tenant_isolation.ts && tsx tests/test_unified_ux.ts && tsx tests/test_workspace_rbac_mention.ts"
   },
   "dependencies": {
     "cors": "^2.8.6",

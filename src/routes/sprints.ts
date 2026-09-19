@@ -186,6 +186,18 @@ export function buildSprintBurndown(sprint: Sprint, cards: Card[], columns?: Boa
 
         const actualRemainingSP = (dayTime <= now || sprint.report) ? Math.max(0, committedSP - completedSPByDay) : null;
 
+        let dailyEffort = 0;
+        for (const c of sprintCards) {
+            if (Array.isArray(c.worklogs)) {
+                for (const w of c.worklogs) {
+                    if (w.date === dateStr) {
+                        dailyEffort += Number(w.hours) || 0;
+                    }
+                }
+            }
+        }
+        dailyEffort = Math.round(dailyEffort * 100) / 100;
+
         days.push({
             date: dateStr,
             dayIndex: i,
@@ -193,7 +205,8 @@ export function buildSprintBurndown(sprint: Sprint, cards: Card[], columns?: Boa
             idealRemainingSP,
             actualRemainingSP,
             totalScopeSP: committedSP,
-            completedSP: (dayTime <= now || sprint.report) ? completedSPByDay : null
+            completedSP: (dayTime <= now || sprint.report) ? completedSPByDay : null,
+            dailyEffort
         });
     }
 

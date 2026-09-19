@@ -23,6 +23,24 @@ const commentSchema = z.object({
     authorId: z.string().optional(),
 });
 
+export const worklogSchema = z.object({
+    id: z.string(),
+    cardId: z.string().optional(),
+    userId: z.string(),
+    userName: z.string(),
+    userAvatarColor: z.string().optional(),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Tarih YYYY-AA-GG formatında olmalıdır'),
+    hours: z.number().positive('Harcanan saat 0\'dan büyük olmalıdır').max(24, 'Bir günde en fazla 24 saat girilebilir'),
+    description: z.string().max(500, 'Açıklama 500 karakterden uzun olamaz').optional().default(''),
+    createdAt: z.number(),
+});
+
+export const createWorklogSchema = z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Tarih YYYY-AA-GG formatında olmalıdır').optional(),
+    hours: z.number().positive('Harcanan saat 0\'dan büyük olmalıdır').max(24, 'Bir günde en fazla 24 saat girilebilir'),
+    description: z.string().max(500, 'Açıklama 500 karakterden uzun olamaz').optional().default(''),
+});
+
 // ── Cards ────────────────────────────────────────────────────
 export const createCardSchema = z.object({
     title: z.string().min(1, 'Başlık boş olamaz').max(200).trim(),
@@ -35,9 +53,10 @@ export const createCardSchema = z.object({
     dueDate: dateStr,
     labels: z.array(z.string().max(50)).max(10).optional().default([]),
     storyPoints: z.number().int().min(0).max(9999).nullable().optional(),
-    estimatedEffort: z.number().int().min(0).max(9999).nullable().optional(),
-    spentEffort: z.number().int().min(0).max(9999).nullable().optional(),
+    estimatedEffort: z.number().min(0).max(9999).nullable().optional(),
+    spentEffort: z.number().min(0).max(9999).nullable().optional(),
     subtasks: z.array(subtaskSchema).max(100).optional().default([]),
+    worklogs: z.array(worklogSchema).max(1000).optional().default([]),
     epicId: z.string().nullable().optional(),
     sprintId: z.string().nullable().optional(),
     blockedBy: z.array(z.string()).optional().default([]),
@@ -62,10 +81,11 @@ export const updateCardSchema = z.object({
     dueDate: dateStr,
     labels: z.array(z.string().max(50)).max(10).optional(),
     storyPoints: z.number().int().min(0).max(9999).nullable().optional(),
-    estimatedEffort: z.number().int().min(0).max(9999).nullable().optional(),
-    spentEffort: z.number().int().min(0).max(9999).nullable().optional(),
+    estimatedEffort: z.number().min(0).max(9999).nullable().optional(),
+    spentEffort: z.number().min(0).max(9999).nullable().optional(),
     subtasks: z.array(subtaskSchema).max(100).optional(),
     comments: z.array(commentSchema).max(500).optional(),
+    worklogs: z.array(worklogSchema).max(1000).optional(),
     epicId: z.string().nullable().optional(),
     sprintId: z.string().nullable().optional(),
     blockedBy: z.array(z.string()).optional(),

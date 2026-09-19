@@ -254,6 +254,7 @@ async function onDrop(e) {
 let _editSubtasks = [];
 let _editComments = [];
 let _editActivity = [];
+let _editWorklogs = [];
 
 function toggleCardRecurrenceOptions(checked) {
     const sel = document.getElementById('cardRecurrenceInterval');
@@ -528,22 +529,38 @@ function openCardDetail(id, defaultCol) {
         `<div class="label-chip${selectedLabels.has(l.id) ? ' selected' : ''}" style="background:${l.bg};color:${l.color}" data-lid="${l.id}" onclick="toggleLabel(this)">${escHtml(l.name)}</div>`
     ).join('');
 
-    // Subtasks, Comments & Activity
+    // Subtasks, Comments & Activity & Worklogs
     _editSubtasks = JSON.parse(JSON.stringify(card?.subtasks || []));
     _editComments = JSON.parse(JSON.stringify(card?.comments || []));
     _editActivity = JSON.parse(JSON.stringify(card?.activity || []));
+    _editWorklogs = JSON.parse(JSON.stringify(card?.worklogs || []));
     renderSubtasksList();
     renderCommentsList();
     renderCardActivityList(_editActivity);
+    renderCardWorklogsList(_editWorklogs, card?.estimatedEffort);
 
     const commentsSec = document.getElementById('commentsSection');
     if (commentsSec) commentsSec.style.display = id ? 'block' : 'none';
+
+    const quickWlLink = document.getElementById('cardQuickWorklogLink');
+    if (quickWlLink) quickWlLink.style.display = id ? 'inline' : 'none';
 
     const cardCommentsCount = document.getElementById('cardCommentsCount');
     if (cardCommentsCount) cardCommentsCount.textContent = _editComments.length;
 
     const cardActivityCount = document.getElementById('cardActivityCount');
     if (cardActivityCount) cardActivityCount.textContent = _editActivity.length;
+
+    const cardWorklogsCount = document.getElementById('cardWorklogsCount');
+    if (cardWorklogsCount) cardWorklogsCount.textContent = _editWorklogs.length;
+
+    // Reset worklog inputs
+    const wlDate = document.getElementById('worklogDate');
+    if (wlDate) wlDate.value = new Date().toISOString().slice(0, 10);
+    const wlHours = document.getElementById('worklogHours');
+    if (wlHours) wlHours.value = '';
+    const wlDesc = document.getElementById('worklogDesc');
+    if (wlDesc) wlDesc.value = '';
 
     switchCardSubTab('comments');
 
@@ -615,27 +632,200 @@ function renderCommentsList() {
 
 function switchCardSubTab(tab) {
     const commentsBtn = document.getElementById('tabCardCommentsBtn');
+    const worklogBtn = document.getElementById('tabCardWorklogBtn');
     const activityBtn = document.getElementById('tabCardActivityBtn');
+
     const commentsContent = document.getElementById('cardSubTabComments');
+    const worklogContent = document.getElementById('cardSubTabWorklog');
     const activityContent = document.getElementById('cardSubTabActivity');
     const refreshBtn = document.getElementById('btnRefreshCardActivity');
 
+    if (commentsBtn) commentsBtn.classList.remove('active');
+    if (worklogBtn) worklogBtn.classList.remove('active');
+    if (activityBtn) activityBtn.classList.remove('active');
+
+    if (commentsContent) commentsContent.style.display = 'none';
+    if (worklogContent) worklogContent.style.display = 'none';
+    if (activityContent) activityContent.style.display = 'none';
+    if (refreshBtn) refreshBtn.style.display = 'none';
+
     if (tab === 'activity') {
-        if (commentsBtn) commentsBtn.classList.remove('active');
         if (activityBtn) activityBtn.classList.add('active');
-        if (commentsContent) commentsContent.style.display = 'none';
         if (activityContent) activityContent.style.display = 'block';
         if (refreshBtn) refreshBtn.style.display = 'inline-flex';
         refreshCardActivity();
+    } else if (tab === 'worklog') {
+        if (worklogBtn) worklogBtn.classList.add('active');
+        if (worklogContent) worklogContent.style.display = 'block';
+        const cardId = document.getElementById('editCardId')?.value;
+        const currentCard = cards.find(c => c.id === cardId);
+        const est = document.getElementById('cardEstimatedEffort')?.value;
+        renderCardWorklogsList(_editWorklogs, est != null && est !== '' ? Number(est) : currentCard?.estimatedEffort);
     } else {
         if (commentsBtn) commentsBtn.classList.add('active');
-        if (activityBtn) activityBtn.classList.remove('active');
         if (commentsContent) commentsContent.style.display = 'block';
-        if (activityContent) activityContent.style.display = 'none';
-        if (refreshBtn) refreshBtn.style.display = 'none';
     }
 }
 window.switchCardSubTab = switchCardSubTab;
+
+function openCardWorklogTab() {
+    switchCardSubTab('worklog');
+    const wlInput = document.getElementById('worklogHours');
+    if (wlInput) wlInput.focus();
+}
+window.openCardWorklogTab = openCardWorklogTab;
+
+function renderCardWorklogsList(worklogs, estimatedEffort) {
+    const list = document.getElementById('worklogsList');
+    const statEst = document.getElementById('worklogStatEstimated');
+    const statSpent = document.getElementById('worklogStatSpent');
+    const statRem = document.getElementById('worklogStatRemaining');
+    const pctBadge = document.getElementById('worklogPctBadge');
+    const progressFill = document.getElementById('worklogProgressFill');
+    const countBadge = document.getElementById('cardWorklogsCount');
+
+    const items = Array.isArray(worklogs) ? worklogs : [];
+    if (countBadge) countBadge.textContent = items.length;
+
+    // Calculate totals
+    const totalSpent = Math.round(items.reduce((sum, w) => sum + (Number(w.hours) || 0), 0) * 100) / 100;
+    const est = estimatedEffort != null && !isNaN(Number(estimatedEffort)) ? Number(estimatedEffort) : null;
+
+    if (statSpent) statSpent.textContent = `${totalSpent} sa`;
+    if (statEst) statEst.textContent = est != null ? `${est} sa` : '—';
+
+    if (statRem) {
+        if (est != null) {
+            const diff = Math.round((est - totalSpent) * 100) / 100;
+            if (diff >= 0) {
+                statRem.textContent = `${diff} sa kaldı`;
+                statRem.style.color = 'var(--text-primary)';
+            } else {
+                statRem.textContent = `+${Math.abs(diff)} sa aşıldı`;
+                statRem.style.color = 'var(--danger)';
+            }
+        } else {
+            statRem.textContent = '—';
+            statRem.style.color = 'var(--text-primary)';
+        }
+    }
+
+    if (pctBadge && progressFill) {
+        if (est != null && est > 0) {
+            const pct = Math.round((totalSpent / est) * 100);
+            pctBadge.textContent = `%${pct} tüketildi`;
+            pctBadge.style.display = 'inline-block';
+            progressFill.style.width = `${Math.min(100, pct)}%`;
+            if (totalSpent > est) {
+                progressFill.style.background = 'var(--danger)';
+                pctBadge.style.color = 'var(--danger)';
+                pctBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+            } else {
+                progressFill.style.background = 'var(--accent)';
+                pctBadge.style.color = 'var(--accent)';
+                pctBadge.style.background = 'rgba(99, 102, 241, 0.15)';
+            }
+        } else {
+            pctBadge.textContent = `${totalSpent} sa harcandı`;
+            progressFill.style.width = totalSpent > 0 ? '100%' : '0%';
+            progressFill.style.background = 'var(--accent)';
+        }
+    }
+
+    if (!list) return;
+
+    if (items.length === 0) {
+        list.innerHTML = `
+            <div style="padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 12px; background: var(--bg-secondary); border-radius: 8px; border: 1px dashed var(--border);">
+                ⏱️ Bu görev için henüz günlük efor kaydı bulunmuyor.<br>
+                Yukarıdaki formdan bugün harcadığınız çalışma süresini ekleyebilirsiniz.
+            </div>`;
+        return;
+    }
+
+    // Sort by date descending (then by createdAt descending)
+    const sorted = [...items].sort((a, b) => {
+        if (b.date !== a.date) return b.date.localeCompare(a.date);
+        return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+
+    list.innerHTML = sorted.map(w => {
+        const userName = w.userName || 'Kullanıcı';
+        const init = initials(userName);
+        const avatarBg = w.userAvatarColor || getAssigneeColor(userName);
+        
+        // Format Turkish date
+        let dateDisplay = w.date;
+        try {
+            const parts = w.date.split('-');
+            if (parts.length === 3) {
+                const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                const today = new Date();
+                const isToday = d.toDateString() === today.toDateString();
+                const dayName = d.toLocaleDateString('tr-TR', { weekday: 'short' });
+                const monthName = d.toLocaleDateString('tr-TR', { month: 'short' });
+                dateDisplay = isToday ? `Bugün (${parts[2]} ${monthName})` : `${parts[2]} ${monthName} ${parts[0]}, ${dayName}`;
+            }
+        } catch {}
+
+        return `
+            <div class="worklog-item" id="worklog-entry-${w.id}" style="display:flex;align-items:flex-start;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;transition:all 0.2s ease;">
+                <div class="assignee-avatar" style="width:30px;height:30px;font-size:11px;background:${avatarBg};flex-shrink:0;margin-top:2px;">
+                    ${escHtml(init)}
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span style="font-size:12px;font-weight:600;color:var(--text-primary);">${escHtml(userName)}</span>
+                            <span style="font-size:11px;color:var(--text-muted);background:var(--surface-2);padding:1px 6px;border-radius:4px;border:1px solid var(--border);">📅 ${escHtml(dateDisplay)}</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span class="effort-badge effort-ok" style="font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(245, 158, 11, 0.15);color:#d97706;border:1px solid rgba(245, 158, 11, 0.3);">
+                                ⏱️ ${w.hours} sa
+                            </span>
+                            <button type="button" class="btn btn-ghost btn-xs" onclick="deleteWorklogEntry('${w.id}')" title="Bu efor kaydını sil" style="color:var(--danger);padding:2px 6px;font-size:12px;opacity:0.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.75">
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+                    ${w.description ? `<div style="font-size:12px;color:var(--text-secondary);line-height:1.4;word-break:break-word;margin-top:2px;">${escHtml(w.description)}</div>` : '<div style="font-size:11px;color:var(--text-muted);font-style:italic;">Açıklama girilmedi</div>'}
+                </div>
+            </div>`;
+    }).join('');
+}
+window.renderCardWorklogsList = renderCardWorklogsList;
+
+async function deleteWorklogEntry(worklogId) {
+    const cardId = document.getElementById('editCardId')?.value;
+    if (!cardId || !worklogId) return;
+
+    const ok = await showConfirm('Bu günlük efor kaydını silmek istediğinize emin misiniz?', 'Efor Kaydını Sil');
+    if (!ok) return;
+
+    try {
+        const res = await API.deleteCardWorklog(cardId, worklogId);
+        if (res && res.success) {
+            _editWorklogs = res.worklogs || [];
+            const card = cards.find(c => c.id === cardId);
+            if (card) {
+                card.worklogs = res.worklogs;
+                card.spentEffort = res.spentEffort;
+                if (res.activity) card.activity = res.activity;
+            }
+            const spentInput = document.getElementById('cardSpentEffort');
+            if (spentInput) spentInput.value = res.spentEffort;
+
+            const est = document.getElementById('cardEstimatedEffort')?.value;
+            renderCardWorklogsList(_editWorklogs, est ? Number(est) : card?.estimatedEffort);
+            showToast('Efor kaydı silindi ✓');
+            renderAll();
+        }
+    } catch (e) {
+        console.error(e);
+        showToast(e.message || 'Silinemedi', 'error');
+    }
+}
+window.deleteWorklogEntry = deleteWorklogEntry;
 
 async function refreshCardActivity() {
     const id = document.getElementById('editCardId')?.value;
@@ -674,6 +864,7 @@ function renderCardActivityList(activities) {
         'CARD_MOVE': { label: 'Durum Değiştirdi', icon: '🔄', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.12)' },
         'CARD_UPDATE': { label: 'Güncelledi', icon: '✏️', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)' },
         'CARD_EFFORT': { label: 'Efor Girdi', icon: '⏱️', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' },
+        'CARD_WORKLOG': { label: 'Günlük Efor', icon: '⏱️', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' },
         'CARD_CREATE': { label: 'Oluşturdu', icon: '➕', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' },
         'SUBTASK_TOGGLE': { label: 'Alt Görev', icon: '☑️', color: '#14b8a6', bg: 'rgba(20, 184, 166, 0.12)' },
         'SUBTASK_ADD': { label: 'Alt Görev Eklendi', icon: '📝', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.12)' }
@@ -777,6 +968,68 @@ safeAddListener('newComment', 'keydown', e => {
     }
 });
 
+safeAddListener('addWorklogBtn', 'click', async () => {
+    const cardId = document.getElementById('editCardId')?.value;
+    if (!cardId) {
+        showToast('Önce bileti kaydetmelisiniz', 'warning');
+        return;
+    }
+
+    const dateInp = document.getElementById('worklogDate');
+    const hoursInp = document.getElementById('worklogHours');
+    const descInp = document.getElementById('worklogDesc');
+
+    const hours = parseFloat(hoursInp?.value || '');
+    if (!hours || isNaN(hours) || hours <= 0) {
+        showToast('Lütfen geçerli bir süre (saat) girin', 'error');
+        hoursInp?.focus();
+        return;
+    }
+    if (hours > 24) {
+        showToast('Bir günde en fazla 24 saat girilebilir', 'error');
+        return;
+    }
+
+    const date = dateInp?.value || new Date().toISOString().slice(0, 10);
+    const description = descInp?.value?.trim() || '';
+
+    try {
+        const res = await API.addCardWorklog(cardId, { date, hours, description });
+        if (res && res.success) {
+            _editWorklogs = res.worklogs || [];
+            const card = cards.find(c => c.id === cardId);
+            if (card) {
+                card.worklogs = res.worklogs;
+                card.spentEffort = res.spentEffort;
+                if (res.activity) card.activity = res.activity;
+            }
+            // Update modal spentEffort field
+            const spentInput = document.getElementById('cardSpentEffort');
+            if (spentInput) spentInput.value = res.spentEffort;
+
+            // Clear inputs
+            if (hoursInp) hoursInp.value = '';
+            if (descInp) descInp.value = '';
+
+            const est = document.getElementById('cardEstimatedEffort')?.value;
+            renderCardWorklogsList(_editWorklogs, est ? Number(est) : card?.estimatedEffort);
+            showToast(`Günlük efor eklendi (${hours} sa) ✓`);
+            renderAll();
+        }
+    } catch (e) {
+        console.error(e);
+        showToast(e.message || 'Efor kaydedilemedi', 'error');
+    }
+});
+
+safeAddListener('worklogDesc', 'keydown', e => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const btn = document.getElementById('addWorklogBtn');
+        if (btn) btn.click();
+    }
+});
+
 safeAddListener('cardSaveBtn', 'click', async () => {
     const id = document.getElementById('editCardId').value;
     const title = document.getElementById('cardTitle').value.trim();
@@ -816,6 +1069,7 @@ safeAddListener('cardSaveBtn', 'click', async () => {
         blockedBy,
         subtasks: _editSubtasks,
         comments: _editComments,
+        worklogs: _editWorklogs,
         customFields: customFieldsPayload,
         slaTargetHours: document.getElementById('cardSlaTarget')?.value !== '' ? Number(document.getElementById('cardSlaTarget').value) : null,
         recurrence: document.getElementById('cardIsRecurring')?.checked ? {

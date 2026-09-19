@@ -41,6 +41,18 @@ export interface CustomFieldDefinition {
     createdAt: number;
 }
 
+export interface WorklogEntry {
+    id: string;
+    cardId?: string;
+    userId: string;
+    userName: string;
+    userAvatarColor?: string;
+    date: string; // YYYY-MM-DD
+    hours: number;
+    description?: string;
+    createdAt: number;
+}
+
 export interface Card {
     id: string;
     key: string;
@@ -58,6 +70,7 @@ export interface Card {
     spentEffort: number | null;
     subtasks: Subtask[];
     comments: Comment[];
+    worklogs?: WorklogEntry[];
     epicId: string | null;
     sprintId: string | null;
     createdAt: number;
@@ -261,6 +274,7 @@ export type ActivityAction =
     | 'CARD_VIEW'
     | 'CARD_COMMENT'
     | 'CARD_EFFORT'
+    | 'CARD_WORKLOG'
     | 'SUBTASK_TOGGLE'
     | 'SUBTASK_ADD'
     | 'WORKSPACE_SWITCH'

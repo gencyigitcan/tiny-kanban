@@ -5,9 +5,9 @@ import { Router } from 'express';
 import { readDb, writeDbSync, uid, logActivity, getEnvironment, getTenantIndex } from '../lib/db.js';
 import { validate } from '../middleware/validate.js';
 import { NotFoundError, AppError, asyncHandler } from '../middleware/error.js';
-import { createCardSchema, updateCardSchema } from '../lib/schemas.js';
+import { createCardSchema, updateCardSchema, createWorklogSchema } from '../lib/schemas.js';
 import { executeAutomations } from '../lib/automations_engine.js';
-import type { Card } from '../types/index.js';
+import type { Card, WorklogEntry } from '../types/index.js';
 
 export const cardRouter = Router();
 
@@ -403,6 +403,121 @@ cardRouter.post('/:id/comments', (req, res) => {
     res.status(201).json({ comment: newComment, comments: card.comments, activity: card.activity || [] });
 });
 
+/** GET /api/cards/:id/worklogs - Get all daily worklogs for card */
+cardRouter.get('/:id/worklogs', (req, res) => {
+    const db = readDb(req);
+    const card = db.cards.find(c => c.id === req.params.id);
+    if (!card) throw new NotFoundError('Card not found');
+    res.json({ worklogs: card.worklogs || [] });
+});
+
+/** POST /api/cards/:id/worklogs - Add a daily effort worklog entry */
+cardRouter.post('/:id/worklogs', validate(createWorklogSchema), asyncHandler(async (req, res) => {
+    const db = readDb(req);
+    const card = db.cards.find(c => c.id === req.params.id);
+    if (!card) throw new NotFoundError('Card not found');
+
+    const body = req.body;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const date = (body.date && typeof body.date === 'string' && body.date.trim()) ? body.date.trim() : todayStr;
+    const hours = Math.round(Number(body.hours) * 100) / 100;
+    const description = String(body.description || '').trim();
+
+    const authorName = req.user?.name || 'Kullanıcı';
+    const authorId = req.user?.id || 'guest';
+    const userAvatarColor = req.user?.avatarColor;
+
+    const newWorklog: WorklogEntry = {
+        id: 'wl-' + uid(),
+        cardId: card.id,
+        userId: authorId,
+        userName: authorName,
+        userAvatarColor,
+        date,
+        hours,
+        description: description || undefined,
+        createdAt: Date.now()
+    };
+
+    card.worklogs = card.worklogs || [];
+    card.worklogs.push(newWorklog);
+
+    // Recompute spentEffort from worklogs
+    const totalSpent = card.worklogs.reduce((sum, w) => sum + (Number(w.hours) || 0), 0);
+    const oldSpent = card.spentEffort;
+    card.spentEffort = Math.round(totalSpent * 100) / 100;
+
+    writeDbSync(db, req);
+
+    const descSnippet = description ? ` ("${description.length > 50 ? description.slice(0, 47) + '…' : description}")` : '';
+    const details = `'${card.title}' (${card.key}) biletine ${date} tarihi için ${hours} sa günlük efor kaydedildi${descSnippet}. (Önceki: ${oldSpent || 0} sa, Yeni Toplam: ${card.spentEffort} sa)`;
+
+    logActivity({
+        userId: authorId,
+        username: req.user?.username || 'kullanici',
+        name: authorName,
+        userRole: req.user?.role || 'user',
+        action: 'CARD_WORKLOG',
+        entityType: 'card',
+        entityId: card.id,
+        details,
+        workspaceId: req.tenantId || 'personal',
+        environment: req.environment || getEnvironment(req)
+    }, req);
+
+    notifyWorkspaceManagers(db, card, `Günlük efor kaydetti: ${hours} sa (${date})`, req.user, req).catch(() => {});
+
+    res.status(201).json({
+        success: true,
+        worklog: newWorklog,
+        worklogs: card.worklogs,
+        spentEffort: card.spentEffort,
+        activity: card.activity || []
+    });
+}));
+
+/** DELETE /api/cards/:id/worklogs/:worklogId - Delete a daily effort worklog entry */
+cardRouter.delete('/:id/worklogs/:worklogId', asyncHandler(async (req, res) => {
+    const db = readDb(req);
+    const card = db.cards.find(c => c.id === req.params.id);
+    if (!card) throw new NotFoundError('Card not found');
+
+    card.worklogs = card.worklogs || [];
+    const wlIndex = card.worklogs.findIndex(w => w.id === req.params.worklogId);
+    if (wlIndex === -1) throw new NotFoundError('Worklog entry not found');
+
+    const removed = card.worklogs[wlIndex];
+    card.worklogs.splice(wlIndex, 1);
+
+    // Recompute spentEffort from remaining worklogs
+    const totalSpent = card.worklogs.reduce((sum, w) => sum + (Number(w.hours) || 0), 0);
+    card.spentEffort = Math.round(totalSpent * 100) / 100;
+
+    writeDbSync(db, req);
+
+    const details = `'${card.title}' (${card.key}) biletinden ${removed.date} tarihli ${removed.hours} saatlik efor kaydı silindi. (Yeni Toplam: ${card.spentEffort} sa)`;
+
+    logActivity({
+        userId: req.user?.id || 'guest',
+        username: req.user?.username || 'kullanici',
+        name: req.user?.name || 'Kullanıcı',
+        userRole: req.user?.role || 'user',
+        action: 'CARD_WORKLOG',
+        entityType: 'card',
+        entityId: card.id,
+        details,
+        workspaceId: req.tenantId || 'personal',
+        environment: req.environment || getEnvironment(req)
+    }, req);
+
+    res.json({
+        success: true,
+        worklogs: card.worklogs,
+        spentEffort: card.spentEffort,
+        activity: card.activity || []
+    });
+}));
+
 /** POST /api/cards */
 cardRouter.post('/', validate(createCardSchema), (req, res) => {
     const body = req.body as Omit<Card, 'id' | 'key' | 'comments' | 'createdAt'>;
@@ -418,6 +533,13 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
         );
         if (!exists) {
             throw new AppError('Atanan kullanıcı bu çalışma alanında veya takımda bulunmuyor', 400);
+        }
+    }
+
+    if (body.col) {
+        const availableCols = (db.columns && db.columns.length > 0) ? db.columns : [{ id: 'todo' }, { id: 'doing' }, { id: 'done' }];
+        if (!availableCols.some((c: any) => c.id === body.col)) {
+            throw new AppError('Geçersiz kolon değeri', 400);
         }
     }
 
@@ -440,6 +562,7 @@ cardRouter.post('/', validate(createCardSchema), (req, res) => {
         spentEffort: body.spentEffort ?? null,
         subtasks: body.subtasks ?? [],
         comments: [],
+        worklogs: (body as any).worklogs ?? [],
         epicId: body.epicId ?? null,
         sprintId: body.sprintId ?? null,
         createdAt: Date.now(),
@@ -509,11 +632,18 @@ cardRouter.put('/:id', validate(updateCardSchema), asyncHandler(async (req, res)
         req.body.col = req.body.column;
     }
 
+    if (req.body.col) {
+        const availableCols = (db.columns && db.columns.length > 0) ? db.columns : [{ id: 'todo' }, { id: 'doing' }, { id: 'done' }];
+        if (!availableCols.some((c: any) => c.id === req.body.col)) {
+            throw new AppError('Geçersiz kolon değeri', 400);
+        }
+    }
+
     const allowed: (keyof Card)[] = [
         'title', 'desc', 'issueType', 'assignee', 'priority', 'col',
         'startDate', 'dueDate', 'labels', 'storyPoints',
         'estimatedEffort', 'spentEffort',
-        'subtasks', 'comments', 'epicId', 'sprintId',
+        'subtasks', 'comments', 'worklogs', 'epicId', 'sprintId',
         'blockedBy', 'blocks', 'customFields',
         'slaTargetHours', 'slaDueAt', 'slaCompletedAt', 'slaBreached',
         'recurrence'
@@ -525,6 +655,13 @@ cardRouter.put('/:id', validate(updateCardSchema), asyncHandler(async (req, res)
     }
 
     const currentCard = db.cards[idx];
+
+    // If worklogs array was updated directly without explicit spentEffort, auto-recompute spentEffort
+    if (req.body.worklogs !== undefined && req.body.spentEffort === undefined) {
+        const wlSum = (currentCard.worklogs || []).reduce((sum: number, w: any) => sum + (Number(w.hours) || 0), 0);
+        currentCard.spentEffort = Math.round(wlSum * 100) / 100;
+    }
+
     const isDoneCol = (colId: string) => {
         if (colId === 'done') return true;
         const colDef = (db.columns || []).find(c => c.id === colId);
@@ -582,6 +719,7 @@ cardRouter.put('/:id', validate(updateCardSchema), asyncHandler(async (req, res)
                     spentEffort: 0,
                     subtasks: (currentCard.subtasks || []).map(s => ({ ...s, id: uid(), done: false })),
                     comments: [],
+                    worklogs: [],
                     epicId: currentCard.epicId,
                     sprintId: currentCard.sprintId,
                     createdAt: Date.now(),
